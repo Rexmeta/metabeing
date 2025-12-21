@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, Users, FileText, Save, Send, Sparkles, Loader2, ImageIcon } from "lucide-react";
+import { ArrowLeft, Users, FileText, Save, Send, Sparkles, Loader2, ImageIcon, ChevronDown, ChevronRight, User, MessageSquare, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import type { CharacterBackground, CharacterCommunicationPatterns, CharacterVoice } from "@shared/schema";
 
 export default function Create() {
   const [, setLocation] = useLocation();
@@ -27,7 +29,40 @@ export default function Create() {
     mbti: "",
     personalityTraits: "",
     imageStyle: "professional",
+    // 페르소나 통합 필드
+    communicationStyle: "",
+    motivation: "",
+    fears: "",
+    background: {
+      personalValues: "",
+      hobbies: "",
+      socialPreference: "",
+      socialBehavior: "",
+    },
+    communicationPatterns: {
+      openingStyle: "",
+      keyPhrases: "",
+      winConditions: "",
+    },
+    voice: {
+      tone: "",
+      pace: "",
+      emotion: "",
+    },
   });
+
+  // Collapsible 섹션 상태
+  const [openSections, setOpenSections] = useState({
+    basic: true,
+    personality: false,
+    communication: false,
+    voice: false,
+    image: false,
+  });
+
+  const toggleSection = (section: keyof typeof openSections) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [imageGenerationProgress, setImageGenerationProgress] = useState(0);
@@ -173,6 +208,38 @@ export default function Create() {
             ? data.personalityTraits.split(",").map(t => t.trim()).filter(Boolean) 
             : [],
           imageStyle: data.imageStyle || null,
+          communicationStyle: data.communicationStyle || null,
+          motivation: data.motivation || null,
+          fears: data.fears 
+            ? data.fears.split(",").map(t => t.trim()).filter(Boolean) 
+            : [],
+          background: (data.background.personalValues || data.background.hobbies || data.background.socialPreference || data.background.socialBehavior) ? {
+            personalValues: data.background.personalValues 
+              ? data.background.personalValues.split(",").map(t => t.trim()).filter(Boolean) 
+              : [],
+            hobbies: data.background.hobbies 
+              ? data.background.hobbies.split(",").map(t => t.trim()).filter(Boolean) 
+              : [],
+            social: {
+              preference: data.background.socialPreference || "",
+              behavior: data.background.socialBehavior || "",
+            },
+          } : null,
+          communicationPatterns: (data.communicationPatterns.openingStyle || data.communicationPatterns.keyPhrases || data.communicationPatterns.winConditions) ? {
+            openingStyle: data.communicationPatterns.openingStyle || "",
+            keyPhrases: data.communicationPatterns.keyPhrases 
+              ? data.communicationPatterns.keyPhrases.split(",").map(t => t.trim()).filter(Boolean) 
+              : [],
+            responseToArguments: {},
+            winConditions: data.communicationPatterns.winConditions 
+              ? data.communicationPatterns.winConditions.split(",").map(t => t.trim()).filter(Boolean) 
+              : [],
+          } : null,
+          voice: (data.voice.tone || data.voice.pace || data.voice.emotion) ? {
+            tone: data.voice.tone || "",
+            pace: data.voice.pace || "",
+            emotion: data.voice.emotion || "",
+          } : null,
           visibility: data.publish ? "public" : "private",
           status: data.publish ? "published" : "draft",
         }),
@@ -298,118 +365,369 @@ export default function Create() {
                   대화에 사용할 캐릭터의 성격과 특성을 정의하세요
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="char-name">캐릭터 이름 *</Label>
-                  <Input
-                    id="char-name"
-                    placeholder="예: 친절한 상담사 김미나"
-                    value={characterForm.name}
-                    onChange={(e) => setCharacterForm(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="char-tagline">한줄 소개</Label>
-                  <Input
-                    id="char-tagline"
-                    placeholder="캐릭터를 한 문장으로 설명해주세요"
-                    value={characterForm.tagline}
-                    onChange={(e) => setCharacterForm(prev => ({ ...prev, tagline: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="char-desc">설명</Label>
-                  <Textarea
-                    id="char-desc"
-                    placeholder="캐릭터의 배경, 특징, 성격을 자세히 설명해주세요"
-                    rows={4}
-                    value={characterForm.description}
-                    onChange={(e) => setCharacterForm(prev => ({ ...prev, description: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="char-prompt">시스템 프롬프트</Label>
-                  <Textarea
-                    id="char-prompt"
-                    placeholder="AI가 이 캐릭터로 행동할 때 참고할 지침을 작성하세요. 말투, 성격, 지식 범위, 금지사항 등을 포함할 수 있습니다."
-                    rows={6}
-                    value={characterForm.systemPrompt}
-                    onChange={(e) => setCharacterForm(prev => ({ ...prev, systemPrompt: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="char-tags">태그 (쉼표로 구분)</Label>
-                  <Input
-                    id="char-tags"
-                    placeholder="예: HR, 상담, 친절함, 협상"
-                    value={characterForm.tags}
-                    onChange={(e) => setCharacterForm(prev => ({ ...prev, tags: e.target.value }))}
-                  />
-                </div>
-
-                <div className="border-t pt-6 mt-6">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <ImageIcon className="h-5 w-5" />
-                    캐릭터 이미지 설정 (선택)
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    성별과 MBTI를 선택하면 AI가 캐릭터의 프로필 이미지와 다양한 표정 이미지를 자동 생성합니다.
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
+              <CardContent className="space-y-4">
+                {/* 기본 정보 섹션 */}
+                <Collapsible open={openSections.basic} onOpenChange={() => toggleSection("basic")}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between p-4 h-auto bg-muted/50">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <User className="h-4 w-4" />
+                        기본 정보
+                      </span>
+                      {openSections.basic ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4 space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="char-gender">성별</Label>
-                      <Select
-                        value={characterForm.gender}
-                        onValueChange={(value: "male" | "female") => 
-                          setCharacterForm(prev => ({ ...prev, gender: value }))
-                        }
-                      >
-                        <SelectTrigger id="char-gender" data-testid="select-char-gender">
-                          <SelectValue placeholder="성별 선택" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="male">남성</SelectItem>
-                          <SelectItem value="female">여성</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="char-name">캐릭터 이름 *</Label>
+                      <Input
+                        id="char-name"
+                        placeholder="예: 친절한 상담사 김미나"
+                        value={characterForm.name}
+                        onChange={(e) => setCharacterForm(prev => ({ ...prev, name: e.target.value }))}
+                      />
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="char-mbti">MBTI (선택)</Label>
-                      <Select
-                        value={characterForm.mbti}
-                        onValueChange={(value) => 
-                          setCharacterForm(prev => ({ ...prev, mbti: value }))
-                        }
-                      >
-                        <SelectTrigger id="char-mbti" data-testid="select-char-mbti">
-                          <SelectValue placeholder="MBTI 선택" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {MBTI_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="char-tagline">한줄 소개</Label>
+                      <Input
+                        id="char-tagline"
+                        placeholder="캐릭터를 한 문장으로 설명해주세요"
+                        value={characterForm.tagline}
+                        onChange={(e) => setCharacterForm(prev => ({ ...prev, tagline: e.target.value }))}
+                      />
                     </div>
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="char-desc">설명</Label>
+                      <Textarea
+                        id="char-desc"
+                        placeholder="캐릭터의 배경, 특징, 성격을 자세히 설명해주세요"
+                        rows={4}
+                        value={characterForm.description}
+                        onChange={(e) => setCharacterForm(prev => ({ ...prev, description: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="char-prompt">시스템 프롬프트</Label>
+                      <Textarea
+                        id="char-prompt"
+                        placeholder="AI가 이 캐릭터로 행동할 때 참고할 지침을 작성하세요."
+                        rows={4}
+                        value={characterForm.systemPrompt}
+                        onChange={(e) => setCharacterForm(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="char-tags">태그 (쉼표로 구분)</Label>
+                      <Input
+                        id="char-tags"
+                        placeholder="예: HR, 상담, 친절함, 협상"
+                        value={characterForm.tags}
+                        onChange={(e) => setCharacterForm(prev => ({ ...prev, tags: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="char-gender">성별</Label>
+                        <Select
+                          value={characterForm.gender}
+                          onValueChange={(value: "male" | "female") => 
+                            setCharacterForm(prev => ({ ...prev, gender: value }))
+                          }
+                        >
+                          <SelectTrigger id="char-gender" data-testid="select-char-gender">
+                            <SelectValue placeholder="성별 선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="male">남성</SelectItem>
+                            <SelectItem value="female">여성</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="char-mbti">MBTI</Label>
+                        <Select
+                          value={characterForm.mbti}
+                          onValueChange={(value) => 
+                            setCharacterForm(prev => ({ ...prev, mbti: value }))
+                          }
+                        >
+                          <SelectTrigger id="char-mbti" data-testid="select-char-mbti">
+                            <SelectValue placeholder="MBTI 선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MBTI_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
 
-                  <div className="grid grid-cols-2 gap-4">
+                {/* 성격 및 배경 섹션 */}
+                <Collapsible open={openSections.personality} onOpenChange={() => toggleSection("personality")}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between p-4 h-auto bg-muted/50">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <Users className="h-4 w-4" />
+                        성격 및 배경 (선택)
+                      </span>
+                      {openSections.personality ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4 space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="char-traits">성격 특성 (쉼표 구분)</Label>
                       <Input
                         id="char-traits"
-                        placeholder="예: 차분함, 분석적"
+                        placeholder="예: 차분함, 분석적, 공감능력"
                         value={characterForm.personalityTraits}
                         onChange={(e) => setCharacterForm(prev => ({ ...prev, personalityTraits: e.target.value }))}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="char-motivation">동기</Label>
+                      <Textarea
+                        id="char-motivation"
+                        placeholder="이 캐릭터의 행동 동기를 설명해주세요"
+                        rows={2}
+                        value={characterForm.motivation}
+                        onChange={(e) => setCharacterForm(prev => ({ ...prev, motivation: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="char-fears">두려움 (쉼표 구분)</Label>
+                      <Input
+                        id="char-fears"
+                        placeholder="예: 실패, 거절, 갈등"
+                        value={characterForm.fears}
+                        onChange={(e) => setCharacterForm(prev => ({ ...prev, fears: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="char-values">가치관 (쉼표 구분)</Label>
+                        <Input
+                          id="char-values"
+                          placeholder="예: 정직, 협력, 성장"
+                          value={characterForm.background.personalValues}
+                          onChange={(e) => setCharacterForm(prev => ({ 
+                            ...prev, 
+                            background: { ...prev.background, personalValues: e.target.value }
+                          }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="char-hobbies">취미 (쉼표 구분)</Label>
+                        <Input
+                          id="char-hobbies"
+                          placeholder="예: 독서, 요가, 커피"
+                          value={characterForm.background.hobbies}
+                          onChange={(e) => setCharacterForm(prev => ({ 
+                            ...prev, 
+                            background: { ...prev.background, hobbies: e.target.value }
+                          }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="char-social-pref">사회적 성향</Label>
+                        <Select
+                          value={characterForm.background.socialPreference}
+                          onValueChange={(value) => 
+                            setCharacterForm(prev => ({ 
+                              ...prev, 
+                              background: { ...prev.background, socialPreference: value }
+                            }))
+                          }
+                        >
+                          <SelectTrigger id="char-social-pref">
+                            <SelectValue placeholder="선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="extrovert">외향적</SelectItem>
+                            <SelectItem value="introvert">내향적</SelectItem>
+                            <SelectItem value="ambivert">양향적</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="char-social-behavior">대인 관계 행동</Label>
+                        <Input
+                          id="char-social-behavior"
+                          placeholder="예: 적극적으로 경청함"
+                          value={characterForm.background.socialBehavior}
+                          onChange={(e) => setCharacterForm(prev => ({ 
+                            ...prev, 
+                            background: { ...prev.background, socialBehavior: e.target.value }
+                          }))}
+                        />
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
 
+                {/* 커뮤니케이션 패턴 섹션 */}
+                <Collapsible open={openSections.communication} onOpenChange={() => toggleSection("communication")}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between p-4 h-auto bg-muted/50">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <MessageSquare className="h-4 w-4" />
+                        커뮤니케이션 패턴 (선택)
+                      </span>
+                      {openSections.communication ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="char-comm-style">커뮤니케이션 스타일</Label>
+                      <Textarea
+                        id="char-comm-style"
+                        placeholder="이 캐릭터의 대화 스타일을 설명해주세요"
+                        rows={2}
+                        value={characterForm.communicationStyle}
+                        onChange={(e) => setCharacterForm(prev => ({ ...prev, communicationStyle: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="char-opening">대화 시작 스타일</Label>
+                      <Input
+                        id="char-opening"
+                        placeholder="예: 따뜻한 인사로 시작"
+                        value={characterForm.communicationPatterns.openingStyle}
+                        onChange={(e) => setCharacterForm(prev => ({ 
+                          ...prev, 
+                          communicationPatterns: { ...prev.communicationPatterns, openingStyle: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="char-phrases">자주 쓰는 표현 (쉼표 구분)</Label>
+                      <Input
+                        id="char-phrases"
+                        placeholder="예: 그렇군요, 이해합니다, 좋은 생각이네요"
+                        value={characterForm.communicationPatterns.keyPhrases}
+                        onChange={(e) => setCharacterForm(prev => ({ 
+                          ...prev, 
+                          communicationPatterns: { ...prev.communicationPatterns, keyPhrases: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="char-win">승리 조건 (쉼표 구분)</Label>
+                      <Input
+                        id="char-win"
+                        placeholder="대화에서 원하는 결과를 나열해주세요"
+                        value={characterForm.communicationPatterns.winConditions}
+                        onChange={(e) => setCharacterForm(prev => ({ 
+                          ...prev, 
+                          communicationPatterns: { ...prev.communicationPatterns, winConditions: e.target.value }
+                        }))}
+                      />
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* 음성 설정 섹션 */}
+                <Collapsible open={openSections.voice} onOpenChange={() => toggleSection("voice")}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between p-4 h-auto bg-muted/50">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <Volume2 className="h-4 w-4" />
+                        음성 설정 (선택)
+                      </span>
+                      {openSections.voice ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4 space-y-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="char-voice-tone">톤</Label>
+                        <Select
+                          value={characterForm.voice.tone}
+                          onValueChange={(value) => 
+                            setCharacterForm(prev => ({ 
+                              ...prev, 
+                              voice: { ...prev.voice, tone: value }
+                            }))
+                          }
+                        >
+                          <SelectTrigger id="char-voice-tone">
+                            <SelectValue placeholder="선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="warm">따뜻함</SelectItem>
+                            <SelectItem value="professional">전문적</SelectItem>
+                            <SelectItem value="friendly">친근함</SelectItem>
+                            <SelectItem value="serious">진지함</SelectItem>
+                            <SelectItem value="calm">차분함</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="char-voice-pace">속도</Label>
+                        <Select
+                          value={characterForm.voice.pace}
+                          onValueChange={(value) => 
+                            setCharacterForm(prev => ({ 
+                              ...prev, 
+                              voice: { ...prev.voice, pace: value }
+                            }))
+                          }
+                        >
+                          <SelectTrigger id="char-voice-pace">
+                            <SelectValue placeholder="선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="slow">느림</SelectItem>
+                            <SelectItem value="moderate">보통</SelectItem>
+                            <SelectItem value="fast">빠름</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="char-voice-emotion">감정</Label>
+                        <Select
+                          value={characterForm.voice.emotion}
+                          onValueChange={(value) => 
+                            setCharacterForm(prev => ({ 
+                              ...prev, 
+                              voice: { ...prev.voice, emotion: value }
+                            }))
+                          }
+                        >
+                          <SelectTrigger id="char-voice-emotion">
+                            <SelectValue placeholder="선택" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="neutral">중립</SelectItem>
+                            <SelectItem value="positive">긍정적</SelectItem>
+                            <SelectItem value="empathetic">공감적</SelectItem>
+                            <SelectItem value="encouraging">격려</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* 이미지 생성 섹션 */}
+                <Collapsible open={openSections.image} onOpenChange={() => toggleSection("image")}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between p-4 h-auto bg-muted/50">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <ImageIcon className="h-4 w-4" />
+                        이미지 생성 (선택)
+                      </span>
+                      {openSections.image ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4 space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      성별과 MBTI를 선택하면 AI가 캐릭터의 프로필 이미지와 10개의 표정 이미지를 자동 생성합니다.
+                    </p>
                     <div className="space-y-2">
                       <Label htmlFor="char-style">이미지 스타일</Label>
                       <Select

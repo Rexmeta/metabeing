@@ -140,7 +140,8 @@ router.get("/characters", async (req: Request, res: Response) => {
 // Allowed fields for character update (whitelist)
 const characterUpdateFields = [
   "name", "tagline", "description", "systemPrompt", "profileImage", "coverImage", 
-  "tags", "safetyFlags", "gender", "mbti", "personalityTraits", "imageStyle", "expressionImagesGenerated"
+  "tags", "safetyFlags", "gender", "mbti", "personalityTraits", "imageStyle", "expressionImagesGenerated",
+  "communicationStyle", "motivation", "fears", "background", "communicationPatterns", "voice"
 ];
 
 // Update character

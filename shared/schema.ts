@@ -448,6 +448,31 @@ export type AiUsageDaily = {
 
 // ===== Character.ai 스타일 UGC 플랫폼 테이블 =====
 
+// 캐릭터 배경 정보 타입
+export interface CharacterBackground {
+  personalValues: string[];
+  hobbies: string[];
+  social: {
+    preference: string;
+    behavior: string;
+  };
+}
+
+// 캐릭터 커뮤니케이션 패턴 타입
+export interface CharacterCommunicationPatterns {
+  openingStyle: string;
+  keyPhrases: string[];
+  responseToArguments: Record<string, string>;
+  winConditions: string[];
+}
+
+// 캐릭터 음성 설정 타입
+export interface CharacterVoice {
+  tone: string;
+  pace: string;
+  emotion: string;
+}
+
 // 캐릭터 (유저 생성 페르소나)
 export const characters = pgTable("characters", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -464,6 +489,13 @@ export const characters = pgTable("characters", {
   personalityTraits: jsonb("personality_traits").$type<string[]>().default([]), // 성격 특성
   imageStyle: varchar("image_style"), // 이미지 스타일 (예: professional, casual)
   expressionImagesGenerated: boolean("expression_images_generated").notNull().default(false), // 표정 이미지 생성 여부
+  // 페르소나 통합 필드
+  communicationStyle: text("communication_style"), // 커뮤니케이션 스타일
+  motivation: text("motivation"), // 동기
+  fears: jsonb("fears").$type<string[]>().default([]), // 두려움
+  background: jsonb("background").$type<CharacterBackground>(), // 배경 정보
+  communicationPatterns: jsonb("communication_patterns").$type<CharacterCommunicationPatterns>(), // 커뮤니케이션 패턴
+  voice: jsonb("voice").$type<CharacterVoice>(), // 음성 설정
   tags: jsonb("tags").$type<string[]>().default([]),
   visibility: varchar("visibility").notNull().default("private"), // private, unlisted, public
   status: varchar("status").notNull().default("draft"), // draft, published
