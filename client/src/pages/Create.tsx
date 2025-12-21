@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useLocation, useSearch } from "wouter";
 import { ArrowLeft, Users, FileText, Save, Send, Sparkles, Loader2, ImageIcon, ChevronDown, ChevronRight, User, MessageSquare, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,10 +47,26 @@ interface CharacterFormData {
   imageStyle: string;
 }
 
+// Helper to get auth headers
+const getAuthHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem("authToken");
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 export default function Create() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Parse edit mode from URL query params
+  const searchParams = new URLSearchParams(search);
+  const editCharacterId = searchParams.get("edit");
+  const isEditMode = !!editCharacterId;
 
   const [characterForm, setCharacterForm] = useState<CharacterFormData>({
     name: "",
@@ -101,7 +117,7 @@ export default function Create() {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [imageGenerationProgress, setImageGenerationProgress] = useState(0);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
-  const [createdCharacterId, setCreatedCharacterId] = useState<string | null>(null);
+  const [createdCharacterId, setCreatedCharacterId] = useState<string | null>(editCharacterId);
 
   const MBTI_TYPES = [
     "ENFJ", "ENFP", "ENTJ", "ENTP",
@@ -110,14 +126,54 @@ export default function Create() {
     "ISFJ", "ISFP", "ISTJ", "ISTP"
   ];
 
-  const getAuthHeaders = (): Record<string, string> => {
-    const token = localStorage.getItem("authToken");
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+  // Fetch character data for edit mode
+  const { data: existingCharacter, isLoading: isLoadingCharacter } = useQuery({
+    queryKey: ["/api/ugc/characters", editCharacterId],
+    enabled: isEditMode,
+  });
+
+  // Populate form when character data is loaded
+  useEffect(() => {
+    if (existingCharacter && isEditMode) {
+      const char = existingCharacter as any;
+      setCharacterForm({
+        name: char.name || "",
+        tagline: char.tagline || "",
+        description: char.description || "",
+        systemPrompt: char.systemPrompt || "",
+        tags: Array.isArray(char.tags) ? char.tags.join(", ") : "",
+        mbti: char.mbti || "",
+        gender: char.gender || "",
+        personality_traits: Array.isArray(char.personalityTraits) ? char.personalityTraits.join(", ") : "",
+        communication_style: char.communicationStyle || "",
+        motivation: char.motivation || "",
+        fears: Array.isArray(char.fears) ? char.fears.join(", ") : "",
+        background: {
+          personal_values: char.background?.personal_values || "",
+          hobbies: char.background?.hobbies || "",
+          social: {
+            preference: char.background?.social?.preference || "",
+            behavior: char.background?.social?.behavior || "",
+          },
+        },
+        communication_patterns: {
+          opening_style: char.communicationPatterns?.opening_style || "",
+          key_phrases: char.communicationPatterns?.key_phrases || "",
+          win_conditions: char.communicationPatterns?.win_conditions || "",
+        },
+        voice: {
+          tone: char.voice?.tone || "",
+          pace: char.voice?.pace || "",
+          emotion: char.voice?.emotion || "",
+        },
+        imageStyle: char.imageStyle || "professional",
+      });
+      if (char.profileImage) {
+        setGeneratedImageUrl(char.profileImage);
+      }
+      setCreatedCharacterId(char.id);
     }
-    return headers;
-  };
+  }, [existingCharacter, isEditMode]);
 
   const handleGenerateBaseImage = async () => {
     if (!createdCharacterId || !characterForm.gender) {
@@ -390,33 +446,41 @@ export default function Create() {
         emotion: data.voice.emotion || "",
       } : null;
 
-      const res = await fetch("/api/ugc/characters", {
-        method: "POST",
+      const payload = {
+        name: data.name,
+        tagline: data.tagline || null,
+        description: data.description || null,
+        systemPrompt: data.systemPrompt || null,
+        tags: data.tags ? data.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+        gender: data.gender || null,
+        mbti: data.mbti || null,
+        personalityTraits: data.personality_traits 
+          ? data.personality_traits.split(",").map(t => t.trim()).filter(Boolean) 
+          : [],
+        imageStyle: data.imageStyle || null,
+        communicationStyle: data.communication_style || null,
+        motivation: data.motivation || null,
+        fears: data.fears 
+          ? data.fears.split(",").map(t => t.trim()).filter(Boolean) 
+          : [],
+        background,
+        communicationPatterns,
+        voice,
+        visibility: data.publish ? "public" : "private",
+        status: data.publish ? "published" : "draft",
+      };
+
+      // Use PUT for edit mode, POST for create mode
+      const url = isEditMode && editCharacterId 
+        ? `/api/ugc/characters/${editCharacterId}` 
+        : "/api/ugc/characters";
+      const method = isEditMode && editCharacterId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers,
         credentials: "include",
-        body: JSON.stringify({
-          name: data.name,
-          tagline: data.tagline || null,
-          description: data.description || null,
-          systemPrompt: data.systemPrompt || null,
-          tags: data.tags ? data.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
-          gender: data.gender || null,
-          mbti: data.mbti || null,
-          personalityTraits: data.personality_traits 
-            ? data.personality_traits.split(",").map(t => t.trim()).filter(Boolean) 
-            : [],
-          imageStyle: data.imageStyle || null,
-          communicationStyle: data.communication_style || null,
-          motivation: data.motivation || null,
-          fears: data.fears 
-            ? data.fears.split(",").map(t => t.trim()).filter(Boolean) 
-            : [],
-          background,
-          communicationPatterns,
-          voice,
-          visibility: data.publish ? "public" : "private",
-          status: data.publish ? "published" : "draft",
-        }),
+        body: JSON.stringify(payload),
       });
       
       const text = await res.text();
