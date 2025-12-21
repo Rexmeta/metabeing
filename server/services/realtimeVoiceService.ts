@@ -199,69 +199,147 @@ export class RealtimeVoiceService {
 
     console.log(`🎙️ Creating realtime voice session: ${sessionId} (${currentSessionCount + 1}/${MAX_CONCURRENT_SESSIONS})`);
 
-    // Load scenario and persona data
-    const scenarios = await fileManager.getAllScenarios();
-    const scenarioObj = scenarios.find(s => s.id === scenarioId);
-    if (!scenarioObj) {
-      throw new Error(`Scenario not found: ${scenarioId}`);
-    }
-
-    const scenarioPersona: any = scenarioObj.personas.find((p: any) => p.id === personaId);
-    if (!scenarioPersona) {
-      throw new Error(`Persona not found: ${personaId}`);
-    }
-
-    // Load MBTI personality traits
-    const mbtiType: string = scenarioPersona.personaRef?.replace('.json', '') || '';
-    const mbtiPersona = mbtiType ? await fileManager.getPersonaByMBTI(mbtiType) : null;
-
-    // 사용자 정보 로드 (이름, 역할)
-    let userName = '사용자';
-    try {
-      const user = await storage.getUser(userId);
-      if (user?.name) {
-        userName = user.name;
-      }
-    } catch (error) {
-      console.warn(`⚠️ Failed to load user info for userId ${userId}:`, error);
-    }
-
-    // 시나리오에서 사용자 역할 정보 추출
-    const playerRole = scenarioObj.context?.playerRole || {};
-    const userRoleInfo = {
-      name: userName,
-      position: playerRole.position || '담당자',
-      department: playerRole.department || '',
-      experience: playerRole.experience || '',
-      responsibility: playerRole.responsibility || ''
-    };
+    // ✨ 페르소나 직접 대화인지 확인 (시나리오 없이 페르소나만으로 대화)
+    const isPersonaDirectChat = scenarioId.startsWith('persona-chat-');
     
-    console.log(`👤 사용자 정보: ${userRoleInfo.name} (${userRoleInfo.position}${userRoleInfo.department ? ', ' + userRoleInfo.department : ''})`);
+    let scenarioObj: any = null;
+    let scenarioPersona: any = null;
+    let mbtiPersona: any = null;
+    let mbtiType: string = '';
+    let userRoleInfo: any = null;
+    let systemInstructions: string = '';
 
-    // 사용자가 선택한 난이도를 시나리오 객체에 적용
-    const scenarioWithUserDifficulty = {
-      ...scenarioObj,
-      difficulty: userSelectedDifficulty || 2 // 사용자가 선택한 난이도 사용, 기본값 2
-    };
+    if (isPersonaDirectChat) {
+      // 페르소나 직접 대화 모드 - 시나리오 없이 페르소나만으로 대화
+      console.log(`🎭 페르소나 직접 대화 모드: ${personaId}`);
+      
+      // 페르소나 데이터 로드 (MBTI personas에서)
+      const persona = await fileManager.getMBTIPersonaById(personaId);
+      
+      if (!persona) {
+        throw new Error(`Persona not found: ${personaId}`);
+      }
+      
+      mbtiType = persona.mbti?.toLowerCase() || '';
+      mbtiPersona = mbtiType ? await fileManager.getPersonaByMBTI(mbtiType) : null;
+      
+      // 가상 시나리오 페르소나 객체 생성
+      scenarioPersona = {
+        id: personaId,
+        name: persona.name || `${mbtiType.toUpperCase()} 페르소나`,
+        position: persona.position || '대화 상대',
+        mbti: persona.mbti,
+        gender: persona.gender,
+        personaRef: mbtiType
+      };
+      
+      // 가상 시나리오 객체 생성
+      scenarioObj = {
+        id: scenarioId,
+        title: '자유 대화',
+        description: `${scenarioPersona.name}와의 자유로운 대화`,
+        difficulty: userSelectedDifficulty || 2,
+        context: {
+          playerRole: { position: '대화 상대' }
+        }
+      };
+      
+      // 사용자 정보 로드
+      let userName = '사용자';
+      try {
+        const user = await storage.getUser(userId);
+        if (user?.name) {
+          userName = user.name;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to load user info for userId ${userId}:`, error);
+      }
+      
+      userRoleInfo = {
+        name: userName,
+        position: '대화 상대',
+        department: '',
+        experience: '',
+        responsibility: ''
+      };
+      
+      // 페르소나 직접 대화용 시스템 명령 생성
+      systemInstructions = this.buildPersonaDirectChatInstructions(scenarioPersona, mbtiPersona, userRoleInfo);
+      
+      console.log('\n' + '='.repeat(80));
+      console.log('🎯 페르소나 직접 대화 시작 - 전달되는 명령 및 컨텍스트');
+      console.log('='.repeat(80));
+      console.log('👤 페르소나:', scenarioPersona.name);
+      console.log('🎭 MBTI:', mbtiType.toUpperCase());
+      console.log('='.repeat(80));
+      console.log('📝 시스템 명령 (SYSTEM INSTRUCTIONS):\n');
+      console.log(systemInstructions);
+      console.log('='.repeat(80) + '\n');
+    } else {
+      // 기존 시나리오 기반 대화 모드
+      const scenarios = await fileManager.getAllScenarios();
+      scenarioObj = scenarios.find(s => s.id === scenarioId);
+      if (!scenarioObj) {
+        throw new Error(`Scenario not found: ${scenarioId}`);
+      }
 
-    // Create system instructions
-    const systemInstructions = this.buildSystemInstructions(
-      scenarioWithUserDifficulty,
-      scenarioPersona,
-      mbtiPersona,
-      userRoleInfo
-    );
+      scenarioPersona = scenarioObj.personas.find((p: any) => p.id === personaId);
+      if (!scenarioPersona) {
+        throw new Error(`Persona not found: ${personaId}`);
+      }
 
-    console.log('\n' + '='.repeat(80));
-    console.log('🎯 실시간 대화 시작 - 전달되는 명령 및 컨텍스트');
-    console.log('='.repeat(80));
-    console.log('📋 시나리오:', scenarioObj.title);
-    console.log('👤 페르소나:', scenarioPersona.name, `(${scenarioPersona.position})`);
-    console.log('🎭 MBTI:', mbtiType.toUpperCase());
-    console.log('='.repeat(80));
-    console.log('📝 시스템 명령 (SYSTEM INSTRUCTIONS):\n');
-    console.log(systemInstructions);
-    console.log('='.repeat(80) + '\n');
+      // Load MBTI personality traits
+      mbtiType = scenarioPersona.personaRef?.replace('.json', '') || '';
+      mbtiPersona = mbtiType ? await fileManager.getPersonaByMBTI(mbtiType) : null;
+
+      // 사용자 정보 로드 (이름, 역할)
+      let userName = '사용자';
+      try {
+        const user = await storage.getUser(userId);
+        if (user?.name) {
+          userName = user.name;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Failed to load user info for userId ${userId}:`, error);
+      }
+
+      // 시나리오에서 사용자 역할 정보 추출
+      const playerRole = scenarioObj.context?.playerRole || {};
+      userRoleInfo = {
+        name: userName,
+        position: playerRole.position || '담당자',
+        department: playerRole.department || '',
+        experience: playerRole.experience || '',
+        responsibility: playerRole.responsibility || ''
+      };
+      
+      console.log(`👤 사용자 정보: ${userRoleInfo.name} (${userRoleInfo.position}${userRoleInfo.department ? ', ' + userRoleInfo.department : ''})`);
+
+      // 사용자가 선택한 난이도를 시나리오 객체에 적용
+      const scenarioWithUserDifficulty = {
+        ...scenarioObj,
+        difficulty: userSelectedDifficulty || 2 // 사용자가 선택한 난이도 사용, 기본값 2
+      };
+
+      // Create system instructions
+      systemInstructions = this.buildSystemInstructions(
+        scenarioWithUserDifficulty,
+        scenarioPersona,
+        mbtiPersona,
+        userRoleInfo
+      );
+
+      console.log('\n' + '='.repeat(80));
+      console.log('🎯 실시간 대화 시작 - 전달되는 명령 및 컨텍스트');
+      console.log('='.repeat(80));
+      console.log('📋 시나리오:', scenarioObj.title);
+      console.log('👤 페르소나:', scenarioPersona.name, `(${scenarioPersona.position})`);
+      console.log('🎭 MBTI:', mbtiType.toUpperCase());
+      console.log('='.repeat(80));
+      console.log('📝 시스템 명령 (SYSTEM INSTRUCTIONS):\n');
+      console.log(systemInstructions);
+      console.log('='.repeat(80) + '\n');
+    }
 
     // Get realtime model for tracking
     const realtimeModel = await this.getRealtimeModel();
@@ -387,6 +465,68 @@ export class RealtimeVoiceService {
       `영어로 생각하거나 설명하지 말고, 바로 한국어로 인사하세요.`,
       userRoleInfo ? `첫 마디 예시: "${userRoleInfo.name}님, 안녕하세요. 급한 건으로 찾아뵙게 됐습니다." 또는 "${userRoleInfo.position}님 오셨군요, 지금 상황이 좀 급합니다."` : `첫 마디 예시: "안녕하세요, 급한 건으로 찾아뵙게 됐습니다." 또는 "오셨군요, 지금 상황이 좀 급합니다."`,
     ];
+
+    return instructions.join('\n');
+  }
+
+  private buildPersonaDirectChatInstructions(
+    scenarioPersona: any,
+    mbtiPersona: any,
+    userRoleInfo?: { name: string; position: string; department: string; experience: string; responsibility: string }
+  ): string {
+    const mbtiType = scenarioPersona.mbti || scenarioPersona.personaRef?.replace('.json', '') || 'UNKNOWN';
+    
+    const userInfoSection = userRoleInfo ? [
+      `# 📌 대화 상대 정보`,
+      `- 이름: ${userRoleInfo.name}`,
+      ``,
+    ] : [];
+    
+    const instructions = [
+      `# 당신의 정체성`,
+      `당신은 "${scenarioPersona.name}"이라는 실제 사람입니다.`,
+      scenarioPersona.position ? `직책: ${scenarioPersona.position}` : '',
+      ``,
+      ...userInfoSection,
+      `# 대화 상황`,
+      `이것은 자유로운 대화입니다. 특별한 시나리오나 상황 없이 자연스러운 일상 대화를 나눕니다.`,
+      ``,
+      `# 당신의 MBTI 성격 특성 (${mbtiType.toUpperCase()})`,
+      mbtiPersona?.communication_style || '균형 잡힌 의사소통 스타일',
+      ``,
+      `## 대화 방식`,
+      `- 대화 시작: ${mbtiPersona?.communication_patterns?.opening_style || '상황에 맞게 자연스럽게'}`,
+      `- 자주 쓰는 표현: ${mbtiPersona?.communication_patterns?.key_phrases?.slice(0, 3).join(', ') || '자연스러운 일상 표현'}`,
+      `- 특징: ${mbtiPersona?.personality_traits?.thinking || '논리적이고 체계적인 사고'}`,
+      ``,
+      `# 🎭 연기 지침`,
+      ``,
+      `## 자연스러운 대화`,
+      `- 친근하고 자연스럽게 대화하세요`,
+      `- 상대방의 말에 관심을 가지고 반응하세요`,
+      `- 질문과 대답을 자연스럽게 주고받으세요`,
+      ``,
+      `## ⚠️ 대화 인터럽션 처리`,
+      `상대방이 말을 시작하는 순간, 즉시 당신의 말을 멈추세요. 그리고:`,
+      `- 상대방의 말을 끝까지 듣고`,
+      `- 상대방이 방금 말한 내용에 대해 즉시 반응하세요`,
+      ``,
+      `# ⭐ 핵심 원칙 (가장 중요!)`,
+      `당신은 AI가 아닌 ${scenarioPersona.name}이라는 진짜 사람입니다.`,
+      ``,
+      `## 🚫 절대 금지사항`,
+      `- 영어 사용 절대 금지! 모든 응답은 반드시 한국어로만 하세요.`,
+      `- 내면의 생각이나 사고 과정을 말로 표현하지 마세요.`,
+      `- 별표(**) 로 감싼 제목이나 메타 텍스트 절대 금지.`,
+      ``,
+      `## ✅ 필수사항`,
+      `- 모든 대화는 100% 한국어로만 진행하세요.`,
+      `- 생각 없이 바로 자연스러운 한국어 대화를 시작하세요.`,
+      ``,
+      `# 🎬 대화 시작 지침`,
+      `세션이 시작되면 반드시 한국어로 먼저 인사를 건네며 대화를 시작하세요.`,
+      userRoleInfo ? `첫 마디 예시: "${userRoleInfo.name}님, 안녕하세요! 무슨 이야기 나눌까요?" 또는 "안녕하세요! 오늘 기분이 어떠세요?"` : `첫 마디 예시: "안녕하세요! 무슨 이야기 나눌까요?" 또는 "안녕하세요! 오늘 기분이 어떠세요?"`,
+    ].filter(line => line !== '');
 
     return instructions.join('\n');
   }
