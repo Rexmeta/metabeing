@@ -35,7 +35,18 @@ router.post("/characters", isAuthenticated, async (req: Request, res: Response) 
     }
 
     const data = insertCharacterSchema.parse({ ...req.body, ownerId: userId });
-    const [character] = await db.insert(characters).values(data as any).returning();
+    console.log("[Character Create] Parsed data:", JSON.stringify(data, null, 2));
+    
+    const result = await db.insert(characters).values(data as any).returning();
+    console.log("[Character Create] Insert result:", JSON.stringify(result, null, 2));
+    
+    const character = result[0];
+    if (!character) {
+      console.error("[Character Create] No character returned from insert");
+      return res.status(500).json({ error: "캐릭터 생성 실패 - 데이터베이스 오류" });
+    }
+    
+    console.log("[Character Create] Success, id:", character.id);
     res.status(201).json(character);
   } catch (error: any) {
     console.error("Character creation error:", error);
