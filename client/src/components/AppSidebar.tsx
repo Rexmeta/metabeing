@@ -140,7 +140,7 @@ export function AppSidebar() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-lg">CharacterAI</span>
+            <span className="font-semibold text-lg">Metabeings</span>
           </div>
         </Link>
       </SidebarHeader>
