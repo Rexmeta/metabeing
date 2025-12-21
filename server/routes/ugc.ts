@@ -81,12 +81,16 @@ router.get("/characters", async (req: Request, res: Response) => {
 
     let conditions = [];
 
-    // Visibility filter
-    if (visibility === "public") {
+    // Visibility filter - Always require proper scoping
+    if (visibility === "mine") {
+      if (!userId) {
+        return res.status(401).json({ error: "로그인이 필요합니다" });
+      }
+      conditions.push(eq(characters.ownerId, userId));
+    } else {
+      // Default to public only - always require published status
       conditions.push(eq(characters.visibility, "public"));
       conditions.push(eq(characters.status, "published"));
-    } else if (visibility === "mine" && userId) {
-      conditions.push(eq(characters.ownerId, userId));
     }
 
     // Search query
@@ -128,11 +132,18 @@ router.get("/characters", async (req: Request, res: Response) => {
   }
 });
 
+// Allowed fields for character update (whitelist)
+const characterUpdateFields = ["name", "tagline", "description", "systemPrompt", "profileImage", "coverImage", "tags", "safetyFlags"];
+
 // Update character
 router.put("/characters/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: "로그인이 필요합니다" });
+    }
 
     const [existing] = await db.select().from(characters).where(eq(characters.id, id));
     if (!existing) {
@@ -142,7 +153,14 @@ router.put("/characters/:id", async (req: Request, res: Response) => {
       return res.status(403).json({ error: "수정 권한이 없습니다" });
     }
 
-    const { ownerId, ...updateData } = req.body;
+    // Whitelist allowed fields only
+    const updateData: Record<string, any> = {};
+    for (const field of characterUpdateFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+
     const [updated] = await db
       .update(characters)
       .set({ ...updateData, updatedAt: new Date(), version: existing.version + 1 })
@@ -160,6 +178,10 @@ router.post("/characters/:id/publish", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "로그인이 필요합니다" });
+    }
 
     const [existing] = await db.select().from(characters).where(eq(characters.id, id));
     if (!existing || existing.ownerId !== userId) {
@@ -183,6 +205,10 @@ router.delete("/characters/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "로그인이 필요합니다" });
+    }
 
     const [existing] = await db.select().from(characters).where(eq(characters.id, id));
     if (!existing || existing.ownerId !== userId) {
@@ -280,11 +306,16 @@ router.get("/scenarios", async (req: Request, res: Response) => {
 
     let conditions = [];
 
-    if (visibility === "public") {
+    // Visibility filter - Always require proper scoping
+    if (visibility === "mine") {
+      if (!userId) {
+        return res.status(401).json({ error: "로그인이 필요합니다" });
+      }
+      conditions.push(eq(ugcScenarios.ownerId, userId));
+    } else {
+      // Default to public only - always require published status
       conditions.push(eq(ugcScenarios.visibility, "public"));
       conditions.push(eq(ugcScenarios.status, "published"));
-    } else if (visibility === "mine" && userId) {
-      conditions.push(eq(ugcScenarios.ownerId, userId));
     }
 
     if (query && typeof query === "string") {
@@ -324,17 +355,34 @@ router.get("/scenarios", async (req: Request, res: Response) => {
   }
 });
 
+// Allowed fields for scenario update (whitelist)
+const scenarioUpdateFields = ["name", "tagline", "description", "background", "goal", "constraints", "openerMessage", "difficulty", "tags"];
+
 router.put("/scenarios/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
 
+    if (!userId) {
+      return res.status(401).json({ error: "로그인이 필요합니다" });
+    }
+
     const [existing] = await db.select().from(ugcScenarios).where(eq(ugcScenarios.id, id));
-    if (!existing || existing.ownerId !== userId) {
+    if (!existing) {
+      return res.status(404).json({ error: "시나리오를 찾을 수 없습니다" });
+    }
+    if (existing.ownerId !== userId) {
       return res.status(403).json({ error: "수정 권한이 없습니다" });
     }
 
-    const { ownerId, ...updateData } = req.body;
+    // Whitelist allowed fields only
+    const updateData: Record<string, any> = {};
+    for (const field of scenarioUpdateFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+
     const [updated] = await db
       .update(ugcScenarios)
       .set({ ...updateData, updatedAt: new Date(), version: existing.version + 1 })
@@ -351,6 +399,10 @@ router.post("/scenarios/:id/publish", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "로그인이 필요합니다" });
+    }
 
     const [existing] = await db.select().from(ugcScenarios).where(eq(ugcScenarios.id, id));
     if (!existing || existing.ownerId !== userId) {
@@ -373,6 +425,10 @@ router.delete("/scenarios/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "로그인이 필요합니다" });
+    }
 
     const [existing] = await db.select().from(ugcScenarios).where(eq(ugcScenarios.id, id));
     if (!existing || existing.ownerId !== userId) {
@@ -431,6 +487,30 @@ router.post("/experiences", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "로그인이 필요합니다" });
     }
 
+    const { characterId, scenarioId } = req.body;
+
+    // Validate character access - must be public or owned by user
+    if (characterId) {
+      const [character] = await db.select().from(characters).where(eq(characters.id, characterId));
+      if (!character) {
+        return res.status(404).json({ error: "캐릭터를 찾을 수 없습니다" });
+      }
+      if (character.visibility !== "public" && character.ownerId !== userId) {
+        return res.status(403).json({ error: "캐릭터에 접근할 권한이 없습니다" });
+      }
+    }
+
+    // Validate scenario access - must be public or owned by user
+    if (scenarioId) {
+      const [scenario] = await db.select().from(ugcScenarios).where(eq(ugcScenarios.id, scenarioId));
+      if (!scenario) {
+        return res.status(404).json({ error: "시나리오를 찾을 수 없습니다" });
+      }
+      if (scenario.visibility !== "public" && scenario.ownerId !== userId) {
+        return res.status(403).json({ error: "시나리오에 접근할 권한이 없습니다" });
+      }
+    }
+
     const data = insertExperienceSchema.parse({ ...req.body, ownerId: userId });
     const [experience] = await db.insert(experiences).values(data as any).returning();
     res.status(201).json(experience);
@@ -442,10 +522,16 @@ router.post("/experiences", async (req: Request, res: Response) => {
 router.get("/experiences/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = (req as any).user?.id;
     const [experience] = await db.select().from(experiences).where(eq(experiences.id, id));
     
     if (!experience) {
       return res.status(404).json({ error: "Experience를 찾을 수 없습니다" });
+    }
+
+    // Check access - must be public or owned by user
+    if (experience.visibility !== "public" && experience.ownerId !== userId) {
+      return res.status(403).json({ error: "접근 권한이 없습니다" });
     }
 
     // Get character and scenario details

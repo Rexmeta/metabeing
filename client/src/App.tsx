@@ -18,6 +18,9 @@ import FeedbackView from "@/pages/FeedbackView";
 import HelpPage from "@/pages/HelpPage";
 import NotFound from "@/pages/not-found";
 import { AuthPage } from "@/pages/AuthPage";
+import Explore from "@/pages/Explore";
+import Create from "@/pages/Create";
+import Library from "@/pages/Library";
 
 function ProtectedRouter() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -54,6 +57,9 @@ function ProtectedRouter() {
       <Route path="/ai-generator" component={AIGeneratorPage} />
       <Route path="/system-admin" component={SystemAdminPage} />
       <Route path="/help" component={HelpPage} />
+      <Route path="/explore" component={Explore} />
+      <Route path="/create" component={Create} />
+      <Route path="/library" component={Library} />
       <Route component={NotFound} />
     </Switch>
   );
