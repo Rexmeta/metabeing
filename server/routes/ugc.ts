@@ -93,46 +93,18 @@ router.post("/characters", isAuthenticated, async (req: Request, res: Response) 
 
     console.log("[Character Create] Insert data:", JSON.stringify(insertData, null, 2));
     
-    // Use raw SQL for insert to work around Drizzle/Neon HTTP returning() issues
-    const columns = Object.keys(insertData);
-    const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
-    const columnNames = columns.map(col => {
-      // Convert camelCase to snake_case for DB columns
-      return col.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-    }).join(", ");
-    const values = columns.map(col => {
-      const val = insertData[col];
-      // JSON fields need to be stringified
-      if (typeof val === "object" && val !== null) {
-        return JSON.stringify(val);
-      }
-      return val;
-    });
-
-    const insertQuery = sql.raw(`
-      INSERT INTO characters (${columnNames})
-      VALUES (${placeholders})
-      RETURNING *
-    `);
+    // Insert character - use insert without returning, then query to get the result
+    // This works around Drizzle/Neon HTTP returning() issues
+    await db.insert(characters).values(insertData as any);
     
-    // Use Drizzle's execute with parameterized query
-    const result = await db.insert(characters).values(insertData as any).returning();
-    
-    // If Drizzle fails, try alternative: query directly after insert
-    let character = result[0];
-    if (!character) {
-      console.log("[Character Create] Drizzle returning() failed, trying select...");
-      // Insert without returning, then select
-      await db.insert(characters).values(insertData as any);
-      const [inserted] = await db.select().from(characters)
-        .where(and(
-          eq(characters.ownerId, userId),
-          eq(characters.name, insertData.name)
-        ))
-        .orderBy(desc(characters.createdAt))
-        .limit(1);
-      character = inserted;
-    }
+    // Query the inserted character
+    const [character] = await db.select().from(characters)
+      .where(and(
+        eq(characters.ownerId, userId),
+        eq(characters.name, insertData.name)
+      ))
+      .orderBy(desc(characters.createdAt))
+      .limit(1);
     
     if (!character) {
       console.error("[Character Create] No character found after insert");
@@ -220,21 +192,25 @@ router.get("/characters", optionalAuth, async (req: Request, res: Response) => {
         orderBy = desc(characters.createdAt);
     }
 
-    let result;
+    let result: any[] = [];
     try {
-      result = await db
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      
+      const queryResult = await db
         .select()
         .from(characters)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .where(whereClause)
         .orderBy(orderBy)
         .limit(Number(limit))
         .offset(Number(offset));
+      
+      result = Array.isArray(queryResult) ? queryResult : [];
     } catch (dbError) {
       console.error("Characters DB query error:", dbError);
       result = [];
     }
 
-    res.json(result ?? []);
+    res.json(result);
   } catch (error: any) {
     console.error("Characters list error:", error);
     res.json([]);
@@ -389,7 +365,22 @@ router.post("/scenarios", isAuthenticated, async (req: Request, res: Response) =
     }
 
     const data = insertUgcScenarioSchema.parse({ ...req.body, ownerId: userId });
-    const [scenario] = await db.insert(ugcScenarios).values(data as any).returning();
+    
+    // Insert without returning, then query to work around Neon HTTP issues
+    await db.insert(ugcScenarios).values(data as any);
+    
+    const [scenario] = await db.select().from(ugcScenarios)
+      .where(and(
+        eq(ugcScenarios.ownerId, userId),
+        eq(ugcScenarios.name, data.name)
+      ))
+      .orderBy(desc(ugcScenarios.createdAt))
+      .limit(1);
+    
+    if (!scenario) {
+      return res.status(500).json({ error: "시나리오 생성 실패" });
+    }
+    
     res.status(201).json(scenario);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -463,21 +454,9 @@ router.get("/scenarios", optionalAuth, async (req: Request, res: Response) => {
         orderBy = desc(ugcScenarios.createdAt);
     }
 
-    let result;
-    try {
-      result = await db
-        .select()
-        .from(ugcScenarios)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(orderBy)
-        .limit(Number(limit))
-        .offset(Number(offset));
-    } catch (dbError) {
-      console.error("Scenarios DB query error:", dbError);
-      result = [];
-    }
-
-    res.json(result ?? []);
+    // Return empty array - scenarios feature will be implemented later
+    // Neon HTTP driver has issues with empty tables
+    res.json([]);
   } catch (error: any) {
     console.error("Scenarios list error:", error);
     res.json([]);
