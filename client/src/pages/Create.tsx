@@ -38,9 +38,15 @@ export default function Create() {
 
   const createCharacterMutation = useMutation({
     mutationFn: async (data: typeof characterForm & { publish?: boolean }) => {
+      const token = localStorage.getItem("authToken");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const res = await fetch("/api/ugc/characters", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: "include",
         body: JSON.stringify({
           name: data.name,
@@ -79,9 +85,15 @@ export default function Create() {
 
   const createScenarioMutation = useMutation({
     mutationFn: async (data: typeof scenarioForm & { publish?: boolean }) => {
+      const token = localStorage.getItem("authToken");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const res = await fetch("/api/ugc/scenarios", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: "include",
         body: JSON.stringify({
           name: data.name,
