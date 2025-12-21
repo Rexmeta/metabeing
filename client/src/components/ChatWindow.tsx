@@ -323,7 +323,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
     
     // 대화가 완료되었으면 타이머 정지
     const shouldRunTimer = conversationStartTime && (
-      isPersonaChat || (conversation && conversation.turnCount < maxTurns)
+      isPersonaChat || (conversation && (conversation.turnCount || 0) < maxTurns)
     );
     
     if (shouldRunTimer) {
@@ -1072,6 +1072,11 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
     return <div className="text-center py-8">로딩 중...</div>;
   }
 
+  // 페르소나 대화용 가상 턴 카운트 (localMessages 기반)
+  const currentTurnCount = isPersonaChat 
+    ? Math.floor(localMessages.filter(m => m.sender === 'user').length)
+    : (conversation?.turnCount || 0);
+
   // 과학적 실시간 스코어링 시스템 (ComOn Check 연구 기반)
   const calculateRealTimeScore = () => {
     const messages = localMessages;
@@ -1136,7 +1141,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
   };
 
   const currentScore = calculateRealTimeScore();
-  const progressPercentage = (conversation.turnCount / maxTurns) * 100;
+  const progressPercentage = (currentTurnCount / maxTurns) * 100;
 
   // 캐릭터 모드 전환 처리
   const handleCharacterModeTransition = () => {
@@ -1275,7 +1280,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
               </div>
               <div className="flex items-center space-x-1">
                 <i className="fas fa-tasks text-xs"></i>
-                <span>{conversation.turnCount}/{maxTurns}</span>
+                <span>{currentTurnCount}/{maxTurns}</span>
               </div>
             </div>
           </div>
@@ -1392,13 +1397,13 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
 
               {/* Chat Input Area */}
               <div className="border-t border-slate-100 bg-white p-6 shadow-[0_-4px_20px_-8px_rgba(0,0,0,0.1)]">
-                {conversation.turnCount >= maxTurns ? (
+                {currentTurnCount >= maxTurns ? (
                   <div className="text-center space-y-4">
                     <div className="text-lg font-semibold text-slate-700">
                       대화가 완료되었습니다!
                     </div>
                     <div className="text-sm text-slate-500 space-y-1">
-                      <div>총 {conversation.turnCount}턴의 대화를 나누었습니다.</div>
+                      <div>총 {currentTurnCount}턴의 대화를 나누었습니다.</div>
                       <div>대화 시간: {formatElapsedTime(elapsedTime)}</div>
                     </div>
                     <div className="flex justify-center space-x-4">
@@ -1688,7 +1693,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                         남은 턴
                       </h4>
                     </div>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-amber-500 bg-clip-text text-transparent">{maxTurns - conversation.turnCount}</p>
+                    <p className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-amber-500 bg-clip-text text-transparent">{maxTurns - currentTurnCount}</p>
                     <p className="text-xs text-slate-500 mt-2">턴이 끝나면 자동으로 평가됩니다</p>
                   </div>
                   <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group">
@@ -2248,7 +2253,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
 
                   
                   {/* Input Section - Only When Active */}
-                  {showInputMode && conversation.turnCount < maxTurns && (
+                  {showInputMode && currentTurnCount < maxTurns && (
                     <div className="border-t border-slate-200/30 p-4">
                       <div className="flex items-start space-x-3">
                         {/* Text Input Area */}
@@ -2308,10 +2313,10 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                   )}
                   
                   {/* Conversation Complete */}
-                  {conversation.turnCount >= maxTurns && (
+                  {currentTurnCount >= maxTurns && (
                     <div className="border-t border-slate-200/30 p-4 text-center space-y-3">
                       <div className="text-sm font-medium text-slate-700">
-                        대화가 완료되었습니다! (총 {conversation.turnCount}턴)
+                        대화가 완료되었습니다! (총 {currentTurnCount}턴)
                       </div>
                       <div className="flex justify-center space-x-3">
                         {onPersonaChange && (
