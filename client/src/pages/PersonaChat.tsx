@@ -11,7 +11,8 @@ import type { ComplexScenario, ScenarioPersona } from "@/lib/scenario-system";
 interface Persona {
   id: string;
   name: string;
-  mbtiType: string;
+  mbtiType?: string;
+  mbti?: string;
   gender: string;
   profileImage?: string;
   description?: string;
@@ -67,7 +68,7 @@ export default function PersonaChat() {
   const createPersonaSnapshot = (persona: Persona): ScenarioPersona => ({
     id: persona.id,
     name: persona.name,
-    mbti: persona.mbtiType,
+    mbti: persona.mbtiType || persona.mbti || "",
     role: persona.personaData?.role || "AI 대화 상대",
     department: persona.personaData?.department || "일반",
     experience: persona.personaData?.experience || "N/A",

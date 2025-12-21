@@ -38,7 +38,8 @@ interface Scenario {
 interface Persona {
   id: string;
   name: string;
-  mbtiType: string;
+  mbtiType?: string;
+  mbti?: string;
   gender: string;
   profileImage?: string;
   description?: string;
@@ -128,7 +129,8 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
 
 function PersonaCard({ persona }: { persona: Persona }) {
   const [, setLocation] = useLocation();
-  const displayName = persona.name || persona.mbtiType || "Unknown";
+  const mbtiDisplay = persona.mbtiType || persona.mbti || "";
+  const displayName = persona.name || mbtiDisplay || "Unknown";
   const displayGender = persona.gender === "male" ? "남성" : persona.gender === "female" ? "여성" : "미지정";
   
   const handleClick = () => {
@@ -157,7 +159,7 @@ function PersonaCard({ persona }: { persona: Persona }) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-1 mb-3">
-          {persona.mbtiType && <Badge variant="secondary" className="text-xs">{persona.mbtiType}</Badge>}
+          {mbtiDisplay && <Badge variant="secondary" className="text-xs">{mbtiDisplay}</Badge>}
           <Badge variant="outline" className="text-xs">{displayGender}</Badge>
         </div>
       </CardContent>
