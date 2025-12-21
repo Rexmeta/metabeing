@@ -7,7 +7,7 @@ const sql = sqlBuilder;
 
 // Initialize database connection
 const neonClient = neon(process.env.DATABASE_URL!);
-const db = drizzle(neonClient);
+export const db = drizzle(neonClient);
 
 export interface IStorage {
   // Conversations (레거시)
@@ -554,7 +554,13 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getAllConversations(): Promise<Conversation[]> {
-    return await db.select().from(conversations);
+    try {
+      const result = await db.select().from(conversations);
+      return result ?? [];
+    } catch (error) {
+      console.log("getAllConversations error:", error);
+      return [];
+    }
   }
 
   async getUserConversations(userId: string): Promise<Conversation[]> {

@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { AuthContext } from "@/hooks/useAuth";
 import type { User, AuthContextType } from "@/hooks/useAuth";
+import { AuthModal } from "./AuthModal";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMessage, setAuthModalMessage] = useState("");
 
   // 페이지 로드 시 사용자 정보 확인 (localStorage 토큰 또는 httpOnly 쿠키 모두 지원)
   const { data: currentUser, isLoading: isUserLoading } = useQuery({
@@ -67,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.token) {
         localStorage.setItem("authToken", data.token);
       }
+      setShowAuthModal(false);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
   });
@@ -99,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.token) {
         localStorage.setItem("authToken", data.token);
       }
+      setShowAuthModal(false);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
   });
@@ -148,18 +153,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await logoutMutation.mutateAsync();
   };
 
+  const requireAuth = useCallback((message?: string): boolean => {
+    if (!user) {
+      setAuthModalMessage(message || "이 기능을 사용하려면 로그인이 필요합니다.");
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
+  }, [user]);
+
   const contextValue: AuthContextType = {
     user,
-    isLoading: isUserLoading, // 초기 사용자 로딩만 포함, mutation pending은 제외
+    isLoading: isUserLoading,
     isAuthenticated: !!user,
     login,
     register,
     logout,
+    showAuthModal,
+    setShowAuthModal,
+    authModalMessage,
+    requireAuth,
   };
 
   return (
     <AuthContext.Provider value={contextValue}>
       {children}
+      <AuthModal 
+        open={showAuthModal} 
+        onOpenChange={setShowAuthModal}
+        message={authModalMessage}
+      />
     </AuthContext.Provider>
   );
 }

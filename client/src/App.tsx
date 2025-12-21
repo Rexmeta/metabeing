@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -17,15 +18,21 @@ import ConversationView from "@/pages/ConversationView";
 import FeedbackView from "@/pages/FeedbackView";
 import HelpPage from "@/pages/HelpPage";
 import NotFound from "@/pages/not-found";
-import { AuthPage } from "@/pages/AuthPage";
 import Explore from "@/pages/Explore";
 import Create from "@/pages/Create";
 import Library from "@/pages/Library";
 
-function ProtectedRouter() {
-  const { isAuthenticated, isLoading } = useAuth();
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated, isLoading, setShowAuthModal } = useAuth();
+  const [hasShownModal, setHasShownModal] = useState(false);
 
-  // 로딩 중일 때 스피너 표시
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !hasShownModal) {
+      setShowAuthModal(true);
+      setHasShownModal(true);
+    }
+  }, [isLoading, isAuthenticated, hasShownModal, setShowAuthModal]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -37,29 +44,62 @@ function ProtectedRouter() {
     );
   }
 
-  // 인증되지 않은 사용자는 로그인/회원가입 페이지로
   if (!isAuthenticated) {
-    return <AuthPage />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <p className="text-gray-600">로그인이 필요합니다.</p>
+        </div>
+      </div>
+    );
   }
 
-  // 인증된 사용자는 기존 라우트들로
+  return <Component />;
+}
+
+function MainRouter() {
   return (
     <Switch>
-      <Route path="/" component={Intro} />
-      <Route path="/home" component={Home} />
-      <Route path="/mypage" component={MyPage} />
-      <Route path="/analytics" component={Analytics} />
-      <Route path="/chat/:conversationId" component={ConversationView} />
-      <Route path="/feedback/:conversationId" component={FeedbackView} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin-dashboard" component={AdminDashboard} />
-      <Route path="/admin-management" component={AdminManagement} />
-      <Route path="/ai-generator" component={AIGeneratorPage} />
-      <Route path="/system-admin" component={SystemAdminPage} />
-      <Route path="/help" component={HelpPage} />
+      <Route path="/" component={Explore} />
       <Route path="/explore" component={Explore} />
-      <Route path="/create" component={Create} />
-      <Route path="/library" component={Library} />
+      <Route path="/intro" component={Intro} />
+      <Route path="/home">
+        {() => <ProtectedRoute component={Home} />}
+      </Route>
+      <Route path="/mypage">
+        {() => <ProtectedRoute component={MyPage} />}
+      </Route>
+      <Route path="/analytics">
+        {() => <ProtectedRoute component={Analytics} />}
+      </Route>
+      <Route path="/chat/:conversationId">
+        {() => <ProtectedRoute component={ConversationView} />}
+      </Route>
+      <Route path="/feedback/:conversationId">
+        {() => <ProtectedRoute component={FeedbackView} />}
+      </Route>
+      <Route path="/admin">
+        {() => <ProtectedRoute component={AdminDashboard} />}
+      </Route>
+      <Route path="/admin-dashboard">
+        {() => <ProtectedRoute component={AdminDashboard} />}
+      </Route>
+      <Route path="/admin-management">
+        {() => <ProtectedRoute component={AdminManagement} />}
+      </Route>
+      <Route path="/ai-generator">
+        {() => <ProtectedRoute component={AIGeneratorPage} />}
+      </Route>
+      <Route path="/system-admin">
+        {() => <ProtectedRoute component={SystemAdminPage} />}
+      </Route>
+      <Route path="/help" component={HelpPage} />
+      <Route path="/create">
+        {() => <ProtectedRoute component={Create} />}
+      </Route>
+      <Route path="/library">
+        {() => <ProtectedRoute component={Library} />}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -71,7 +111,7 @@ function App() {
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
-          <ProtectedRouter />
+          <MainRouter />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

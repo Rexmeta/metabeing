@@ -1,6 +1,4 @@
 import { Router, Request, Response } from "express";
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
 import { eq, and, or, desc, asc, ilike, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -20,9 +18,7 @@ import {
   type UgcScenario,
   type Experience,
 } from "@shared/schema";
-
-const neonClient = neon(process.env.DATABASE_URL!);
-const db = drizzle(neonClient);
+import { db } from "../storage";
 
 const router = Router();
 
@@ -118,17 +114,24 @@ router.get("/characters", async (req: Request, res: Response) => {
         orderBy = desc(characters.createdAt);
     }
 
-    const result = await db
-      .select()
-      .from(characters)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(orderBy)
-      .limit(Number(limit))
-      .offset(Number(offset));
+    let result;
+    try {
+      result = await db
+        .select()
+        .from(characters)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(orderBy)
+        .limit(Number(limit))
+        .offset(Number(offset));
+    } catch (dbError) {
+      console.error("Characters DB query error:", dbError);
+      result = [];
+    }
 
-    res.json(result);
+    res.json(result ?? []);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error("Characters list error:", error);
+    res.json([]);
   }
 });
 
@@ -341,17 +344,24 @@ router.get("/scenarios", async (req: Request, res: Response) => {
         orderBy = desc(ugcScenarios.createdAt);
     }
 
-    const result = await db
-      .select()
-      .from(ugcScenarios)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(orderBy)
-      .limit(Number(limit))
-      .offset(Number(offset));
+    let result;
+    try {
+      result = await db
+        .select()
+        .from(ugcScenarios)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(orderBy)
+        .limit(Number(limit))
+        .offset(Number(offset));
+    } catch (dbError) {
+      console.error("Scenarios DB query error:", dbError);
+      result = [];
+    }
 
-    res.json(result);
+    res.json(result ?? []);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error("Scenarios list error:", error);
+    res.json([]);
   }
 });
 
@@ -573,9 +583,10 @@ router.get("/experiences", async (req: Request, res: Response) => {
       .limit(Number(limit))
       .offset(Number(offset));
 
-    res.json(result);
+    res.json(result ?? []);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error("Experiences list error:", error);
+    res.status(500).json({ error: error.message || "경험 목록 조회 실패" });
   }
 });
 
@@ -697,9 +708,10 @@ router.get("/bookmarks", async (req: Request, res: Response) => {
       .where(and(...conditions))
       .orderBy(desc(bookmarks.createdAt));
 
-    res.json(result);
+    res.json(result ?? []);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error("Bookmarks list error:", error);
+    res.status(500).json({ error: error.message || "북마크 목록 조회 실패" });
   }
 });
 

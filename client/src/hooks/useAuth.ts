@@ -1,4 +1,4 @@
-import { useContext, createContext } from "react";
+import { useContext, createContext, useState, useCallback } from "react";
 
 export interface User {
   id: string;
@@ -17,6 +17,10 @@ export interface AuthContextType {
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (email: string, password: string, name: string, categoryId?: string) => Promise<void>;
   logout: () => Promise<void>;
+  showAuthModal: boolean;
+  setShowAuthModal: (show: boolean) => void;
+  authModalMessage: string;
+  requireAuth: (message?: string) => boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,4 +31,18 @@ export function useAuth() {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
+}
+
+export function useRequireAuth() {
+  const { isAuthenticated, setShowAuthModal } = useAuth();
+  
+  const requireAuth = useCallback((message?: string) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
+  }, [isAuthenticated, setShowAuthModal]);
+  
+  return { requireAuth, isAuthenticated };
 }
