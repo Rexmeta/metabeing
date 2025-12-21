@@ -110,64 +110,6 @@ export default function Create() {
     "ISFJ", "ISFP", "ISTJ", "ISTP"
   ];
 
-  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
-
-  const loadMBTITemplate = async (mbtiType: string) => {
-    if (!mbtiType) return;
-    
-    setIsLoadingTemplate(true);
-    try {
-      const res = await fetch(`/api/personas/templates/${mbtiType.toLowerCase()}`);
-      if (!res.ok) {
-        // 템플릿이 없어도 MBTI 값만 설정
-        setCharacterForm(prev => ({ ...prev, mbti: mbtiType }));
-        console.warn("MBTI 템플릿을 찾을 수 없습니다. MBTI만 설정됩니다.");
-        return;
-      }
-      
-      const template = await res.json();
-      
-      // 기존 값이 있으면 보존, 비어있으면 템플릿 값 적용
-      setCharacterForm(prev => ({
-        ...prev,
-        mbti: mbtiType,
-        // 비어있는 필드만 템플릿으로 채움
-        personality_traits: prev.personality_traits || (template.personalityTraits?.join(", ") || ""),
-        communication_style: prev.communication_style || (template.communicationStyle || ""),
-        motivation: prev.motivation || (template.motivation || ""),
-        fears: prev.fears || (template.fears?.join(", ") || ""),
-        background: {
-          personal_values: prev.background.personal_values || (template.background?.personalValues?.join(", ") || ""),
-          hobbies: prev.background.hobbies || (template.background?.hobbies?.join(", ") || ""),
-          social: {
-            preference: prev.background.social.preference || (template.background?.social?.preference || ""),
-            behavior: prev.background.social.behavior || (template.background?.social?.behavior || ""),
-          },
-        },
-        communication_patterns: {
-          opening_style: prev.communication_patterns.opening_style || (template.communicationPatterns?.openingStyle || ""),
-          key_phrases: prev.communication_patterns.key_phrases || (template.communicationPatterns?.keyPhrases?.join(", ") || ""),
-          win_conditions: prev.communication_patterns.win_conditions || (template.communicationPatterns?.winConditions?.join(", ") || ""),
-        },
-        voice: {
-          tone: prev.voice.tone || (template.voice?.tone || ""),
-          pace: prev.voice.pace || (template.voice?.pace || ""),
-          emotion: prev.voice.emotion || (template.voice?.emotion || ""),
-        },
-      }));
-      
-      toast({
-        title: "MBTI 템플릿 적용",
-        description: `${mbtiType} 페르소나 정보가 비어있는 필드에 채워졌습니다.`,
-      });
-    } catch (error) {
-      console.error("MBTI 템플릿 로드 실패:", error);
-      // 오류 시에도 MBTI 값만 설정
-      setCharacterForm(prev => ({ ...prev, mbti: mbtiType }));
-    } finally {
-      setIsLoadingTemplate(false);
-    }
-  };
 
   const generateCharacterImagesMutation = useMutation({
     mutationFn: async (characterId: string) => {
@@ -509,23 +451,15 @@ export default function Create() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="char-mbti">MBTI (선택 시 템플릿 자동 적용)</Label>
+                        <Label htmlFor="char-mbti">MBTI</Label>
                         <Select
                           value={characterForm.mbti}
                           onValueChange={(value) => {
-                            loadMBTITemplate(value);
+                            setCharacterForm(prev => ({ ...prev, mbti: value }));
                           }}
-                          disabled={isLoadingTemplate}
                         >
                           <SelectTrigger id="char-mbti" data-testid="select-char-mbti">
-                            {isLoadingTemplate ? (
-                              <span className="flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                템플릿 로드 중...
-                              </span>
-                            ) : (
-                              <SelectValue placeholder="MBTI 선택 (페르소나 자동 채우기)" />
-                            )}
+                            <SelectValue placeholder="MBTI 선택" />
                           </SelectTrigger>
                           <SelectContent>
                             {MBTI_TYPES.map((type) => (
