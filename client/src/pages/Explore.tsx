@@ -127,16 +127,19 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
 }
 
 function PersonaCard({ persona }: { persona: Persona }) {
+  const displayName = persona.name || persona.mbtiType || "Unknown";
+  const displayGender = persona.gender === "male" ? "남성" : persona.gender === "female" ? "여성" : "미지정";
+  
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
           <Avatar className="h-12 w-12">
             <AvatarImage src={persona.profileImage} />
-            <AvatarFallback>{persona.name.slice(0, 2)}</AvatarFallback>
+            <AvatarFallback>{displayName.slice(0, 2)}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg truncate">{persona.name}</CardTitle>
+            <CardTitle className="text-lg truncate">{displayName}</CardTitle>
             <CardDescription className="line-clamp-2">
               {persona.description || "AI 페르소나"}
             </CardDescription>
@@ -145,8 +148,8 @@ function PersonaCard({ persona }: { persona: Persona }) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-1 mb-3">
-          <Badge variant="secondary" className="text-xs">{persona.mbtiType}</Badge>
-          <Badge variant="outline" className="text-xs">{persona.gender === "male" ? "남성" : "여성"}</Badge>
+          {persona.mbtiType && <Badge variant="secondary" className="text-xs">{persona.mbtiType}</Badge>}
+          <Badge variant="outline" className="text-xs">{displayGender}</Badge>
         </div>
       </CardContent>
     </Card>
