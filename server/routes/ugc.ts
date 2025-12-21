@@ -19,7 +19,7 @@ import {
   type Experience,
 } from "@shared/schema";
 import { db } from "../storage";
-import { isAuthenticated } from "../auth";
+import { isAuthenticated, optionalAuth } from "../auth";
 import { getAIServiceForFeature } from "../services/aiServiceFactory";
 
 const router = Router();
@@ -83,7 +83,7 @@ router.get("/characters/:id", async (req: Request, res: Response) => {
 });
 
 // List characters (with search, filter, sort)
-router.get("/characters", async (req: Request, res: Response) => {
+router.get("/characters", optionalAuth, async (req: Request, res: Response) => {
   try {
     const { query, tags, sort = "new", visibility = "public", limit = 20, offset = 0 } = req.query;
     const userId = (req as any).user?.id;
@@ -319,7 +319,7 @@ router.get("/scenarios/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/scenarios", async (req: Request, res: Response) => {
+router.get("/scenarios", optionalAuth, async (req: Request, res: Response) => {
   try {
     const { query, tags, sort = "new", visibility = "public", limit = 20, offset = 0 } = req.query;
     const userId = (req as any).user?.id;

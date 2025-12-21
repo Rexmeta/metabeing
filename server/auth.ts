@@ -132,6 +132,30 @@ export const isAuthenticated: RequestHandler = async (req: any, res, next) => {
   }
 };
 
+// 선택적 인증 미들웨어 (토큰이 있으면 파싱, 없으면 그냥 통과)
+export const optionalAuth: RequestHandler = async (req: any, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : req.cookies?.token;
+
+    if (token) {
+      const decoded = verifyToken(token);
+      if (decoded) {
+        const user = await storage.getUser(decoded.userId);
+        if (user) {
+          req.user = user;
+        }
+      }
+    }
+    next();
+  } catch (error) {
+    // 오류가 발생해도 다음으로 진행 (선택적 인증이므로)
+    next();
+  }
+};
+
 // 인증 라우트 설정
 export function setupAuth(app: Express) {
   // 회원가입
