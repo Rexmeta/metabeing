@@ -172,7 +172,7 @@ export default function PersonaChat() {
 
   if (loadingPersona || isCreating || !chatSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">
@@ -185,7 +185,7 @@ export default function PersonaChat() {
 
   if (personaError || !persona) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
         <div className="text-center">
           <p className="text-destructive mb-4">페르소나를 찾을 수 없습니다.</p>
           <Button onClick={() => setLocation("/")} data-testid="button-back-home">
@@ -210,7 +210,7 @@ export default function PersonaChat() {
   }));
 
   return (
-    <div className="h-screen w-full">
+    <div className="h-[calc(100vh-3.5rem)] w-full">
       <ChatWindow
         scenario={dummyScenario}
         persona={personaSnapshot}
