@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScenarioManager } from "@/components/admin/ScenarioManager";
 import { PersonaManager } from "@/components/admin/PersonaManager";
@@ -6,7 +7,16 @@ import { DifficultySettingsTab } from "@/components/admin/DifficultySettingsTab"
 import { AppHeader } from "@/components/AppHeader";
 
 export default function AdminManagement() {
-  const [activeTab, setActiveTab] = useState("manage-scenarios");
+  const [location] = useLocation();
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const tabFromUrl = urlParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "manage-scenarios");
+
+  useEffect(() => {
+    if (tabFromUrl) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   return (
     <div className="min-h-screen bg-slate-50">
