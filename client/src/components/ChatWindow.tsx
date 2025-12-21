@@ -1783,7 +1783,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
 
           {chatMode === 'character' && (
             <div 
-              className="fixed inset-0 z-10 flex"
+              className="absolute inset-0 z-10 flex"
               data-testid="character-mode"
             >
               {/* Wide Screen Left Sidebar - Goals Panel (visible on xl+) */}

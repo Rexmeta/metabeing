@@ -210,7 +210,7 @@ export default function PersonaChat() {
   }));
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] w-full">
+    <div className="h-[calc(100vh-3.5rem)] w-full relative">
       <ChatWindow
         scenario={dummyScenario}
         persona={personaSnapshot}
