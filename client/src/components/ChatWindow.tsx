@@ -1287,11 +1287,11 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
         </div>
 
         {/* Main Content Area */}
-        <div className="relative flex-1 flex flex-col">
+        <div className="relative flex-1 flex flex-col min-h-0">
           {/* Chat Messages Area */}
           {chatMode === 'messenger' && (
-            <>
-              <div className="h-96 overflow-y-auto p-6 space-y-5 bg-gradient-to-b from-slate-50 to-white scroll-smooth" data-testid="chat-messages">
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-gradient-to-b from-slate-50 to-white scroll-smooth" data-testid="chat-messages">
                 {localMessages.map((message: ConversationMessage, index: number) => (
                 <div
                   key={index}
@@ -1778,7 +1778,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {chatMode === 'character' && (
@@ -1852,14 +1852,14 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
               </div>
 
               {/* Character Image Area with max-width constraint */}
-              <div className="flex-1 flex justify-center bg-slate-100">
+              <div className="flex-1 flex justify-center min-h-0 bg-slate-100">
                 <div 
-                  className={`relative w-full max-w-[800px] xl:max-w-[900px] h-full bg-cover bg-center bg-no-repeat transition-all duration-300 ${
+                  className={`relative w-full h-full bg-cover bg-center bg-no-repeat transition-all duration-300 ${
                     isEmotionTransitioning ? 'brightness-95 scale-[1.02]' : 'brightness-110 scale-100'
                   }`}
                   style={{
                     backgroundImage: loadedImageUrl ? `url(${loadedImageUrl})` : 'none',
-                    backgroundColor: '#f5f5f5'
+                    backgroundColor: '#f1f5f9'
                   }}
                 >
               
