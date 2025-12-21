@@ -758,8 +758,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('💬 페르소나 직접 대화 - 텍스트/TTS 모드');
       
       try {
-        const { getAIServiceForFeature } = await import('./services/aiServiceFactory');
-        const aiService = await getAIServiceForFeature('conversation');
+        const { GoogleGenAI } = await import('@google/genai');
+        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+        if (!apiKey) {
+          throw new Error('GEMINI_API_KEY or GOOGLE_API_KEY is required');
+        }
+        const genAI = new GoogleGenAI({ apiKey });
         
         // 페르소나 전용 프롬프트 생성
         const personaPrompt = `당신은 "${personaName}"입니다.
@@ -780,10 +784,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 사용자에게 먼저 인사하며 대화를 시작해주세요. 2-3문장으로 간결하게 인사하세요.`;
 
-        const aiResponse = await aiService.generateResponse(personaPrompt, {
-          maxTokens: 300,
-          temperature: 0.8
+        const response = await genAI.models.generateContent({
+          model: 'gemini-2.5-flash',
+          config: {
+            maxOutputTokens: 300,
+            temperature: 0.8
+          },
+          contents: [{ role: 'user', parts: [{ text: personaPrompt }] }]
         });
+        
+        const aiResponse = response.text || '안녕하세요! 만나서 반갑습니다.';
         
         const initialMessage = {
           sender: 'ai' as const,
@@ -848,8 +858,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`💬 페르소나 대화 메시지: sessionId=${sessionId}`);
       
-      const { getAIServiceForFeature } = await import('./services/aiServiceFactory');
-      const aiService = await getAIServiceForFeature('conversation');
+      const { GoogleGenAI } = await import('@google/genai');
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!apiKey) {
+        throw new Error('GEMINI_API_KEY or GOOGLE_API_KEY is required');
+      }
+      const genAI = new GoogleGenAI({ apiKey });
       
       // 대화 히스토리 구성
       const conversationHistory = (previousMessages || []).map((msg: any) => 
@@ -878,20 +892,37 @@ ${conversationHistory}
 
 ${personaSnapshot.name}:`;
 
-      const aiResponse = await aiService.generateResponse(personaPrompt, {
-        maxTokens: 500,
-        temperature: 0.8
+      const response = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash',
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "object",
+            properties: {
+              content: { type: "string" },
+              emotion: { type: "string" }
+            },
+            required: ["content", "emotion"]
+          },
+          maxOutputTokens: 500,
+          temperature: 0.8
+        },
+        contents: [{ 
+          role: 'user', 
+          parts: [{ text: personaPrompt + `\n\nJSON 형식으로 응답하세요: { "content": "응답 내용", "emotion": "감정 (neutral, joy, sad, angry, surprise, curious, concern 중 하나)" }` }] 
+        }]
       });
       
-      // 감정 분석 (간단하게)
+      const responseText = response.text || '{"content": "네, 말씀해주세요.", "emotion": "neutral"}';
+      let aiResponse = '네, 말씀해주세요.';
       let emotion = 'neutral';
-      const lowerResponse = aiResponse.toLowerCase();
-      if (lowerResponse.includes('기뻐') || lowerResponse.includes('좋아') || lowerResponse.includes('감사')) {
-        emotion = 'joy';
-      } else if (lowerResponse.includes('걱정') || lowerResponse.includes('안타')) {
-        emotion = 'concern';
-      } else if (lowerResponse.includes('궁금') || lowerResponse.includes('흥미')) {
-        emotion = 'curious';
+      
+      try {
+        const parsed = JSON.parse(responseText);
+        aiResponse = parsed.content || aiResponse;
+        emotion = parsed.emotion || emotion;
+      } catch {
+        aiResponse = responseText;
       }
       
       res.json({
