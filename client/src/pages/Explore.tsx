@@ -23,6 +23,17 @@ interface Scenario {
   createdAt: string;
 }
 
+interface PersonaImages {
+  base?: string;
+  style?: string;
+  male?: {
+    expressions?: Record<string, string>;
+  };
+  female?: {
+    expressions?: Record<string, string>;
+  };
+}
+
 interface Persona {
   id: string;
   name: string;
@@ -32,6 +43,7 @@ interface Persona {
   profileImage?: string;
   description?: string;
   createdAt?: string;
+  images?: PersonaImages;
 }
 
 function ScenarioCard({ scenario }: { scenario: Scenario }) {
@@ -80,6 +92,28 @@ function PersonaCard({ persona }: { persona: Persona }) {
   const displayName = persona.name || mbtiDisplay || "Unknown";
   const displayGender = persona.gender === "male" ? "남성" : persona.gender === "female" ? "여성" : "미지정";
   
+  // 페르소나 기본 표정 이미지 가져오기
+  const getPersonaImage = () => {
+    if (!persona.images) return null;
+    
+    const gender = persona.gender || 'male';
+    const genderImages = persona.images[gender as 'male' | 'female'];
+    
+    // 기본 표정(중립) 이미지 사용
+    if (genderImages?.expressions?.['중립']) {
+      return genderImages.expressions['중립'];
+    }
+    
+    // base 이미지 폴백
+    if (persona.images.base) {
+      return persona.images.base;
+    }
+    
+    return null;
+  };
+  
+  const personaImage = getPersonaImage();
+  
   const handleClick = () => {
     setLocation(`/persona/${persona.id}/chat`);
   };
@@ -118,10 +152,10 @@ function PersonaCard({ persona }: { persona: Persona }) {
       <div className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-lg transition-all duration-500 group-hover:shadow-2xl group-hover:scale-[1.02]">
         
         {/* 배경 이미지 또는 그라데이션 */}
-        {persona.profileImage ? (
+        {personaImage ? (
           <>
             <img 
-              src={persona.profileImage} 
+              src={personaImage} 
               alt={displayName}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
             />
