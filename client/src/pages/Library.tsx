@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { Plus, FileText, Bookmark, Trash2, Eye, MoreVertical } from "lucide-react";
+import { useLocation, useSearch } from "wouter";
+import { Plus, FileText, Bookmark, Trash2, Eye, MoreVertical, Users, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,11 +45,38 @@ interface Bookmark {
   createdAt: string;
 }
 
+interface Persona {
+  id: string;
+  name: string;
+  displayName?: string;
+  mbpiType?: string;
+  mbtiType?: string;
+  gender?: string;
+  description?: string;
+  images?: {
+    male?: { expressions?: Record<string, string>; base?: string };
+    female?: { expressions?: Record<string, string>; base?: string };
+  };
+}
+
 export default function Library() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deleteDialog, setDeleteDialog] = useState<{ type: "scenario"; id: string } | null>(null);
+  
+  const searchParams = new URLSearchParams(searchString);
+  const tabFromUrl = searchParams.get("tab") || "personas";
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
+  
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const tab = params.get("tab");
+    if (tab && ["personas", "scenarios", "bookmarks"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchString]);
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem("authToken");
@@ -79,6 +106,15 @@ export default function Library() {
         credentials: "include",
         headers: getAuthHeaders(),
       });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: personas = [], isLoading: loadingPersonas } = useQuery<Persona[]>({
+    queryKey: ["/api/admin/personas"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/personas");
       if (!res.ok) return [];
       return res.json();
     },
@@ -128,16 +164,19 @@ export default function Library() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">내 라이브러리</h1>
-            <p className="text-slate-600 mt-1">내가 만든 시나리오와 북마크를 관리하세요</p>
+            <p className="text-slate-600 mt-1">페르소나, 시나리오, 북마크를 관리하세요</p>
           </div>
-          <Button onClick={() => setLocation("/create")} className="gap-2">
+          <Button onClick={() => setLocation("/admin-management?tab=manage-personas")} className="gap-2">
             <Plus className="h-4 w-4" />
-            새로 만들기
+            페르소나 만들기
           </Button>
         </div>
 
-        <Tabs defaultValue="scenarios" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-6">
+            <TabsTrigger value="personas" className="gap-2">
+              <Users className="h-4 w-4" /> 내 페르소나 ({personas.length})
+            </TabsTrigger>
             <TabsTrigger value="scenarios" className="gap-2">
               <FileText className="h-4 w-4" /> 내 시나리오 ({myScenarios.length})
             </TabsTrigger>
@@ -145,6 +184,70 @@ export default function Library() {
               <Bookmark className="h-4 w-4" /> 북마크 ({myBookmarks.length})
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="personas">
+            {loadingPersonas ? (
+              <div className="text-center py-8">로딩 중...</div>
+            ) : personas.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 mx-auto text-slate-300 mb-4" />
+                <h3 className="text-lg font-medium text-slate-600">아직 페르소나가 없습니다</h3>
+                <Button className="mt-4" onClick={() => setLocation("/admin-management?tab=manage-personas")}>
+                  페르소나 만들기
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {personas.map((persona) => {
+                  const mbti = persona.mbtiType || persona.mbpiType || "";
+                  const gender = persona.gender || "female";
+                  const genderImages = gender === "male" ? persona.images?.male : persona.images?.female;
+                  const imageUrl = genderImages?.expressions?.["중립"] || genderImages?.base || null;
+                  
+                  return (
+                    <Card
+                      key={persona.id}
+                      className="overflow-hidden cursor-pointer hover-elevate"
+                      onClick={() => setLocation(`/persona-chat/${persona.id}`)}
+                      data-testid={`card-persona-${persona.id}`}
+                    >
+                      <div className="aspect-[3/4] relative bg-gradient-to-br from-blue-500 to-purple-600">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={persona.displayName || persona.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <User className="w-16 h-16 text-white/40" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                        {mbti && (
+                          <div className="absolute top-3 left-3">
+                            <Badge variant="secondary" className="bg-white/20 backdrop-blur-sm border-white/30 text-white">
+                              {mbti}
+                            </Badge>
+                          </div>
+                        )}
+                        <div className="absolute bottom-3 left-3 right-3">
+                          <h3 className="text-white font-bold text-lg drop-shadow-lg">
+                            {persona.displayName || persona.name}
+                          </h3>
+                          {persona.description && (
+                            <p className="text-white/80 text-sm line-clamp-2 mt-1">
+                              {persona.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
 
           <TabsContent value="scenarios">
             {loadingScens ? (

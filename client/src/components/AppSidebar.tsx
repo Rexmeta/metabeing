@@ -59,8 +59,8 @@ const myContentItems = [
     requiresAuth: true,
   },
   {
-    title: "내 캐릭터",
-    url: "/library?tab=characters",
+    title: "내 페르소나",
+    url: "/library?tab=personas",
     icon: Users,
     requiresAuth: true,
   },
