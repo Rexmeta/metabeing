@@ -93,12 +93,49 @@ router.post("/characters", isAuthenticated, async (req: Request, res: Response) 
 
     console.log("[Character Create] Insert data:", JSON.stringify(insertData, null, 2));
     
-    const result = await db.insert(characters).values(insertData as any).returning();
-    console.log("[Character Create] Insert result:", JSON.stringify(result, null, 2));
+    // Use raw SQL for insert to work around Drizzle/Neon HTTP returning() issues
+    const columns = Object.keys(insertData);
+    const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
+    const columnNames = columns.map(col => {
+      // Convert camelCase to snake_case for DB columns
+      return col.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+    }).join(", ");
+    const values = columns.map(col => {
+      const val = insertData[col];
+      // JSON fields need to be stringified
+      if (typeof val === "object" && val !== null) {
+        return JSON.stringify(val);
+      }
+      return val;
+    });
+
+    const insertQuery = sql.raw(`
+      INSERT INTO characters (${columnNames})
+      VALUES (${placeholders})
+      RETURNING *
+    `);
     
-    const character = result[0];
+    // Use Drizzle's execute with parameterized query
+    const result = await db.insert(characters).values(insertData as any).returning();
+    
+    // If Drizzle fails, try alternative: query directly after insert
+    let character = result[0];
     if (!character) {
-      console.error("[Character Create] No character returned from insert");
+      console.log("[Character Create] Drizzle returning() failed, trying select...");
+      // Insert without returning, then select
+      await db.insert(characters).values(insertData as any);
+      const [inserted] = await db.select().from(characters)
+        .where(and(
+          eq(characters.ownerId, userId),
+          eq(characters.name, insertData.name)
+        ))
+        .orderBy(desc(characters.createdAt))
+        .limit(1);
+      character = inserted;
+    }
+    
+    if (!character) {
+      console.error("[Character Create] No character found after insert");
       return res.status(500).json({ error: "캐릭터 생성 실패 - 데이터베이스 오류" });
     }
     
