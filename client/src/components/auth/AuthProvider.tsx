@@ -132,14 +132,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  // 현재 사용자 정보 업데이트
+  // 현재 사용자 정보 업데이트 - 쿼리 결과가 바뀔 때마다 동기화
   useEffect(() => {
-    if (currentUser && !user) {
+    if (currentUser) {
       setUser(currentUser);
-    } else if (!currentUser && !isUserLoading && user) {
+    } else if (!isUserLoading) {
       setUser(null);
     }
-  }, [currentUser, isUserLoading, user]);
+  }, [currentUser, isUserLoading]);
 
   const login = async (email: string, password: string, rememberMe?: boolean) => {
     await loginMutation.mutateAsync({ email, password, rememberMe });
