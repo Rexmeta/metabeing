@@ -66,10 +66,22 @@ export default function Library() {
   const queryClient = useQueryClient();
   const [deleteDialog, setDeleteDialog] = useState<{ type: "character" | "scenario"; id: string } | null>(null);
 
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("authToken");
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
   const { data: myCharacters = [], isLoading: loadingChars } = useQuery<Character[]>({
     queryKey: ["/api/ugc/characters", "mine"],
     queryFn: async () => {
-      const res = await fetch("/api/ugc/characters?visibility=mine", { credentials: "include" });
+      const res = await fetch("/api/ugc/characters?visibility=mine", { 
+        credentials: "include",
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) return [];
       return res.json();
     },
@@ -78,7 +90,10 @@ export default function Library() {
   const { data: myScenarios = [], isLoading: loadingScens } = useQuery<Scenario[]>({
     queryKey: ["/api/ugc/scenarios", "mine"],
     queryFn: async () => {
-      const res = await fetch("/api/ugc/scenarios?visibility=mine", { credentials: "include" });
+      const res = await fetch("/api/ugc/scenarios?visibility=mine", { 
+        credentials: "include",
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) return [];
       return res.json();
     },
@@ -87,7 +102,10 @@ export default function Library() {
   const { data: myBookmarks = [] } = useQuery<Bookmark[]>({
     queryKey: ["/api/ugc/bookmarks"],
     queryFn: async () => {
-      const res = await fetch("/api/ugc/bookmarks", { credentials: "include" });
+      const res = await fetch("/api/ugc/bookmarks", { 
+        credentials: "include",
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) return [];
       return res.json();
     },
@@ -99,6 +117,7 @@ export default function Library() {
       const res = await fetch(`/api/ugc/${endpoint}/${id}`, {
         method: "DELETE",
         credentials: "include",
+        headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error("삭제 실패");
     },
@@ -118,6 +137,7 @@ export default function Library() {
       const res = await fetch(`/api/ugc/${endpoint}/${id}/publish`, {
         method: "POST",
         credentials: "include",
+        headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error("공개 실패");
       return res.json();
