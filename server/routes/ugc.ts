@@ -786,7 +786,7 @@ router.post("/bookmarks", isAuthenticated, async (req: Request, res: Response) =
 });
 
 // Get user bookmarks
-router.get("/bookmarks", async (req: Request, res: Response) => {
+router.get("/bookmarks", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
