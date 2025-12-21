@@ -1246,7 +1246,7 @@ router.post('/generate-character-expressions', async (req, res) => {
       });
     }
 
-    const expressionsToGenerate = ['기쁨', '슬픔', '분노', '놀람', '호기심'];
+    const expressionsToGenerate = ['기쁨', '슬픔', '분노', '놀람', '호기심', '불안', '단호', '실망', '당혹'];
     const results: any[] = [];
     
     for (const emotion of expressionsToGenerate) {
@@ -1256,7 +1256,11 @@ router.post('/generate-character-expressions', async (req, res) => {
           '슬픔': { english: 'sad', description: 'sad, downcast, melancholic' },
           '분노': { english: 'angry', description: 'angry, frustrated, upset' },
           '놀람': { english: 'surprise', description: 'surprised, amazed, astonished' },
-          '호기심': { english: 'curious', description: 'curious, interested, intrigued' }
+          '호기심': { english: 'curious', description: 'curious, interested, intrigued' },
+          '불안': { english: 'anxious', description: 'anxious, worried, nervous, uneasy' },
+          '단호': { english: 'determined', description: 'determined, resolute, firm, confident' },
+          '실망': { english: 'disappointed', description: 'disappointed, let down, disheartened' },
+          '당혹': { english: 'confused', description: 'confused, perplexed, puzzled, bewildered' }
         };
 
         const emotionInfo = emotionMap[emotion];
