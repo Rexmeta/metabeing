@@ -458,6 +458,12 @@ export const characters = pgTable("characters", {
   systemPrompt: text("system_prompt"), // AI 성격, 말투, 지식 범위
   profileImage: varchar("profile_image"),
   coverImage: varchar("cover_image"),
+  // 이미지 생성용 필드
+  gender: varchar("gender"), // male, female
+  mbti: varchar("mbti"), // MBTI 16가지 중 하나 (선택)
+  personalityTraits: jsonb("personality_traits").$type<string[]>().default([]), // 성격 특성
+  imageStyle: varchar("image_style"), // 이미지 스타일 (예: professional, casual)
+  expressionImagesGenerated: boolean("expression_images_generated").notNull().default(false), // 표정 이미지 생성 여부
   tags: jsonb("tags").$type<string[]>().default([]),
   visibility: varchar("visibility").notNull().default("private"), // private, unlisted, public
   status: varchar("status").notNull().default("draft"), // draft, published

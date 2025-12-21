@@ -1067,7 +1067,274 @@ router.post('/optimize-existing-images', async (req, res) => {
   }
 });
 
+// ===== 캐릭터 이미지 생성 API =====
+
+// 캐릭터 이미지를 로컬 파일로 저장하는 함수
+async function saveCharacterImageToLocal(
+  base64ImageUrl: string, 
+  characterId: string, 
+  emotion: string,
+  gender: 'male' | 'female' = 'male'
+): Promise<string> {
+  try {
+    // 보안: characterId 검증
+    if (characterId.includes('..') || characterId.includes('/') || characterId.includes('\\')) {
+      throw new Error('Invalid character ID');
+    }
+
+    const matches = base64ImageUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches) {
+      throw new Error('유효하지 않은 base64 이미지 형식입니다.');
+    }
+
+    const imageData = matches[2];
+    
+    // 저장 경로 설정 (attached_assets/characters/{characterId}/{gender}/)
+    const imageDir = path.join(process.cwd(), 'attached_assets', 'characters', characterId, gender);
+    
+    if (!fs.existsSync(imageDir)) {
+      fs.mkdirSync(imageDir, { recursive: true });
+    }
+    
+    const emotionEnglishMap: Record<string, string> = {
+      '중립': 'neutral',
+      '기쁨': 'joy',
+      '슬픔': 'sad',
+      '분노': 'angry',
+      '놀람': 'surprise',
+      '호기심': 'curious',
+      '불안': 'anxious',
+      '단호': 'determined',
+      '실망': 'disappointed',
+      '당혹': 'confused'
+    };
+
+    const emotionEn = emotionEnglishMap[emotion] || emotion;
+    const buffer = Buffer.from(imageData, 'base64');
+    
+    const { original: origConfig, thumbnail: thumbConfig } = IMAGE_CONFIG.persona;
+    
+    const optimizedFilename = `${emotionEn}.webp`;
+    const optimizedPath = path.join(imageDir, optimizedFilename);
+    await sharp(buffer)
+      .resize(origConfig.width, origConfig.height, { fit: 'cover', position: 'center' })
+      .webp({ quality: origConfig.quality })
+      .toFile(optimizedPath);
+    
+    const thumbnailFilename = `${emotionEn}-thumb.webp`;
+    const thumbnailPath = path.join(imageDir, thumbnailFilename);
+    await sharp(buffer)
+      .resize(thumbConfig.width, thumbConfig.height, { fit: 'cover', position: 'center' })
+      .webp({ quality: thumbConfig.quality })
+      .toFile(thumbnailPath);
+    
+    console.log(`📁 캐릭터 이미지 저장: ${characterId}/${gender}/${emotionEn}`);
+    
+    const webPath = `/characters/${characterId}/${gender}/${optimizedFilename}`;
+    return webPath;
+    
+  } catch (error) {
+    console.error('캐릭터 이미지 로컬 저장 실패:', error);
+    throw error;
+  }
+}
+
+// 캐릭터 기본 이미지 생성 엔드포인트
+router.post('/generate-character-base', async (req, res) => {
+  try {
+    const { characterId, mbti, gender, personalityTraits, imageStyle } = req.body;
+
+    if (!characterId || !gender) {
+      return res.status(400).json({ 
+        error: '캐릭터 ID와 성별이 필요합니다.' 
+      });
+    }
+
+    const effectiveMbti = mbti || 'ENFP';
+    const imagePrompt = generatePersonaImagePrompt(
+      effectiveMbti, 
+      gender, 
+      personalityTraits || [], 
+      imageStyle || ''
+    );
+
+    console.log(`🎨 캐릭터 기본 이미지 생성 요청: ${characterId} (${effectiveMbti}, ${gender})`);
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY });
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image-preview",
+      contents: [{ role: 'user', parts: [{ text: imagePrompt }] }]
+    });
+    
+    let imageUrl = null;
+    if (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts) {
+      for (const part of result.candidates[0].content.parts) {
+        const inlineData = part.inlineData;
+        if (inlineData && inlineData.data && inlineData.mimeType) {
+          imageUrl = `data:${inlineData.mimeType};base64,${inlineData.data}`;
+          break;
+        }
+      }
+    }
+    
+    if (!imageUrl) {
+      throw new Error('이미지가 생성되지 않았습니다.');
+    }
+
+    const localImagePath = await saveCharacterImageToLocal(imageUrl, characterId, 'neutral', gender);
+    
+    console.log(`✅ 캐릭터 기본 이미지 생성 성공: ${localImagePath}`);
+
+    trackImageUsage({
+      model: 'gemini-2.5-flash-image-preview',
+      provider: 'gemini',
+      metadata: { type: 'character-base', characterId, mbti: effectiveMbti, gender }
+    });
+
+    res.json({
+      success: true,
+      imageUrl: localImagePath,
+      metadata: {
+        model: "gemini-2.5-flash-image-preview",
+        characterId,
+        mbti: effectiveMbti,
+        gender
+      }
+    });
+
+  } catch (error: any) {
+    console.error('캐릭터 기본 이미지 생성 오류:', error);
+    res.status(500).json({
+      error: '캐릭터 이미지 생성 실패',
+      details: error.message
+    });
+  }
+});
+
+// 캐릭터 표정 이미지 일괄 생성 엔드포인트
+router.post('/generate-character-expressions', async (req, res) => {
+  try {
+    const { characterId, mbti, gender, personalityTraits, imageStyle } = req.body;
+
+    if (!characterId || !gender) {
+      return res.status(400).json({ 
+        error: '캐릭터 ID와 성별이 필요합니다.' 
+      });
+    }
+
+    const effectiveMbti = mbti || 'ENFP';
+    console.log(`🎨 캐릭터 표정 이미지 일괄 생성 시작: ${characterId} (${effectiveMbti}, ${gender})`);
+
+    const baseDir = path.join(process.cwd(), 'attached_assets', 'characters', characterId, gender);
+    
+    let baseImagePath = '';
+    const possiblePaths = [
+      path.join(baseDir, 'neutral.webp'),
+      path.join(baseDir, 'neutral.png')
+    ];
+    
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        baseImagePath = p;
+        break;
+      }
+    }
+    
+    if (!baseImagePath) {
+      return res.status(400).json({ 
+        error: '기본 이미지가 없습니다. 먼저 기본 이미지를 생성해주세요.' 
+      });
+    }
+
+    const expressionsToGenerate = ['기쁨', '슬픔', '분노', '놀람', '호기심'];
+    const results: any[] = [];
+    
+    for (const emotion of expressionsToGenerate) {
+      try {
+        const emotionMap: Record<string, { english: string; description: string }> = {
+          '기쁨': { english: 'joy', description: 'joyful, happy, smiling broadly' },
+          '슬픔': { english: 'sad', description: 'sad, downcast, melancholic' },
+          '분노': { english: 'angry', description: 'angry, frustrated, upset' },
+          '놀람': { english: 'surprise', description: 'surprised, amazed, astonished' },
+          '호기심': { english: 'curious', description: 'curious, interested, intrigued' }
+        };
+
+        const emotionInfo = emotionMap[emotion];
+        if (!emotionInfo) continue;
+
+        const expressionPrompt = generateExpressionImagePrompt(
+          effectiveMbti,
+          gender,
+          personalityTraits || [],
+          imageStyle || '',
+          emotionInfo.description
+        );
+
+        const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY });
+        
+        const baseImageBuffer = fs.readFileSync(baseImagePath);
+        const base64Image = baseImageBuffer.toString('base64');
+        const mimeType = baseImagePath.endsWith('.webp') ? 'image/webp' : 'image/png';
+
+        const result = await ai.models.generateContent({
+          model: "gemini-2.5-flash-image-preview",
+          contents: [{
+            role: 'user',
+            parts: [
+              { inlineData: { data: base64Image, mimeType } },
+              { text: expressionPrompt }
+            ]
+          }]
+        });
+
+        let imageUrl = null;
+        if (result.candidates && result.candidates[0]?.content?.parts) {
+          for (const part of result.candidates[0].content.parts) {
+            if (part.inlineData?.data && part.inlineData?.mimeType) {
+              imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+              break;
+            }
+          }
+        }
+
+        if (imageUrl) {
+          const savedPath = await saveCharacterImageToLocal(imageUrl, characterId, emotion, gender);
+          results.push({ emotion, success: true, path: savedPath });
+          console.log(`✅ ${emotion} 표정 생성 완료`);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+      } catch (expressionError: any) {
+        console.error(`❌ ${emotion} 표정 생성 실패:`, expressionError.message);
+        results.push({ emotion, success: false, error: expressionError.message });
+      }
+    }
+
+    trackImageUsage({
+      model: 'gemini-2.5-flash-image-preview',
+      provider: 'gemini',
+      metadata: { type: 'character-expressions', characterId, count: results.filter(r => r.success).length }
+    });
+
+    res.json({
+      success: true,
+      characterId,
+      results,
+      successCount: results.filter(r => r.success).length,
+      totalCount: expressionsToGenerate.length
+    });
+
+  } catch (error: any) {
+    console.error('캐릭터 표정 이미지 생성 오류:', error);
+    res.status(500).json({
+      error: '표정 이미지 생성 실패',
+      details: error.message
+    });
+  }
+});
+
 // saveImageToLocal 함수도 export
-export { saveImageToLocal, savePersonaImageToLocal, getThumbnailPath };
+export { saveImageToLocal, savePersonaImageToLocal, saveCharacterImageToLocal, getThumbnailPath };
 
 export default router;

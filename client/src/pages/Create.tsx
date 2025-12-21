@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, Users, FileText, Save, Eye, Send } from "lucide-react";
+import { ArrowLeft, Users, FileText, Save, Send, Sparkles, Loader2, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Progress } from "@/components/ui/progress";
 
 export default function Create() {
   const [, setLocation] = useLocation();
@@ -22,6 +23,118 @@ export default function Create() {
     description: "",
     systemPrompt: "",
     tags: "",
+    gender: "" as "" | "male" | "female",
+    mbti: "",
+    personalityTraits: "",
+    imageStyle: "professional",
+  });
+
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [imageGenerationProgress, setImageGenerationProgress] = useState(0);
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [createdCharacterId, setCreatedCharacterId] = useState<string | null>(null);
+
+  const MBTI_TYPES = [
+    "ENFJ", "ENFP", "ENTJ", "ENTP",
+    "ESFJ", "ESFP", "ESTJ", "ESTP",
+    "INFJ", "INFP", "INTJ", "INTP",
+    "ISFJ", "ISFP", "ISTJ", "ISTP"
+  ];
+
+  const generateCharacterImagesMutation = useMutation({
+    mutationFn: async (characterId: string) => {
+      const token = localStorage.getItem("authToken");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      setIsGeneratingImages(true);
+      setImageGenerationProgress(0);
+
+      const res = await fetch("/api/images/generate-character-base", {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({
+          characterId,
+          gender: characterForm.gender,
+          mbti: characterForm.mbti || "ENFP",
+          personalityTraits: characterForm.personalityTraits 
+            ? characterForm.personalityTraits.split(",").map(t => t.trim()).filter(Boolean) 
+            : [],
+          imageStyle: characterForm.imageStyle || "professional",
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "이미지 생성 실패");
+      }
+
+      setImageGenerationProgress(30);
+      const baseResult = await res.json();
+      setGeneratedImageUrl(baseResult.imageUrl);
+
+      setImageGenerationProgress(50);
+      const expressionsRes = await fetch("/api/images/generate-character-expressions", {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({
+          characterId,
+          gender: characterForm.gender,
+          mbti: characterForm.mbti || "ENFP",
+          personalityTraits: characterForm.personalityTraits 
+            ? characterForm.personalityTraits.split(",").map(t => t.trim()).filter(Boolean) 
+            : [],
+          imageStyle: characterForm.imageStyle || "professional",
+        }),
+      });
+
+      let expressionsGenerated = false;
+      if (!expressionsRes.ok) {
+        console.warn("표정 이미지 생성 실패, 기본 이미지만 사용");
+      } else {
+        setImageGenerationProgress(100);
+        expressionsGenerated = true;
+      }
+
+      // 캐릭터의 expressionImagesGenerated 필드 업데이트
+      if (expressionsGenerated) {
+        const updateRes = await fetch(`/api/ugc/characters/${characterId}`, {
+          method: "PUT",
+          headers,
+          credentials: "include",
+          body: JSON.stringify({
+            expressionImagesGenerated: true,
+            profileImage: baseResult.imageUrl,
+          }),
+        });
+        if (!updateRes.ok) {
+          console.error("캐릭터 업데이트 실패");
+        }
+      }
+
+      return { ...baseResult, expressionsGenerated };
+    },
+    onSuccess: () => {
+      setIsGeneratingImages(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/ugc/characters"] });
+      toast({
+        title: "이미지 생성 완료",
+        description: "캐릭터 이미지와 표정 이미지가 생성되었습니다.",
+      });
+      setLocation("/library");
+    },
+    onError: (error: Error) => {
+      setIsGeneratingImages(false);
+      toast({
+        title: "이미지 생성 실패",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const [scenarioForm, setScenarioForm] = useState({
@@ -37,7 +150,7 @@ export default function Create() {
   });
 
   const createCharacterMutation = useMutation({
-    mutationFn: async (data: typeof characterForm & { publish?: boolean }) => {
+    mutationFn: async (data: typeof characterForm & { publish?: boolean; generateImages?: boolean }) => {
       const token = localStorage.getItem("authToken");
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) {
@@ -54,6 +167,12 @@ export default function Create() {
           description: data.description || null,
           systemPrompt: data.systemPrompt || null,
           tags: data.tags ? data.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+          gender: data.gender || null,
+          mbti: data.mbti || null,
+          personalityTraits: data.personalityTraits 
+            ? data.personalityTraits.split(",").map(t => t.trim()).filter(Boolean) 
+            : [],
+          imageStyle: data.imageStyle || null,
           visibility: data.publish ? "public" : "private",
           status: data.publish ? "published" : "draft",
         }),
@@ -62,17 +181,28 @@ export default function Create() {
         const error = await res.json();
         throw new Error(error.error || "캐릭터 생성 실패");
       }
-      return res.json();
+      const result = await res.json();
+      return { ...result, generateImages: data.generateImages };
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/ugc/characters"] });
-      toast({
-        title: variables.publish ? "캐릭터 공개됨" : "캐릭터 저장됨",
-        description: variables.publish 
-          ? "캐릭터가 성공적으로 공개되었습니다!"
-          : "캐릭터가 임시저장되었습니다.",
-      });
-      setLocation("/library");
+      
+      if (data.generateImages && data.id && characterForm.gender) {
+        setCreatedCharacterId(data.id);
+        generateCharacterImagesMutation.mutate(data.id);
+        toast({
+          title: "캐릭터 저장됨",
+          description: "이미지 생성을 시작합니다...",
+        });
+      } else {
+        toast({
+          title: variables.publish ? "캐릭터 공개됨" : "캐릭터 저장됨",
+          description: variables.publish 
+            ? "캐릭터가 성공적으로 공개되었습니다!"
+            : "캐릭터가 임시저장되었습니다.",
+        });
+        setLocation("/library");
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -221,24 +351,149 @@ export default function Create() {
                   />
                 </div>
 
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    className="flex-1 gap-2"
-                    disabled={!characterForm.name || createCharacterMutation.isPending}
-                    onClick={() => createCharacterMutation.mutate({ ...characterForm, publish: false })}
-                  >
-                    <Save className="h-4 w-4" />
-                    임시저장
-                  </Button>
-                  <Button
-                    className="flex-1 gap-2"
-                    disabled={!characterForm.name || createCharacterMutation.isPending}
-                    onClick={() => createCharacterMutation.mutate({ ...characterForm, publish: true })}
-                  >
-                    <Send className="h-4 w-4" />
-                    공개하기
-                  </Button>
+                <div className="border-t pt-6 mt-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5" />
+                    캐릭터 이미지 설정 (선택)
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    성별과 MBTI를 선택하면 AI가 캐릭터의 프로필 이미지와 다양한 표정 이미지를 자동 생성합니다.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="char-gender">성별</Label>
+                      <Select
+                        value={characterForm.gender}
+                        onValueChange={(value: "male" | "female") => 
+                          setCharacterForm(prev => ({ ...prev, gender: value }))
+                        }
+                      >
+                        <SelectTrigger id="char-gender" data-testid="select-char-gender">
+                          <SelectValue placeholder="성별 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="male">남성</SelectItem>
+                          <SelectItem value="female">여성</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="char-mbti">MBTI (선택)</Label>
+                      <Select
+                        value={characterForm.mbti}
+                        onValueChange={(value) => 
+                          setCharacterForm(prev => ({ ...prev, mbti: value }))
+                        }
+                      >
+                        <SelectTrigger id="char-mbti" data-testid="select-char-mbti">
+                          <SelectValue placeholder="MBTI 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MBTI_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="char-traits">성격 특성 (쉼표 구분)</Label>
+                      <Input
+                        id="char-traits"
+                        placeholder="예: 차분함, 분석적"
+                        value={characterForm.personalityTraits}
+                        onChange={(e) => setCharacterForm(prev => ({ ...prev, personalityTraits: e.target.value }))}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="char-style">이미지 스타일</Label>
+                      <Select
+                        value={characterForm.imageStyle}
+                        onValueChange={(value) => 
+                          setCharacterForm(prev => ({ ...prev, imageStyle: value }))
+                        }
+                      >
+                        <SelectTrigger id="char-style" data-testid="select-char-style">
+                          <SelectValue placeholder="스타일 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="professional">프로페셔널</SelectItem>
+                          <SelectItem value="casual">캐주얼</SelectItem>
+                          <SelectItem value="creative">크리에이티브</SelectItem>
+                          <SelectItem value="friendly">친근함</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {generatedImageUrl && (
+                    <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                      <p className="text-sm text-muted-foreground mb-2">생성된 프로필 이미지</p>
+                      <img 
+                        src={generatedImageUrl} 
+                        alt="생성된 캐릭터 이미지" 
+                        className="w-32 h-32 object-cover rounded-lg mx-auto"
+                      />
+                    </div>
+                  )}
+
+                  {isGeneratingImages && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm text-muted-foreground">이미지 생성 중...</p>
+                      <Progress value={imageGenerationProgress} className="h-2" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3 pt-4">
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2"
+                      disabled={!characterForm.name || createCharacterMutation.isPending || isGeneratingImages}
+                      onClick={() => createCharacterMutation.mutate({ ...characterForm, publish: false })}
+                      data-testid="button-char-save"
+                    >
+                      <Save className="h-4 w-4" />
+                      임시저장
+                    </Button>
+                    <Button
+                      className="flex-1 gap-2"
+                      disabled={!characterForm.name || createCharacterMutation.isPending || isGeneratingImages}
+                      onClick={() => createCharacterMutation.mutate({ ...characterForm, publish: true })}
+                      data-testid="button-char-publish"
+                    >
+                      <Send className="h-4 w-4" />
+                      공개하기
+                    </Button>
+                  </div>
+
+                  {characterForm.gender && (
+                    <Button
+                      variant="secondary"
+                      className="w-full gap-2"
+                      disabled={!characterForm.name || createCharacterMutation.isPending || isGeneratingImages}
+                      onClick={() => createCharacterMutation.mutate({ ...characterForm, publish: false, generateImages: true })}
+                      data-testid="button-char-generate-images"
+                    >
+                      {isGeneratingImages ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          이미지 생성 중...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          저장 + 이미지 자동 생성
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

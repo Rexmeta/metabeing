@@ -17,6 +17,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  emotion?: string;
 }
 
 export default function CharacterChat() {
@@ -26,7 +27,41 @@ export default function CharacterChat() {
   const [activeTab, setActiveTab] = useState<"chat" | "profile">("chat");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
+  const [currentEmotion, setCurrentEmotion] = useState<string>("중립");
+  const [characterImageUrl, setCharacterImageUrl] = useState<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // 감정을 이미지 파일명으로 변환 (한국어/영어 모두 지원)
+  const getEmotionImagePath = (emotion: string, characterId: string, gender: string = "male") => {
+    const emotionMap: Record<string, string> = {
+      // 한국어
+      "중립": "neutral",
+      "기쁨": "joy",
+      "슬픔": "sad",
+      "분노": "angry",
+      "놀람": "surprise",
+      "호기심": "curious",
+      "불안": "anxious",
+      "단호": "determined",
+      "실망": "disappointed",
+      "당혹": "confused",
+      // 영어 (AI 모델이 영어로 응답할 경우)
+      "neutral": "neutral",
+      "joy": "joy",
+      "happy": "joy",
+      "sad": "sad",
+      "angry": "angry",
+      "surprise": "surprise",
+      "surprised": "surprise",
+      "curious": "curious",
+      "anxious": "anxious",
+      "determined": "determined",
+      "disappointed": "disappointed",
+      "confused": "confused"
+    };
+    const emotionEn = emotionMap[emotion.toLowerCase()] || emotionMap[emotion] || "neutral";
+    return `/characters/${characterId}/${gender}/${emotionEn}.webp`;
+  };
 
   const { data: character, isLoading } = useQuery<Character>({
     queryKey: [`/api/ugc/characters/${id}`],
@@ -64,8 +99,17 @@ export default function CharacterChat() {
           role: "assistant",
           content: data.response,
           timestamp: new Date(),
+          emotion: data.emotion,
         },
       ]);
+      // 감정 업데이트 및 표정 이미지 변경
+      if (data.emotion) {
+        setCurrentEmotion(data.emotion);
+        if (character?.gender && character?.expressionImagesGenerated) {
+          const imagePath = getEmotionImagePath(data.emotion, character.id, character.gender);
+          setCharacterImageUrl(imagePath);
+        }
+      }
     },
   });
 
@@ -180,7 +224,13 @@ export default function CharacterChat() {
                 >
                   {msg.role === "assistant" && (
                     <Avatar className="w-8 h-8 flex-shrink-0">
-                      <AvatarImage src={character.profileImage || undefined} />
+                      <AvatarImage 
+                        src={
+                          msg.emotion && character.gender && character.expressionImagesGenerated
+                            ? getEmotionImagePath(msg.emotion, character.id, character.gender)
+                            : (characterImageUrl || character.profileImage || undefined)
+                        } 
+                      />
                       <AvatarFallback>{character.name?.charAt(0)}</AvatarFallback>
                     </Avatar>
                   )}

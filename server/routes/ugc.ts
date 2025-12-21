@@ -138,7 +138,10 @@ router.get("/characters", async (req: Request, res: Response) => {
 });
 
 // Allowed fields for character update (whitelist)
-const characterUpdateFields = ["name", "tagline", "description", "systemPrompt", "profileImage", "coverImage", "tags", "safetyFlags"];
+const characterUpdateFields = [
+  "name", "tagline", "description", "systemPrompt", "profileImage", "coverImage", 
+  "tags", "safetyFlags", "gender", "mbti", "personalityTraits", "imageStyle", "expressionImagesGenerated"
+];
 
 // Update character
 router.put("/characters/:id", async (req: Request, res: Response) => {

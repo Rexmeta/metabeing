@@ -50,6 +50,12 @@ Preferred communication style: Simple, everyday language.
 - **AI Usage Tracking**: Logs AI API usage data (feature, model, token usage, cost) for cost analysis.
 - **Configurable Difficulty Settings**: Difficulty levels are editable via the operator dashboard, allowing customization of name, description, response length, tone, pressure, feedback style, and constraints.
 - **Intro Video Generation**: Integration with Gemini Veo 3.1 API for generating 8-second intro videos for scenarios, stored as WebM files.
+- **Character Image Generation**: AI-generated profile and expression images for user-created characters.
+    - Uses Gemini 2.5 Flash Image API for image generation.
+    - Generates base portrait and 5 expression images (joy, sad, angry, surprise, curious).
+    - Images stored at `/attached_assets/characters/{characterId}/{gender}/{emotion}.webp`.
+    - Expression images displayed in chat based on AI emotion analysis response.
+    - Supports gender (male/female) and MBTI-based visual traits.
 
 # External Dependencies
 
