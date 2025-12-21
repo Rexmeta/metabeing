@@ -1068,7 +1068,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
     );
   }
 
-  if (!conversation) {
+  if (!isPersonaChat && !conversation) {
     return <div className="text-center py-8">로딩 중...</div>;
   }
 
