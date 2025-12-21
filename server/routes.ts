@@ -686,6 +686,226 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ✨ 페르소나 직접 대화용 API - 시나리오 없이 페르소나만으로 대화
+  app.post("/api/persona-chat", isAuthenticated, async (req, res) => {
+    try {
+      // @ts-ignore - req.user는 auth 미들웨어에서 설정됨
+      const userId = req.user?.id;
+      
+      const { personaId, mode, difficulty } = req.body;
+      
+      if (!personaId) {
+        return res.status(400).json({ error: "personaId is required" });
+      }
+      
+      console.log(`🎭 페르소나 직접 대화 시작: personaId=${personaId}, mode=${mode}`);
+      
+      // 페르소나 정보 가져오기
+      const persona = await fileManager.getMBTIPersonaById(personaId);
+      if (!persona) {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+      
+      const personaName = persona.name || persona.mbti || personaId;
+      
+      // 페르소나 대화용 가상 scenarioId 생성
+      const virtualScenarioId = `persona-chat-${personaId}`;
+      const virtualScenarioName = `${personaName}와의 자유 대화`;
+      
+      // 인메모리 세션 생성 (DB 저장 없이)
+      const sessionId = `persona-session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 페르소나 스냅샷 생성
+      const personaSnapshot = {
+        id: persona.id || personaId,
+        name: personaName,
+        mbti: persona.mbti || persona.mbtiType || "",
+        gender: persona.gender || "unknown",
+        role: persona.position || "대화 상대",
+        department: persona.department || "",
+        personality: {
+          traits: persona.personality_traits || [],
+          communicationStyle: persona.communication_style || "친근한 대화 스타일",
+          motivation: persona.motivation || "",
+          fears: persona.fears || []
+        },
+        background: persona.background || {},
+        communicationPatterns: persona.communication_patterns || {},
+        voice: persona.voice || { tone: "친근한", pace: "보통", emotion: "따뜻한" }
+      };
+      
+      // 실시간 음성 모드는 WebSocket을 통해 처리
+      if (mode === 'realtime_voice') {
+        console.log('🎙️ 페르소나 직접 대화 - 실시간 음성 모드');
+        return res.json({
+          id: sessionId,
+          scenarioId: virtualScenarioId,
+          scenarioName: virtualScenarioName,
+          personaId,
+          personaSnapshot,
+          messages: [],
+          turnCount: 0,
+          status: 'active',
+          mode,
+          difficulty: difficulty || 2,
+          userId,
+          isPersonaChat: true,
+          createdAt: new Date().toISOString()
+        });
+      }
+      
+      // 텍스트/TTS 모드 - AI 초기 메시지 생성
+      console.log('💬 페르소나 직접 대화 - 텍스트/TTS 모드');
+      
+      try {
+        const { getAIServiceForFeature } = await import('./services/aiServiceFactory');
+        const aiService = await getAIServiceForFeature('conversation');
+        
+        // 페르소나 전용 프롬프트 생성
+        const personaPrompt = `당신은 "${personaName}"입니다.
+
+성격 특성:
+- MBTI: ${personaSnapshot.mbti}
+- 성별: ${personaSnapshot.gender === 'male' ? '남성' : personaSnapshot.gender === 'female' ? '여성' : '미지정'}
+- 역할: ${personaSnapshot.role}
+- 부서: ${personaSnapshot.department}
+- 의사소통 스타일: ${personaSnapshot.personality.communicationStyle}
+- 성격 특성: ${personaSnapshot.personality.traits?.join(', ') || '친절함'}
+
+대화 지침:
+1. 위의 성격 특성에 맞게 자연스럽게 대화하세요.
+2. 시나리오나 특별한 상황 없이 자유로운 대화를 진행합니다.
+3. 사용자와 친근하고 자연스럽게 대화하세요.
+4. 한국어로 대화합니다.
+
+사용자에게 먼저 인사하며 대화를 시작해주세요. 2-3문장으로 간결하게 인사하세요.`;
+
+        const aiResponse = await aiService.generateResponse(personaPrompt, {
+          maxTokens: 300,
+          temperature: 0.8
+        });
+        
+        const initialMessage = {
+          sender: 'ai' as const,
+          message: aiResponse,
+          timestamp: new Date().toISOString(),
+          emotion: 'neutral'
+        };
+        
+        return res.json({
+          id: sessionId,
+          scenarioId: virtualScenarioId,
+          scenarioName: virtualScenarioName,
+          personaId,
+          personaSnapshot,
+          messages: [initialMessage],
+          turnCount: 0,
+          status: 'active',
+          mode,
+          difficulty: difficulty || 2,
+          userId,
+          isPersonaChat: true,
+          createdAt: new Date().toISOString()
+        });
+        
+      } catch (aiError) {
+        console.error("페르소나 AI 초기 메시지 생성 실패:", aiError);
+        // AI 실패해도 대화 세션은 반환
+        return res.json({
+          id: sessionId,
+          scenarioId: virtualScenarioId,
+          scenarioName: virtualScenarioName,
+          personaId,
+          personaSnapshot,
+          messages: [],
+          turnCount: 0,
+          status: 'active',
+          mode,
+          difficulty: difficulty || 2,
+          userId,
+          isPersonaChat: true,
+          createdAt: new Date().toISOString()
+        });
+      }
+      
+    } catch (error) {
+      console.error("페르소나 직접 대화 생성 오류:", error);
+      res.status(500).json({ error: "Failed to create persona chat" });
+    }
+  });
+
+  // ✨ 페르소나 직접 대화 메시지 전송 API
+  app.post("/api/persona-chat/:sessionId/message", isAuthenticated, async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.user?.id;
+      const { sessionId } = req.params;
+      const { message, personaSnapshot, messages: previousMessages, difficulty } = req.body;
+      
+      if (!message || !personaSnapshot) {
+        return res.status(400).json({ error: "message and personaSnapshot are required" });
+      }
+      
+      console.log(`💬 페르소나 대화 메시지: sessionId=${sessionId}`);
+      
+      const { getAIServiceForFeature } = await import('./services/aiServiceFactory');
+      const aiService = await getAIServiceForFeature('conversation');
+      
+      // 대화 히스토리 구성
+      const conversationHistory = (previousMessages || []).map((msg: any) => 
+        `${msg.sender === 'user' ? '사용자' : personaSnapshot.name}: ${msg.message}`
+      ).join('\n');
+      
+      const personaPrompt = `당신은 "${personaSnapshot.name}"입니다.
+
+성격 특성:
+- MBTI: ${personaSnapshot.mbti || ''}
+- 성별: ${personaSnapshot.gender === 'male' ? '남성' : personaSnapshot.gender === 'female' ? '여성' : '미지정'}
+- 역할: ${personaSnapshot.role || '대화 상대'}
+- 의사소통 스타일: ${personaSnapshot.personality?.communicationStyle || '친근한 대화 스타일'}
+- 성격 특성: ${personaSnapshot.personality?.traits?.join(', ') || '친절함'}
+
+이전 대화:
+${conversationHistory}
+
+대화 지침:
+1. 위의 성격 특성에 맞게 자연스럽게 대화하세요.
+2. 사용자의 말에 공감하고 적절히 반응하세요.
+3. 한국어로 대화합니다.
+4. 2-4문장으로 자연스럽게 응답하세요.
+
+사용자: ${message}
+
+${personaSnapshot.name}:`;
+
+      const aiResponse = await aiService.generateResponse(personaPrompt, {
+        maxTokens: 500,
+        temperature: 0.8
+      });
+      
+      // 감정 분석 (간단하게)
+      let emotion = 'neutral';
+      const lowerResponse = aiResponse.toLowerCase();
+      if (lowerResponse.includes('기뻐') || lowerResponse.includes('좋아') || lowerResponse.includes('감사')) {
+        emotion = 'joy';
+      } else if (lowerResponse.includes('걱정') || lowerResponse.includes('안타')) {
+        emotion = 'concern';
+      } else if (lowerResponse.includes('궁금') || lowerResponse.includes('흥미')) {
+        emotion = 'curious';
+      }
+      
+      res.json({
+        response: aiResponse,
+        emotion,
+        emotionReason: ''
+      });
+      
+    } catch (error) {
+      console.error("페르소나 대화 메시지 처리 오류:", error);
+      res.status(500).json({ error: "Failed to process message" });
+    }
+  });
+
   // Get all conversations for the current user
   app.get("/api/conversations", isAuthenticated, async (req, res) => {
     try {

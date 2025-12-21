@@ -74,9 +74,11 @@ interface ChatWindowProps {
   onPersonaChange?: () => void;
   onReady?: () => void;
   onConversationEnding?: () => void;
+  isPersonaChat?: boolean;
+  initialMessages?: ConversationMessage[];
 }
 
-export default function ChatWindow({ scenario, persona, conversationId, onChatComplete, onExit, onPersonaChange, onReady, onConversationEnding }: ChatWindowProps) {
+export default function ChatWindow({ scenario, persona, conversationId, onChatComplete, onExit, onPersonaChange, onReady, onConversationEnding, isPersonaChat = false, initialMessages = [] }: ChatWindowProps) {
   const [location, setLocation] = useLocation();
   const [userInput, setUserInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -86,7 +88,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [conversationStartTime, setConversationStartTime] = useState<Date | null>(null);
-  const [localMessages, setLocalMessages] = useState<ConversationMessage[]>([]);
+  const [localMessages, setLocalMessages] = useState<ConversationMessage[]>(initialMessages);
   const [chatMode, setChatMode] = useState<'messenger' | 'character'>('character');
   const [isWideScreen, setIsWideScreen] = useState(false);
   const [showInputMode, setShowInputMode] = useState(false);
@@ -303,22 +305,28 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
 
   const { data: conversation, error } = useQuery<Conversation>({
     queryKey: ["/api/conversations", conversationId],
-    enabled: !!conversationId,
+    enabled: !!conversationId && !isPersonaChat,
   });
 
   // 대화 시작 시간 설정 및 타이머 효과
   useEffect(() => {
-    if (conversation && conversation.createdAt && !conversationStartTime) {
+    if (isPersonaChat && !conversationStartTime) {
+      setConversationStartTime(new Date());
+    } else if (conversation && conversation.createdAt && !conversationStartTime) {
       setConversationStartTime(new Date(conversation.createdAt));
     }
-  }, [conversation, conversationStartTime]);
+  }, [conversation, conversationStartTime, isPersonaChat]);
 
   // 경과 시간 업데이트 타이머
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     // 대화가 완료되었으면 타이머 정지
-    if (conversationStartTime && conversation && conversation.turnCount < maxTurns) {
+    const shouldRunTimer = conversationStartTime && (
+      isPersonaChat || (conversation && conversation.turnCount < maxTurns)
+    );
+    
+    if (shouldRunTimer) {
       interval = setInterval(() => {
         const now = new Date();
         const elapsed = Math.floor((now.getTime() - conversationStartTime.getTime()) / 1000);
@@ -331,16 +339,49 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
         clearInterval(interval);
       }
     };
-  }, [conversationStartTime, conversation]);
+  }, [conversationStartTime, conversation, isPersonaChat]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (message: string) => {
+      // 페르소나 직접 대화인 경우 별도 API 사용
+      if (isPersonaChat) {
+        const response = await apiRequest("POST", `/api/persona-chat/${conversationId}/message`, {
+          message,
+          personaSnapshot: persona,
+          messages: localMessages,
+          difficulty: scenario.difficulty || 2
+        });
+        return response.json();
+      }
+      
+      // 기존 시나리오+페르소나 대화
       const response = await apiRequest("POST", `/api/conversations/${conversationId}/messages`, {
         message
       });
       return response.json();
     },
     onSuccess: (data) => {
+      // 페르소나 직접 대화인 경우 다른 응답 구조 처리
+      if (isPersonaChat && data.response) {
+        const aiMessage: ConversationMessage = {
+          sender: 'ai',
+          message: data.response,
+          timestamp: new Date().toISOString(),
+          emotion: data.emotion || '중립',
+          emotionReason: data.emotionReason || ''
+        };
+        // localMessages에는 이미 사용자 메시지가 추가되어 있으므로 AI 메시지만 추가
+        setLocalMessages(prev => [...prev, aiMessage]);
+        
+        // 감정에 따라 캐릭터 이미지 업데이트
+        if (data.emotion) {
+          setCurrentEmotion(data.emotion);
+        }
+        setIsLoading(false);
+        return;
+      }
+      
+      // 기존 시나리오+페르소나 대화 응답 처리
       // AI 응답만 로컬 메시지에 추가
       if (data.messages && data.messages.length > 0) {
         const latestMessage = data.messages[data.messages.length - 1];
@@ -349,8 +390,10 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
         }
       }
       
-      // 서버 데이터 동기화는 별도로 처리
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
+      // 서버 데이터 동기화는 별도로 처리 (페르소나 대화는 제외)
+      if (!isPersonaChat) {
+        queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId] });
+      }
       setIsLoading(false);
     },
     onError: () => {

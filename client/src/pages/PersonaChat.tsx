@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -10,20 +10,42 @@ import type { ComplexScenario, ScenarioPersona } from "@/lib/scenario-system";
 
 interface Persona {
   id: string;
-  name: string;
+  name?: string;
   mbtiType?: string;
   mbti?: string;
   gender: string;
   profileImage?: string;
   description?: string;
-  personaData?: any;
+  position?: string;
+  department?: string;
+  personality_traits?: string[];
+  communication_style?: string;
+  motivation?: string;
+  fears?: string[];
+  background?: any;
+  communication_patterns?: any;
+  voice?: any;
+}
+
+interface PersonaChatSession {
+  id: string;
+  scenarioId: string;
+  scenarioName: string;
+  personaId: string;
+  personaSnapshot: any;
+  messages: any[];
+  turnCount: number;
+  status: string;
+  mode: string;
+  difficulty: number;
+  isPersonaChat: boolean;
 }
 
 export default function PersonaChat() {
   const params = useParams<{ personaId: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [chatSession, setChatSession] = useState<PersonaChatSession | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
   const { data: persona, isLoading: loadingPersona, error: personaError } = useQuery<Persona>({
@@ -36,12 +58,12 @@ export default function PersonaChat() {
     enabled: !!params.personaId,
   });
 
-  const createDummyScenario = (persona: Persona): ComplexScenario => ({
-    id: `persona-chat-${persona.id}`,
-    title: `${persona.name}와의 대화`,
-    description: persona.description || `${persona.name} 페르소나와의 자유 대화`,
+  const createDummyScenario = (session: PersonaChatSession): ComplexScenario => ({
+    id: session.scenarioId,
+    title: session.scenarioName,
+    description: `${session.personaSnapshot.name} 페르소나와의 자유 대화`,
     context: {
-      situation: `${persona.name}와 자유롭게 대화하는 상황입니다.`,
+      situation: `${session.personaSnapshot.name}와 자유롭게 대화하는 상황입니다.`,
       timeline: "제한 없음",
       stakes: "자유 대화",
       playerRole: {
@@ -58,84 +80,69 @@ export default function PersonaChat() {
       acceptable: "대화 진행",
       failure: "N/A"
     },
-    personas: [persona.id],
-    recommendedFlow: [persona.id],
-    difficulty: 2,
+    personas: [session.personaId],
+    recommendedFlow: [session.personaId],
+    difficulty: session.difficulty,
     estimatedTime: "무제한",
     skills: ["의사소통"]
   });
 
-  const createPersonaSnapshot = (persona: Persona): ScenarioPersona => ({
-    id: persona.id,
-    name: persona.name,
-    mbti: persona.mbtiType || persona.mbti || "",
-    role: persona.personaData?.role || "AI 대화 상대",
-    department: persona.personaData?.department || "일반",
-    experience: persona.personaData?.experience || "N/A",
-    gender: persona.gender === "male" ? "male" : persona.gender === "female" ? "female" : undefined,
+  const createPersonaSnapshotForChat = (session: PersonaChatSession): ScenarioPersona => ({
+    id: session.personaSnapshot.id,
+    name: session.personaSnapshot.name,
+    mbti: session.personaSnapshot.mbti || "",
+    role: session.personaSnapshot.role || "AI 대화 상대",
+    department: session.personaSnapshot.department || "일반",
+    experience: "N/A",
+    gender: session.personaSnapshot.gender === "male" ? "male" : session.personaSnapshot.gender === "female" ? "female" : undefined,
     personality: {
-      traits: persona.personaData?.traits || ["친절함", "대화를 즐김"],
-      communicationStyle: persona.personaData?.communicationStyle || "친근하고 열린 대화 스타일",
-      motivation: persona.personaData?.motivation || "대화 상대와의 소통",
-      fears: persona.personaData?.fears || [],
+      traits: session.personaSnapshot.personality?.traits || ["친절함", "대화를 즐김"],
+      communicationStyle: session.personaSnapshot.personality?.communicationStyle || "친근하고 열린 대화 스타일",
+      motivation: session.personaSnapshot.personality?.motivation || "대화 상대와의 소통",
+      fears: session.personaSnapshot.personality?.fears || [],
     },
     background: {
-      education: persona.personaData?.education || "N/A",
-      previousExperience: persona.personaData?.previousExperience || "N/A",
-      majorProjects: persona.personaData?.majorProjects || [],
-      expertise: persona.personaData?.expertise || []
+      education: "N/A",
+      previousExperience: "N/A",
+      majorProjects: [],
+      expertise: []
     },
     currentSituation: {
-      workload: persona.personaData?.workload || "보통",
-      pressure: persona.personaData?.pressure || "낮음",
-      concerns: persona.personaData?.concerns || [],
-      position: persona.personaData?.position || "대화 상대"
+      workload: "보통",
+      pressure: "낮음",
+      concerns: [],
+      position: session.personaSnapshot.role || "대화 상대"
     },
-    communicationPatterns: {
-      openingStyle: persona.personaData?.openingStyle || "친근하게 인사",
-      keyPhrases: persona.personaData?.keyPhrases || [],
-      responseToArguments: persona.personaData?.responseToArguments || {},
-      winConditions: persona.personaData?.winConditions || []
+    communicationPatterns: session.personaSnapshot.communicationPatterns || {
+      openingStyle: "친근하게 인사",
+      keyPhrases: [],
+      responseToArguments: {},
+      winConditions: []
     },
-    image: persona.profileImage || "",
-    voice: {
-      tone: persona.personaData?.voiceTone || "친근한",
-      pace: persona.personaData?.voicePace || "보통",
-      emotion: persona.personaData?.voiceEmotion || "따뜻한"
-    },
-    stance: persona.personaData?.stance,
-    goal: persona.personaData?.goal,
-    tradeoff: persona.personaData?.tradeoff,
+    image: "",
+    voice: session.personaSnapshot.voice || {
+      tone: "친근한",
+      pace: "보통",
+      emotion: "따뜻한"
+    }
   });
 
   useEffect(() => {
-    const startConversation = async () => {
-      if (!persona || conversationId || isCreating) return;
+    const startPersonaChat = async () => {
+      if (!persona || chatSession || isCreating) return;
 
       setIsCreating(true);
       try {
-        const personaSnapshot = createPersonaSnapshot(persona);
-        const dummyScenario = createDummyScenario(persona);
-
-        const conversationData = {
-          scenarioId: dummyScenario.id,
-          personaId: persona.id,
-          personaSnapshot: personaSnapshot,
-          scenarioName: dummyScenario.title,
-          messages: [],
-          turnCount: 0,
-          status: "active" as const,
-          mode: "realtime_voice" as const,
-          difficulty: 2,
-          forceNewRun: true,
-          isPersonaChat: true,
-        };
-
-        const response = await apiRequest("POST", "/api/conversations", conversationData);
-        const conversation = await response.json();
-        setConversationId(conversation.id);
+        const response = await apiRequest("POST", "/api/persona-chat", {
+          personaId: params.personaId,
+          mode: "text",
+          difficulty: 2
+        });
+        
+        const session = await response.json();
+        setChatSession(session);
       } catch (error) {
-        console.error("대화 생성 실패:", error);
+        console.error("페르소나 대화 생성 실패:", error);
         toast({
           title: "오류",
           description: "대화를 시작할 수 없습니다.",
@@ -147,8 +154,8 @@ export default function PersonaChat() {
       }
     };
 
-    startConversation();
-  }, [persona, conversationId, isCreating]);
+    startPersonaChat();
+  }, [persona, chatSession, isCreating, params.personaId]);
 
   const handleChatComplete = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
@@ -163,7 +170,7 @@ export default function PersonaChat() {
     setLocation("/");
   };
 
-  if (loadingPersona || isCreating || !conversationId) {
+  if (loadingPersona || isCreating || !chatSession) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -190,17 +197,28 @@ export default function PersonaChat() {
     );
   }
 
-  const dummyScenario = createDummyScenario(persona);
-  const personaSnapshot = createPersonaSnapshot(persona);
+  const dummyScenario = createDummyScenario(chatSession);
+  const personaSnapshot = createPersonaSnapshotForChat(chatSession);
+
+  // 초기 메시지 변환
+  const initialMessages = (chatSession.messages || []).map((msg: any) => ({
+    sender: msg.sender as 'user' | 'ai',
+    message: msg.message,
+    timestamp: msg.timestamp || new Date().toISOString(),
+    emotion: msg.emotion,
+    emotionReason: msg.emotionReason
+  }));
 
   return (
     <div className="h-screen w-full">
       <ChatWindow
         scenario={dummyScenario}
         persona={personaSnapshot}
-        conversationId={conversationId}
+        conversationId={chatSession.id}
         onChatComplete={handleChatComplete}
         onExit={handleExit}
+        isPersonaChat={true}
+        initialMessages={initialMessages}
       />
     </div>
   );
