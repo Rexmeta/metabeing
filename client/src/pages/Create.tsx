@@ -110,6 +110,133 @@ export default function Create() {
     "ISFJ", "ISFP", "ISTJ", "ISTP"
   ];
 
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem("authToken");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
+  const handleGenerateBaseImage = async () => {
+    if (!createdCharacterId || !characterForm.gender) {
+      toast({
+        title: "오류",
+        description: "캐릭터 ID와 성별이 필요합니다. 먼저 캐릭터를 저장해주세요.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGeneratingImages(true);
+    setImageGenerationProgress(0);
+
+    try {
+      const res = await fetch("/api/images/generate-character-base", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify({
+          characterId: createdCharacterId,
+          gender: characterForm.gender,
+          mbti: characterForm.mbti || "ENFP",
+          personalityTraits: characterForm.personality_traits 
+            ? characterForm.personality_traits.split(",").map(t => t.trim()).filter(Boolean) 
+            : [],
+          imageStyle: characterForm.imageStyle || "professional",
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "기본 이미지 생성 실패");
+      }
+
+      const result = await res.json();
+      setGeneratedImageUrl(result.imageUrl);
+      setImageGenerationProgress(100);
+
+      toast({
+        title: "기본 이미지 생성 완료",
+        description: "캐릭터 기본 이미지가 생성되었습니다.",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/ugc/characters"] });
+    } catch (error: any) {
+      toast({
+        title: "오류",
+        description: error.message || "기본 이미지 생성에 실패했습니다.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingImages(false);
+    }
+  };
+
+  const handleGenerateExpressions = async () => {
+    if (!createdCharacterId || !characterForm.gender) {
+      toast({
+        title: "오류",
+        description: "캐릭터 ID와 성별이 필요합니다. 먼저 캐릭터를 저장해주세요.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGeneratingImages(true);
+    setImageGenerationProgress(0);
+
+    try {
+      const res = await fetch("/api/images/generate-character-expressions", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify({
+          characterId: createdCharacterId,
+          gender: characterForm.gender,
+          mbti: characterForm.mbti || "ENFP",
+          personalityTraits: characterForm.personality_traits 
+            ? characterForm.personality_traits.split(",").map(t => t.trim()).filter(Boolean) 
+            : [],
+          imageStyle: characterForm.imageStyle || "professional",
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "표정 이미지 생성 실패");
+      }
+
+      const result = await res.json();
+      setImageGenerationProgress(100);
+
+      // 캐릭터 업데이트
+      await fetch(`/api/ugc/characters/${createdCharacterId}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify({
+          expressionImagesGenerated: true,
+        }),
+      });
+
+      toast({
+        title: "표정 이미지 생성 완료",
+        description: `${result.totalGenerated || 9}개의 표정 이미지가 생성되었습니다.`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/ugc/characters"] });
+    } catch (error: any) {
+      toast({
+        title: "오류",
+        description: error.message || "표정 이미지 생성에 실패했습니다.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingImages(false);
+    }
+  };
 
   const generateCharacterImagesMutation = useMutation({
     mutationFn: async (characterId: string) => {
@@ -887,26 +1014,50 @@ export default function Create() {
                     </Button>
                   </div>
 
-                  {characterForm.gender && (
-                    <Button
-                      variant="secondary"
-                      className="w-full gap-2"
-                      disabled={!characterForm.name || createCharacterMutation.isPending || isGeneratingImages}
-                      onClick={() => createCharacterMutation.mutate({ ...characterForm, publish: false, generateImages: true })}
-                      data-testid="button-char-generate-images"
-                    >
-                      {isGeneratingImages ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          이미지 생성 중...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4" />
-                          저장 + 이미지 자동 생성
-                        </>
+                  {characterForm.gender && !createdCharacterId && (
+                    <p className="text-sm text-muted-foreground text-center">
+                      이미지 생성은 캐릭터 저장 후 수정 모드에서 가능합니다
+                    </p>
+                  )}
+
+                  {createdCharacterId && characterForm.gender && (
+                    <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        이미지 생성
+                      </h4>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isGeneratingImages}
+                          onClick={() => handleGenerateBaseImage()}
+                          data-testid="button-generate-base"
+                        >
+                          {isGeneratingImages ? (
+                            <><Loader2 className="h-4 w-4 animate-spin mr-2" />생성 중...</>
+                          ) : (
+                            "기본 이미지 생성"
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isGeneratingImages}
+                          onClick={() => handleGenerateExpressions()}
+                          data-testid="button-generate-expressions"
+                        >
+                          {isGeneratingImages ? (
+                            <><Loader2 className="h-4 w-4 animate-spin mr-2" />생성 중... ({imageGenerationProgress}%)</>
+                          ) : (
+                            "전체 표정 생성"
+                          )}
+                        </Button>
+                      </div>
+                      {isGeneratingImages && (
+                        <Progress value={imageGenerationProgress} className="h-2" />
                       )}
-                    </Button>
+                    </div>
                   )}
                 </div>
               </CardContent>
