@@ -19,6 +19,15 @@ interface MBTIPersona {
   id: string;
   mbti: string;
   gender: 'male' | 'female'; // 성별 필드 추가
+  // 시나리오 페르소나 정의 필드
+  name: string;
+  department: string;
+  position: string;
+  experience: string;
+  stance: string;
+  goal: string;
+  tradeoff: string;
+  // 성격 특성
   personality_traits: string[];
   communication_style: string;
   motivation: string;
@@ -105,6 +114,15 @@ interface MBTIPersonaFormData {
   id: string;
   mbti: string;
   gender: 'male' | 'female'; // 성별 필드 추가
+  // 시나리오 페르소나 정의 필드
+  name: string;
+  department: string;
+  position: string;
+  experience: string;
+  stance: string;
+  goal: string;
+  tradeoff: string;
+  // 성격 특성
   personality_traits: string[];
   communication_style: string;
   motivation: string;
@@ -199,6 +217,15 @@ export function PersonaManager() {
     id: '',
     mbti: '',
     gender: 'male', // 성별 기본값 설정
+    // 시나리오 페르소나 정의 필드
+    name: '',
+    department: '',
+    position: '',
+    experience: '',
+    stance: '',
+    goal: '',
+    tradeoff: '',
+    // 성격 특성
     personality_traits: [],
     communication_style: '',
     motivation: '',
@@ -593,6 +620,15 @@ export function PersonaManager() {
       id: '',
       mbti: '',
       gender: 'male', // 성별 기본값 추가
+      // 시나리오 페르소나 정의 필드
+      name: '',
+      department: '',
+      position: '',
+      experience: '',
+      stance: '',
+      goal: '',
+      tradeoff: '',
+      // 성격 특성
       personality_traits: [],
       communication_style: '',
       motivation: '',
@@ -630,6 +666,15 @@ export function PersonaManager() {
       id: persona.id,
       mbti: persona.mbti,
       gender: persona.gender || 'male',
+      // 시나리오 페르소나 정의 필드
+      name: persona.name || '',
+      department: persona.department || '',
+      position: persona.position || '',
+      experience: persona.experience || '',
+      stance: persona.stance || '',
+      goal: persona.goal || '',
+      tradeoff: persona.tradeoff || '',
+      // 성격 특성
       personality_traits: persona.personality_traits || [],
       communication_style: persona.communication_style || '',
       motivation: persona.motivation || '',
@@ -771,6 +816,99 @@ export function PersonaManager() {
                       required
                       className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
                       data-testid="input-mbti"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 시나리오 페르소나 정의 섹션 */}
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <i className="fas fa-user-tie text-teal-600"></i>
+                  시나리오 페르소나 정의
+                </h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <Label htmlFor="persona_name" className="text-sm font-semibold text-slate-700 mb-1.5 block">이름</Label>
+                      <Input
+                        id="persona_name"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="김철수"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-persona-name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="persona_department" className="text-sm font-semibold text-slate-700 mb-1.5 block">부서</Label>
+                      <Input
+                        id="persona_department"
+                        value={formData.department}
+                        onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
+                        placeholder="영업팀"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-persona-department"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="persona_position" className="text-sm font-semibold text-slate-700 mb-1.5 block">직책</Label>
+                      <Input
+                        id="persona_position"
+                        value={formData.position}
+                        onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
+                        placeholder="팀장"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-persona-position"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="persona_experience" className="text-sm font-semibold text-slate-700 mb-1.5 block">경력/경험</Label>
+                    <Textarea
+                      id="persona_experience"
+                      value={formData.experience}
+                      onChange={(e) => setFormData(prev => ({ ...prev, experience: e.target.value }))}
+                      placeholder="10년 경력의 영업 전문가, 다양한 고객 대응 경험 보유"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-persona-experience"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="persona_stance" className="text-sm font-semibold text-slate-700 mb-1.5 block">입장/태도</Label>
+                    <Textarea
+                      id="persona_stance"
+                      value={formData.stance}
+                      onChange={(e) => setFormData(prev => ({ ...prev, stance: e.target.value }))}
+                      placeholder="가격보다 품질과 신뢰를 중시하며, 장기적 파트너십을 원함"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-persona-stance"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="persona_goal" className="text-sm font-semibold text-slate-700 mb-1.5 block">목표</Label>
+                    <Textarea
+                      id="persona_goal"
+                      value={formData.goal}
+                      onChange={(e) => setFormData(prev => ({ ...prev, goal: e.target.value }))}
+                      placeholder="팀 실적 달성과 고객 만족도 향상"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-persona-goal"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="persona_tradeoff" className="text-sm font-semibold text-slate-700 mb-1.5 block">트레이드오프 (고려 사항)</Label>
+                    <Textarea
+                      id="persona_tradeoff"
+                      value={formData.tradeoff}
+                      onChange={(e) => setFormData(prev => ({ ...prev, tradeoff: e.target.value }))}
+                      placeholder="비용 절감과 품질 유지 사이의 균형"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-persona-tradeoff"
                     />
                   </div>
                 </div>
