@@ -4649,27 +4649,38 @@ ${personaSnapshot.name}:`;
       return;
     }
 
-    // ✨ Verify persona_run ownership (새로운 구조)
-    const personaRun = await storage.getPersonaRun(conversationId);
-    if (!personaRun) {
-      ws.send(JSON.stringify({ type: 'error', error: 'Conversation not found' }));
-      ws.close();
-      return;
-    }
+    // ✨ 페르소나 직접 대화 세션인지 확인 (인메모리 세션)
+    const isPersonaDirectChat = conversationId.startsWith('persona-session-');
+    
+    let userSelectedDifficulty = 2; // 기본 난이도
+    
+    if (!isPersonaDirectChat) {
+      // 기존 시나리오 기반 대화 - DB에서 조회
+      const personaRun = await storage.getPersonaRun(conversationId);
+      if (!personaRun) {
+        ws.send(JSON.stringify({ type: 'error', error: 'Conversation not found' }));
+        ws.close();
+        return;
+      }
 
-    const scenarioRun = await storage.getScenarioRun(personaRun.scenarioRunId);
-    if (!scenarioRun || scenarioRun.userId !== userId) {
-      ws.send(JSON.stringify({ type: 'error', error: 'Unauthorized access' }));
-      ws.close();
-      return;
+      const scenarioRun = await storage.getScenarioRun(personaRun.scenarioRunId);
+      if (!scenarioRun || scenarioRun.userId !== userId) {
+        ws.send(JSON.stringify({ type: 'error', error: 'Unauthorized access' }));
+        ws.close();
+        return;
+      }
+      
+      userSelectedDifficulty = personaRun.difficulty || scenarioRun.difficulty || 2;
+    } else {
+      // 페르소나 직접 대화 - 인메모리 세션, 별도 권한 확인 불필요
+      console.log(`🎭 페르소나 직접 대화 WebSocket 연결: ${conversationId}`);
     }
 
     // Create unique session ID
     const sessionId = `${userId}-${conversationId}-${Date.now()}`;
 
     try {
-      // 사용자가 선택한 난이도 가져오기
-      const userSelectedDifficulty = personaRun.difficulty || scenarioRun.difficulty || 2;
+      // 사용자가 선택한 난이도
       console.log(`🎯 실시간 음성 세션 난이도: Level ${userSelectedDifficulty}`);
       
       // Create realtime voice session
