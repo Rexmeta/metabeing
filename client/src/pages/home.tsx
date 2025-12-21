@@ -880,15 +880,17 @@ export default function Home() {
         )}
 
         {currentView === "chat" && selectedScenario && selectedPersona && conversationId && (
-          <ChatWindow
-            scenario={selectedScenario}
-            persona={selectedPersona}
-            conversationId={conversationId}
-            onChatComplete={handleChatComplete}
-            onExit={handleReturnToScenarios}
-            onReady={handleChatReady}
-            onConversationEnding={() => setIsTransitioningToFeedback(true)}
-          />
+          <div className="fixed inset-0 z-40">
+            <ChatWindow
+              scenario={selectedScenario}
+              persona={selectedPersona}
+              conversationId={conversationId}
+              onChatComplete={handleChatComplete}
+              onExit={handleReturnToScenarios}
+              onReady={handleChatReady}
+              onConversationEnding={() => setIsTransitioningToFeedback(true)}
+            />
+          </div>
         )}
         
         {isVideoTransitioning && (

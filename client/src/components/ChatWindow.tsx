@@ -1183,7 +1183,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
   };
 
   return (
-    <div className={`chat-window relative ${isPersonaChat ? 'h-full w-full' : 'fixed inset-0 z-40'}`}>
+    <div className="chat-window flex flex-col h-full w-full">
       {isInitialLoading && (
         <div 
           className={`fixed inset-0 z-50 bg-black flex items-center justify-center transition-opacity duration-500 ${
@@ -1194,7 +1194,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
           <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
         </div>
       )}
-      <div className={`bg-white shadow-sm border border-slate-200 overflow-hidden ${isPersonaChat ? 'h-full relative rounded-none' : 'h-full rounded-xl'}`}>
+      <div className="bg-white shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
         {/* Chat Header */}
         <div className="bg-gradient-to-r from-corporate-600 to-corporate-700 px-4 sm:px-6 py-3 sm:py-4 text-white">
           <div className="flex items-center justify-between gap-3">
@@ -1783,7 +1783,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
 
           {chatMode === 'character' && (
             <div 
-              className="absolute inset-0 z-10 flex"
+              className="flex flex-1 min-h-0"
               data-testid="character-mode"
             >
               {/* Wide Screen Left Sidebar - Goals Panel (visible on xl+) */}
