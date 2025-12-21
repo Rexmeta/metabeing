@@ -1194,7 +1194,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
           <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
         </div>
       )}
-      <div className="bg-white shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0">
+      <div className="bg-white shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0 relative">
         {/* Chat Header */}
         <div className="bg-gradient-to-r from-corporate-600 to-corporate-700 px-4 sm:px-6 py-3 sm:py-4 text-white">
           <div className="flex items-center justify-between gap-3">
@@ -1287,7 +1287,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
         </div>
 
         {/* Main Content Area */}
-        <div className="relative flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0">
           {/* Chat Messages Area */}
           {chatMode === 'messenger' && (
             <div className="flex flex-col flex-1 min-h-0">
