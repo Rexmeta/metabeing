@@ -14,6 +14,7 @@ import { generateAIResponse, generateFeedback, generateStrategyReflectionFeedbac
 import { createSampleData } from "./sampleData";
 import ttsRoutes from "./routes/tts.js";
 import imageGenerationRoutes, { saveImageToLocal } from "./routes/imageGeneration.js";
+import ugcRoutes from "./routes/ugc.js";
 import { fileManager } from "./services/fileManager";
 import { generateScenarioWithAI, enhanceScenarioWithAI } from "./services/aiScenarioGenerator";
 import { realtimeVoiceService } from "./services/realtimeVoiceService";
@@ -4213,6 +4214,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 이미지 생성 라우트
   app.use("/api/image", imageGenerationRoutes);
+
+  // UGC 플랫폼 라우트 (Character.ai 스타일)
+  app.use("/api/ugc", ugcRoutes);
 
   // Create sample data for development
   if (process.env.NODE_ENV === "development") {

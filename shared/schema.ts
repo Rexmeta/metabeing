@@ -445,3 +445,182 @@ export type AiUsageDaily = {
   totalCostUsd: number;
   requestCount: number;
 };
+
+// ===== Character.ai 스타일 UGC 플랫폼 테이블 =====
+
+// 캐릭터 (유저 생성 페르소나)
+export const characters = pgTable("characters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").notNull().references(() => users.id),
+  name: varchar("name").notNull(),
+  tagline: varchar("tagline"), // 한줄 소개
+  description: text("description"),
+  systemPrompt: text("system_prompt"), // AI 성격, 말투, 지식 범위
+  profileImage: varchar("profile_image"),
+  coverImage: varchar("cover_image"),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  visibility: varchar("visibility").notNull().default("private"), // private, unlisted, public
+  status: varchar("status").notNull().default("draft"), // draft, published
+  safetyFlags: jsonb("safety_flags").$type<string[]>().default([]),
+  sourceCharacterId: varchar("source_character_id"), // 리믹스 원본
+  viewCount: integer("view_count").notNull().default(0),
+  usageCount: integer("usage_count").notNull().default(0), // 대화에 사용된 횟수
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("idx_characters_owner_id").on(table.ownerId),
+  index("idx_characters_visibility").on(table.visibility),
+  index("idx_characters_status").on(table.status),
+]);
+
+// 시나리오 (유저 생성 시나리오)
+export const ugcScenarios = pgTable("ugc_scenarios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").notNull().references(() => users.id),
+  name: varchar("name").notNull(),
+  tagline: varchar("tagline"),
+  description: text("description"),
+  background: text("background"), // 배경 설명
+  goal: text("goal"), // 목표
+  constraints: text("constraints"), // 제약 조건
+  openerMessage: text("opener_message"), // 첫 메시지
+  difficulty: integer("difficulty").default(2), // 1-4
+  tags: jsonb("tags").$type<string[]>().default([]),
+  visibility: varchar("visibility").notNull().default("private"),
+  status: varchar("status").notNull().default("draft"),
+  sourceScenarioId: varchar("source_scenario_id"), // 리믹스 원본
+  viewCount: integer("view_count").notNull().default(0),
+  usageCount: integer("usage_count").notNull().default(0),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("idx_ugc_scenarios_owner_id").on(table.ownerId),
+  index("idx_ugc_scenarios_visibility").on(table.visibility),
+  index("idx_ugc_scenarios_status").on(table.status),
+]);
+
+// Experience (캐릭터 × 시나리오 조합)
+export const experiences = pgTable("experiences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerId: varchar("owner_id").notNull().references(() => users.id),
+  characterId: varchar("character_id").notNull().references(() => characters.id),
+  scenarioId: varchar("scenario_id").references(() => ugcScenarios.id), // nullable - 캐릭터만으로도 대화 가능
+  name: varchar("name"),
+  description: text("description"),
+  options: jsonb("options").$type<ExperienceOptions>(), // 난이도, 대화모드 등
+  visibility: varchar("visibility").notNull().default("private"),
+  viewCount: integer("view_count").notNull().default(0),
+  usageCount: integer("usage_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("idx_experiences_owner_id").on(table.ownerId),
+  index("idx_experiences_character_id").on(table.characterId),
+  index("idx_experiences_scenario_id").on(table.scenarioId),
+]);
+
+// 좋아요
+export const likes = pgTable("likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  targetType: varchar("target_type").notNull(), // character, scenario, experience
+  targetId: varchar("target_id").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("idx_likes_user_id").on(table.userId),
+  index("idx_likes_target").on(table.targetType, table.targetId),
+]);
+
+// 북마크
+export const bookmarks = pgTable("bookmarks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  targetType: varchar("target_type").notNull(),
+  targetId: varchar("target_id").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("idx_bookmarks_user_id").on(table.userId),
+  index("idx_bookmarks_target").on(table.targetType, table.targetId),
+]);
+
+// 신고
+export const reports = pgTable("reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reporterId: varchar("reporter_id").notNull().references(() => users.id),
+  targetType: varchar("target_type").notNull(),
+  targetId: varchar("target_id").notNull(),
+  reason: varchar("reason").notNull(), // spam, inappropriate, copyright, other
+  description: text("description"),
+  status: varchar("status").notNull().default("pending"), // pending, reviewed, resolved, dismissed
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  resolvedAt: timestamp("resolved_at"),
+}, (table) => [
+  index("idx_reports_target").on(table.targetType, table.targetId),
+  index("idx_reports_status").on(table.status),
+]);
+
+// Experience 옵션 타입
+export type ExperienceOptions = {
+  difficulty?: number;
+  mode?: 'text' | 'tts' | 'realtime_voice';
+  emotionEnabled?: boolean;
+  customSettings?: Record<string, any>;
+};
+
+// UGC 테이블 Insert 스키마
+export const insertCharacterSchema = createInsertSchema(characters).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  viewCount: true,
+  usageCount: true,
+  version: true,
+});
+
+export const insertUgcScenarioSchema = createInsertSchema(ugcScenarios).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  viewCount: true,
+  usageCount: true,
+  version: true,
+});
+
+export const insertExperienceSchema = createInsertSchema(experiences).omit({
+  id: true,
+  createdAt: true,
+  viewCount: true,
+  usageCount: true,
+});
+
+export const insertLikeSchema = createInsertSchema(likes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBookmarkSchema = createInsertSchema(bookmarks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertReportSchema = createInsertSchema(reports).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+});
+
+// UGC 타입들
+export type InsertCharacter = z.infer<typeof insertCharacterSchema>;
+export type InsertUgcScenario = z.infer<typeof insertUgcScenarioSchema>;
+export type InsertExperience = z.infer<typeof insertExperienceSchema>;
+export type InsertLike = z.infer<typeof insertLikeSchema>;
+export type InsertBookmark = z.infer<typeof insertBookmarkSchema>;
+export type InsertReport = z.infer<typeof insertReportSchema>;
+
+export type Character = typeof characters.$inferSelect;
+export type UgcScenario = typeof ugcScenarios.$inferSelect;
+export type Experience = typeof experiences.$inferSelect;
+export type Like = typeof likes.$inferSelect;
+export type Bookmark = typeof bookmarks.$inferSelect;
+export type Report = typeof reports.$inferSelect;
