@@ -196,20 +196,11 @@ function PersonaCard({ persona }: { persona: Persona }) {
           </h3>
           
           {/* 설명 */}
-          <p className="text-white/80 text-sm line-clamp-2 mb-3 drop-shadow-md">
-            {persona.description || "AI 페르소나와 대화해보세요"}
-          </p>
-
-          {/* 하단 태그들 */}
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white/90 border border-white/20">
-              {displayGender}
-            </span>
-            <span className="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white/90 border border-white/20 flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
-              대화하기
-            </span>
-          </div>
+          {persona.description && (
+            <p className="text-white/80 text-sm line-clamp-2 drop-shadow-md">
+              {persona.description}
+            </p>
+          )}
         </div>
 
         {/* 호버 시 반짝이는 효과 */}
