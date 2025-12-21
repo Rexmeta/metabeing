@@ -48,21 +48,23 @@ router.post("/characters", isAuthenticated, async (req: Request, res: Response) 
       return res.status(401).json({ error: "로그인이 필요합니다" });
     }
 
-    // Build insert data, excluding null JSON fields (they cause Drizzle/Neon issues)
+    // Build insert data, excluding null/empty fields (Drizzle/Neon may fail silently with nulls)
     const insertData: Record<string, any> = {
       ownerId: userId,
       name: req.body.name,
-      tagline: req.body.tagline || null,
-      description: req.body.description || null,
-      systemPrompt: req.body.systemPrompt || null,
-      gender: req.body.gender || null,
-      mbti: req.body.mbti || null,
-      imageStyle: req.body.imageStyle || "professional",
-      communicationStyle: req.body.communicationStyle || null,
-      motivation: req.body.motivation || null,
       visibility: req.body.visibility || "private",
       status: req.body.status || "draft",
     };
+
+    // Only add optional string fields if they have content
+    if (req.body.tagline) insertData.tagline = req.body.tagline;
+    if (req.body.description) insertData.description = req.body.description;
+    if (req.body.systemPrompt) insertData.systemPrompt = req.body.systemPrompt;
+    if (req.body.gender) insertData.gender = req.body.gender;
+    if (req.body.mbti) insertData.mbti = req.body.mbti;
+    if (req.body.imageStyle) insertData.imageStyle = req.body.imageStyle;
+    if (req.body.communicationStyle) insertData.communicationStyle = req.body.communicationStyle;
+    if (req.body.motivation) insertData.motivation = req.body.motivation;
 
     // Only include array/JSON fields if they have actual content
     if (Array.isArray(req.body.personalityTraits) && req.body.personalityTraits.length > 0) {
