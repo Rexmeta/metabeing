@@ -83,34 +83,105 @@ function PersonaCard({ persona }: { persona: Persona }) {
   const handleClick = () => {
     setLocation(`/persona/${persona.id}/chat`);
   };
+
+  // MBTI 타입별 그라데이션 색상
+  const getMbtiGradient = (mbti: string) => {
+    const mbtiLower = mbti.toLowerCase();
+    const gradients: Record<string, string> = {
+      'intj': 'from-indigo-600 via-purple-600 to-violet-700',
+      'intp': 'from-cyan-500 via-blue-500 to-indigo-600',
+      'entj': 'from-amber-500 via-orange-500 to-red-600',
+      'entp': 'from-yellow-400 via-orange-400 to-pink-500',
+      'infj': 'from-purple-500 via-pink-500 to-rose-500',
+      'infp': 'from-pink-400 via-purple-400 to-indigo-500',
+      'enfj': 'from-emerald-400 via-teal-500 to-cyan-600',
+      'enfp': 'from-orange-400 via-pink-500 to-purple-600',
+      'istj': 'from-slate-500 via-gray-600 to-zinc-700',
+      'isfj': 'from-rose-400 via-pink-400 to-fuchsia-500',
+      'estj': 'from-blue-600 via-indigo-600 to-violet-700',
+      'esfj': 'from-pink-500 via-rose-500 to-red-500',
+      'istp': 'from-gray-500 via-slate-600 to-zinc-700',
+      'isfp': 'from-green-400 via-emerald-500 to-teal-600',
+      'estp': 'from-red-500 via-orange-500 to-yellow-500',
+      'esfp': 'from-fuchsia-500 via-pink-500 to-rose-500',
+    };
+    return gradients[mbtiLower] || 'from-slate-600 via-gray-700 to-zinc-800';
+  };
   
   return (
-    <Card 
-      className="cursor-pointer hover:shadow-lg transition-shadow"
+    <div 
+      className="group relative cursor-pointer"
       onClick={handleClick}
       data-testid={`card-persona-${persona.id}`}
     >
-      <CardHeader className="pb-3">
-        <div className="flex items-start gap-3">
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={persona.profileImage} />
-            <AvatarFallback>{displayName.slice(0, 2)}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg truncate">{displayName}</CardTitle>
-            <CardDescription className="line-clamp-2">
-              {persona.description || "AI 페르소나"}
-            </CardDescription>
+      {/* 카드 컨테이너 - 인스타그램 스타일 */}
+      <div className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-lg transition-all duration-500 group-hover:shadow-2xl group-hover:scale-[1.02]">
+        
+        {/* 배경 이미지 또는 그라데이션 */}
+        {persona.profileImage ? (
+          <>
+            <img 
+              src={persona.profileImage} 
+              alt={displayName}
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            />
+            {/* 다크 오버레이 그라데이션 */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+          </>
+        ) : (
+          /* 이미지 없을 때 MBTI 기반 그라데이션 */
+          <div className={`absolute inset-0 bg-gradient-to-br ${getMbtiGradient(mbtiDisplay)}`}>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <User className="w-24 h-24 text-white/30" />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+          </div>
+        )}
+
+        {/* 상단 MBTI 뱃지 */}
+        {mbtiDisplay && (
+          <div className="absolute top-3 left-3 z-10">
+            <div className="px-3 py-1.5 bg-white/20 backdrop-blur-md rounded-full border border-white/30">
+              <span className="text-white font-bold text-sm tracking-wider">{mbtiDisplay}</span>
+            </div>
+          </div>
+        )}
+
+        {/* 좋아요/북마크 스타일 아이콘 (장식용) */}
+        <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="p-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30">
+            <Star className="w-4 h-4 text-white" />
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-1 mb-3">
-          {mbtiDisplay && <Badge variant="secondary" className="text-xs">{mbtiDisplay}</Badge>}
-          <Badge variant="outline" className="text-xs">{displayGender}</Badge>
+
+        {/* 하단 정보 영역 */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
+          {/* 이름 */}
+          <h3 className="text-xl font-bold text-white mb-1 drop-shadow-lg">
+            {displayName}
+          </h3>
+          
+          {/* 설명 */}
+          <p className="text-white/80 text-sm line-clamp-2 mb-3 drop-shadow-md">
+            {persona.description || "AI 페르소나와 대화해보세요"}
+          </p>
+
+          {/* 하단 태그들 */}
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white/90 border border-white/20">
+              {displayGender}
+            </span>
+            <span className="px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white/90 border border-white/20 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              대화하기
+            </span>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* 호버 시 반짝이는 효과 */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      </div>
+    </div>
   );
 }
 
@@ -238,19 +309,15 @@ export default function Explore() {
 
           <TabsContent value="personas">
             {loadingPersonas ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="flex gap-3">
-                        <div className="h-12 w-12 rounded-full bg-slate-200" />
-                        <div className="flex-1 space-y-2">
-                          <div className="h-4 bg-slate-200 rounded w-3/4" />
-                          <div className="h-3 bg-slate-200 rounded w-full" />
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {[...Array(12)].map((_, i) => (
+                  <div key={i} className="aspect-[3/4] rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 animate-pulse overflow-hidden">
+                    <div className="h-full flex flex-col justify-end p-4">
+                      <div className="h-5 bg-slate-400/30 rounded w-3/4 mb-2" />
+                      <div className="h-3 bg-slate-400/30 rounded w-full mb-1" />
+                      <div className="h-3 bg-slate-400/30 rounded w-2/3" />
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : personas.length === 0 ? (
@@ -263,7 +330,7 @@ export default function Explore() {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {personas.map((persona) => (
                   <PersonaCard key={persona.id} persona={persona} />
                 ))}
