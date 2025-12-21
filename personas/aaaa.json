@@ -33,11 +33,11 @@
     "emotion": ""
   },
   "images": {
-    "base": "",
+    "base": "/personas/aaaa/male/neutral.webp?t=1766293577512",
     "style": "",
     "male": {
       "expressions": {
-        "중립": "",
+        "중립": "/personas/aaaa/male/neutral.webp?t=1766293577512",
         "기쁨": "",
         "슬픔": "",
         "분노": "",
