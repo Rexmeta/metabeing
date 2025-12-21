@@ -22,7 +22,7 @@ interface UseRealtimeVoiceReturn {
   status: RealtimeVoiceStatus;
   isRecording: boolean;
   isAISpeaking: boolean;
-  connect: () => Promise<void>;
+  connect: (hasExistingMessages?: boolean) => Promise<void>;
   disconnect: () => void;
   startRecording: () => void;
   stopRecording: () => void;
@@ -198,7 +198,10 @@ export function useRealtimeVoice({
     setIsAISpeaking(false);
   }, [stopCurrentPlayback]);
 
-  const connect = useCallback(async () => {
+  const hasExistingMessagesRef = useRef<boolean>(false);
+
+  const connect = useCallback(async (hasExistingMessages: boolean = false) => {
+    hasExistingMessagesRef.current = hasExistingMessages;
     setStatus('connecting');
     setError(null);
 
@@ -238,8 +241,14 @@ export function useRealtimeVoice({
         // 이렇게 하면 클라이언트가 오디오 재생 준비가 완료된 상태에서 첫 인사를 받을 수 있음
         setTimeout(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'client.ready' }));
-            console.log('📤 Sent client.ready signal to server');
+            ws.send(JSON.stringify({ type: 'client.ready', hasExistingMessages: hasExistingMessagesRef.current }));
+            console.log(`📤 Sent client.ready signal to server (hasExistingMessages: ${hasExistingMessagesRef.current})`);
+            
+            // 🔧 이미 초기 메시지가 있으면 AI 인사 트리거를 건너뜀 (중복 인사 방지)
+            if (hasExistingMessagesRef.current) {
+              console.log('⏭️ Skipping first greeting trigger - session already has initial messages');
+              return;
+            }
             
             // 🔧 Gemini Live API는 오디오 입력 없이 응답하지 않으므로,
             // 짧은 무음 오디오 (0.5초)를 보내서 AI가 첫 인사를 시작하도록 트리거

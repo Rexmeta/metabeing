@@ -1012,6 +1012,13 @@ export class RealtimeVoiceService {
           break;
         }
         
+        // 이미 초기 메시지가 있으면 인사 트리거 건너뛰기 (중복 인사 방지)
+        if (message.hasExistingMessages) {
+          console.log('⏭️ Session already has initial messages, skipping AI greeting trigger');
+          session.hasReceivedFirstAIResponse = true;
+          break;
+        }
+        
         // 첫 인사를 유도하는 트리거 - 상대방이 도착했음을 알려 AI가 먼저 인사하도록 함
         const firstMessage = `(상대방이 방금 도착했습니다. 당신이 먼저 인사를 건네세요.)`;
         

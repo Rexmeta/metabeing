@@ -1432,7 +1432,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                       <div className="text-center space-y-4 py-4">
                         <p className="text-sm text-slate-600">실시간 음성 대화를 시작하세요</p>
                         <Button
-                          onClick={() => realtimeVoice.connect()}
+                          onClick={() => realtimeVoice.connect(localMessages.some(m => m.sender === 'ai'))}
                           className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full shadow-lg"
                           data-testid="button-start-voice-messenger"
                         >
@@ -2018,7 +2018,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                           <div className="flex flex-col items-center space-y-4 py-4">
                             <p className="text-sm text-slate-600">실시간 음성 대화를 시작하세요</p>
                             <Button
-                              onClick={() => realtimeVoice.connect()}
+                              onClick={() => realtimeVoice.connect(localMessages.some(m => m.sender === 'ai'))}
                               className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-6 text-lg font-semibold rounded-full shadow-lg"
                               data-testid="button-start-voice"
                             >
