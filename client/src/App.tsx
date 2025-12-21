@@ -24,8 +24,6 @@ import Explore from "@/pages/Explore";
 import Create from "@/pages/Create";
 import Library from "@/pages/Library";
 import ProfileSettings from "@/pages/ProfileSettings";
-import CharacterDetail from "@/pages/CharacterDetail";
-import CharacterChat from "@/pages/CharacterChat";
 import PersonaChat from "@/pages/PersonaChat";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
@@ -113,10 +111,6 @@ function MainRouter() {
     <Switch>
       <Route path="/" component={Explore} />
       <Route path="/explore" component={Explore} />
-      <Route path="/character/:id" component={CharacterDetail} />
-      <Route path="/character/:id/chat">
-        {() => <ProtectedRoute component={CharacterChat} />}
-      </Route>
       <Route path="/persona/:personaId/chat">
         {() => <ProtectedRoute component={PersonaChat} />}
       </Route>
