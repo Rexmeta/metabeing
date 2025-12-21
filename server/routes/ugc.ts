@@ -26,6 +26,20 @@ const router = Router();
 
 // ===== Characters CRUD =====
 
+// Helper to clean JSON fields (convert empty strings to null)
+const cleanJsonField = (value: any): any => {
+  if (value === "" || value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value === "object" && Object.keys(value).length === 0) return null;
+  return value;
+};
+
 // Create character
 router.post("/characters", isAuthenticated, async (req: Request, res: Response) => {
   try {
@@ -34,7 +48,19 @@ router.post("/characters", isAuthenticated, async (req: Request, res: Response) 
       return res.status(401).json({ error: "로그인이 필요합니다" });
     }
 
-    const data = insertCharacterSchema.parse({ ...req.body, ownerId: userId });
+    // Clean JSON fields before parsing
+    const cleanedBody = {
+      ...req.body,
+      ownerId: userId,
+      background: cleanJsonField(req.body.background),
+      communicationPatterns: cleanJsonField(req.body.communicationPatterns),
+      voice: cleanJsonField(req.body.voice),
+      fears: Array.isArray(req.body.fears) && req.body.fears.length > 0 ? req.body.fears : [],
+      personalityTraits: Array.isArray(req.body.personalityTraits) && req.body.personalityTraits.length > 0 ? req.body.personalityTraits : [],
+      tags: Array.isArray(req.body.tags) && req.body.tags.length > 0 ? req.body.tags : [],
+    };
+
+    const data = insertCharacterSchema.parse(cleanedBody);
     console.log("[Character Create] Parsed data:", JSON.stringify(data, null, 2));
     
     const result = await db.insert(characters).values(data as any).returning();
@@ -173,11 +199,20 @@ router.put("/characters/:id", async (req: Request, res: Response) => {
       return res.status(403).json({ error: "수정 권한이 없습니다" });
     }
 
-    // Whitelist allowed fields only
+    // Whitelist allowed fields only and clean JSON fields
     const updateData: Record<string, any> = {};
+    const jsonFields = ["background", "communicationPatterns", "voice"];
+    const arrayFields = ["fears", "personalityTraits", "tags"];
+    
     for (const field of characterUpdateFields) {
       if (req.body[field] !== undefined) {
-        updateData[field] = req.body[field];
+        if (jsonFields.includes(field)) {
+          updateData[field] = cleanJsonField(req.body[field]);
+        } else if (arrayFields.includes(field)) {
+          updateData[field] = Array.isArray(req.body[field]) ? req.body[field] : [];
+        } else {
+          updateData[field] = req.body[field];
+        }
       }
     }
 
