@@ -153,6 +153,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await logoutMutation.mutateAsync();
   };
 
+  const refreshUser = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+  };
+
   const requireAuth = useCallback((message?: string): boolean => {
     if (!user) {
       setAuthModalMessage(message || "이 기능을 사용하려면 로그인이 필요합니다.");
@@ -169,6 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     login,
     register,
     logout,
+    refreshUser,
     showAuthModal,
     setShowAuthModal,
     authModalMessage,

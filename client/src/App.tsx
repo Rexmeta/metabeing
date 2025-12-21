@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
 import Intro from "@/pages/intro";
 import Home from "@/pages/home";
 import MyPage from "@/pages/MyPage";
@@ -21,6 +23,7 @@ import NotFound from "@/pages/not-found";
 import Explore from "@/pages/Explore";
 import Create from "@/pages/Create";
 import Library from "@/pages/Library";
+import ProfileSettings from "@/pages/ProfileSettings";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, setShowAuthModal } = useAuth();
@@ -35,10 +38,10 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩 중...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">로딩 중...</p>
         </div>
       </div>
     );
@@ -46,9 +49,54 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">로그인이 필요합니다.</p>
+          <p className="text-muted-foreground">로그인이 필요합니다.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <Component />;
+}
+
+function AdminRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isAuthenticated, isLoading, setShowAuthModal } = useAuth();
+  const [hasShownModal, setHasShownModal] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !hasShownModal) {
+      setShowAuthModal(true);
+      setHasShownModal(true);
+    }
+  }, [isLoading, isAuthenticated, hasShownModal, setShowAuthModal]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">로그인이 필요합니다.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user?.role !== "admin" && user?.role !== "operator") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">접근 권한이 없습니다.</p>
         </div>
       </div>
     );
@@ -72,6 +120,9 @@ function MainRouter() {
       <Route path="/analytics">
         {() => <ProtectedRoute component={Analytics} />}
       </Route>
+      <Route path="/profile-settings">
+        {() => <ProtectedRoute component={ProfileSettings} />}
+      </Route>
       <Route path="/chat/:conversationId">
         {() => <ProtectedRoute component={ConversationView} />}
       </Route>
@@ -79,19 +130,19 @@ function MainRouter() {
         {() => <ProtectedRoute component={FeedbackView} />}
       </Route>
       <Route path="/admin">
-        {() => <ProtectedRoute component={AdminDashboard} />}
+        {() => <AdminRoute component={AdminDashboard} />}
       </Route>
       <Route path="/admin-dashboard">
-        {() => <ProtectedRoute component={AdminDashboard} />}
+        {() => <AdminRoute component={AdminDashboard} />}
       </Route>
       <Route path="/admin-management">
-        {() => <ProtectedRoute component={AdminManagement} />}
+        {() => <AdminRoute component={AdminManagement} />}
       </Route>
       <Route path="/ai-generator">
-        {() => <ProtectedRoute component={AIGeneratorPage} />}
+        {() => <AdminRoute component={AIGeneratorPage} />}
       </Route>
       <Route path="/system-admin">
-        {() => <ProtectedRoute component={SystemAdminPage} />}
+        {() => <AdminRoute component={SystemAdminPage} />}
       </Route>
       <Route path="/help" component={HelpPage} />
       <Route path="/create">
@@ -105,13 +156,36 @@ function MainRouter() {
   );
 }
 
+function AppLayout() {
+  const sidebarStyle = {
+    "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "3rem",
+  } as React.CSSProperties;
+
+  return (
+    <SidebarProvider style={sidebarStyle}>
+      <div className="flex min-h-screen w-full">
+        <AppSidebar />
+        <main className="flex-1 flex flex-col min-h-screen">
+          <header className="sticky top-0 z-50 flex items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 h-14">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+          </header>
+          <div className="flex-1 overflow-auto">
+            <MainRouter />
+          </div>
+        </main>
+      </div>
+    </SidebarProvider>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
-          <MainRouter />
+          <AppLayout />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
