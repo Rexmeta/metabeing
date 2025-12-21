@@ -1183,7 +1183,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
   };
 
   return (
-    <div className="chat-window relative">
+    <div className="chat-window relative h-full w-full">
       {isInitialLoading && (
         <div 
           className={`fixed inset-0 z-50 bg-black flex items-center justify-center transition-opacity duration-500 ${
