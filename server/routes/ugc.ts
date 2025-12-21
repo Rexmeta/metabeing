@@ -19,13 +19,14 @@ import {
   type Experience,
 } from "@shared/schema";
 import { db } from "../storage";
+import { isAuthenticated } from "../auth";
 
 const router = Router();
 
 // ===== Characters CRUD =====
 
 // Create character
-router.post("/characters", async (req: Request, res: Response) => {
+router.post("/characters", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -177,7 +178,7 @@ router.put("/characters/:id", async (req: Request, res: Response) => {
 });
 
 // Publish character
-router.post("/characters/:id/publish", async (req: Request, res: Response) => {
+router.post("/characters/:id/publish", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
@@ -226,7 +227,7 @@ router.delete("/characters/:id", async (req: Request, res: Response) => {
 });
 
 // Fork/Remix character
-router.post("/characters/:id/fork", async (req: Request, res: Response) => {
+router.post("/characters/:id/fork", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
@@ -262,7 +263,7 @@ router.post("/characters/:id/fork", async (req: Request, res: Response) => {
 
 // ===== Scenarios CRUD =====
 
-router.post("/scenarios", async (req: Request, res: Response) => {
+router.post("/scenarios", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -405,7 +406,7 @@ router.put("/scenarios/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/scenarios/:id/publish", async (req: Request, res: Response) => {
+router.post("/scenarios/:id/publish", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
@@ -452,7 +453,7 @@ router.delete("/scenarios/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/scenarios/:id/fork", async (req: Request, res: Response) => {
+router.post("/scenarios/:id/fork", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;
@@ -490,7 +491,7 @@ router.post("/scenarios/:id/fork", async (req: Request, res: Response) => {
 
 // ===== Experiences (Character × Scenario) =====
 
-router.post("/experiences", async (req: Request, res: Response) => {
+router.post("/experiences", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -593,7 +594,7 @@ router.get("/experiences", async (req: Request, res: Response) => {
 // ===== Social Features =====
 
 // Like
-router.post("/likes", async (req: Request, res: Response) => {
+router.post("/likes", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -657,7 +658,7 @@ router.get("/likes/:targetType/:targetId", async (req: Request, res: Response) =
 });
 
 // Bookmark
-router.post("/bookmarks", async (req: Request, res: Response) => {
+router.post("/bookmarks", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -716,7 +717,7 @@ router.get("/bookmarks", async (req: Request, res: Response) => {
 });
 
 // Report
-router.post("/reports", async (req: Request, res: Response) => {
+router.post("/reports", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
