@@ -24,6 +24,7 @@ import Explore from "@/pages/Explore";
 import Create from "@/pages/Create";
 import Library from "@/pages/Library";
 import ProfileSettings from "@/pages/ProfileSettings";
+import CharacterDetail from "@/pages/CharacterDetail";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, setShowAuthModal } = useAuth();
@@ -110,6 +111,7 @@ function MainRouter() {
     <Switch>
       <Route path="/" component={Explore} />
       <Route path="/explore" component={Explore} />
+      <Route path="/character/:id" component={CharacterDetail} />
       <Route path="/intro" component={Intro} />
       <Route path="/home">
         {() => <ProtectedRoute component={Home} />}
