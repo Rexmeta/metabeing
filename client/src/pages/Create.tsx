@@ -747,26 +747,26 @@ export default function Create() {
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
 
-                  {generatedImageUrl && (
-                    <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                      <p className="text-sm text-muted-foreground mb-2">생성된 프로필 이미지</p>
-                      <img 
-                        src={generatedImageUrl} 
-                        alt="생성된 캐릭터 이미지" 
-                        className="w-32 h-32 object-cover rounded-lg mx-auto"
-                      />
-                    </div>
-                  )}
+                    {generatedImageUrl && (
+                      <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground mb-2">생성된 프로필 이미지</p>
+                        <img 
+                          src={generatedImageUrl} 
+                          alt="생성된 캐릭터 이미지" 
+                          className="w-32 h-32 object-cover rounded-lg mx-auto"
+                        />
+                      </div>
+                    )}
 
-                  {isGeneratingImages && (
-                    <div className="mt-4 space-y-2">
-                      <p className="text-sm text-muted-foreground">이미지 생성 중...</p>
-                      <Progress value={imageGenerationProgress} className="h-2" />
-                    </div>
-                  )}
-                </div>
+                    {isGeneratingImages && (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-sm text-muted-foreground">이미지 생성 중...</p>
+                        <Progress value={imageGenerationProgress} className="h-2" />
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
 
                 <div className="flex flex-col gap-3 pt-4">
                   <div className="flex gap-3">
