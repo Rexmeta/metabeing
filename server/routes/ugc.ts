@@ -48,22 +48,50 @@ router.post("/characters", isAuthenticated, async (req: Request, res: Response) 
       return res.status(401).json({ error: "로그인이 필요합니다" });
     }
 
-    // Clean JSON fields before parsing
-    const cleanedBody = {
-      ...req.body,
+    // Build insert data, excluding null JSON fields (they cause Drizzle/Neon issues)
+    const insertData: Record<string, any> = {
       ownerId: userId,
-      background: cleanJsonField(req.body.background),
-      communicationPatterns: cleanJsonField(req.body.communicationPatterns),
-      voice: cleanJsonField(req.body.voice),
-      fears: Array.isArray(req.body.fears) && req.body.fears.length > 0 ? req.body.fears : [],
-      personalityTraits: Array.isArray(req.body.personalityTraits) && req.body.personalityTraits.length > 0 ? req.body.personalityTraits : [],
-      tags: Array.isArray(req.body.tags) && req.body.tags.length > 0 ? req.body.tags : [],
+      name: req.body.name,
+      tagline: req.body.tagline || null,
+      description: req.body.description || null,
+      systemPrompt: req.body.systemPrompt || null,
+      gender: req.body.gender || null,
+      mbti: req.body.mbti || null,
+      imageStyle: req.body.imageStyle || "professional",
+      communicationStyle: req.body.communicationStyle || null,
+      motivation: req.body.motivation || null,
+      visibility: req.body.visibility || "private",
+      status: req.body.status || "draft",
     };
 
-    const data = insertCharacterSchema.parse(cleanedBody);
-    console.log("[Character Create] Parsed data:", JSON.stringify(data, null, 2));
+    // Only include array/JSON fields if they have actual content
+    if (Array.isArray(req.body.personalityTraits) && req.body.personalityTraits.length > 0) {
+      insertData.personalityTraits = req.body.personalityTraits;
+    }
+    if (Array.isArray(req.body.fears) && req.body.fears.length > 0) {
+      insertData.fears = req.body.fears;
+    }
+    if (Array.isArray(req.body.tags) && req.body.tags.length > 0) {
+      insertData.tags = req.body.tags;
+    }
     
-    const result = await db.insert(characters).values(data as any).returning();
+    // JSON object fields - only include if they're valid objects with content
+    const bgVal = cleanJsonField(req.body.background);
+    if (bgVal && typeof bgVal === "object" && Object.keys(bgVal).length > 0) {
+      insertData.background = bgVal;
+    }
+    const cpVal = cleanJsonField(req.body.communicationPatterns);
+    if (cpVal && typeof cpVal === "object" && Object.keys(cpVal).length > 0) {
+      insertData.communicationPatterns = cpVal;
+    }
+    const voiceVal = cleanJsonField(req.body.voice);
+    if (voiceVal && typeof voiceVal === "object" && Object.keys(voiceVal).length > 0) {
+      insertData.voice = voiceVal;
+    }
+
+    console.log("[Character Create] Insert data:", JSON.stringify(insertData, null, 2));
+    
+    const result = await db.insert(characters).values(insertData as any).returning();
     console.log("[Character Create] Insert result:", JSON.stringify(result, null, 2));
     
     const character = result[0];
