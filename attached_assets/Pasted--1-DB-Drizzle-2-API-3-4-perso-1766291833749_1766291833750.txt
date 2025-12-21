@@ -1,0 +1,352 @@
+좋습니다. 아래는 **바로 구현 가능한 수준**으로 (1) DB 스키마(Drizzle 기준) (2) API 스펙 (3) 프론트 라우팅/화면 구성 (4) 마이그레이션(기존 personas/scenarios → UGC)까지 한 번에 정리한 “최소비용 MVP 설계”입니다.
+
+---
+
+## 1) MVP 범위 고정
+
+Character.ai 핵심 루프만 먼저 만듭니다.
+
+* 유저: 로그인/회원가입
+* 캐릭터(=persona) 생성/편집/발행(public, unlisted, private)
+* 시나리오 생성/편집/발행
+* 탐색(검색/태그/정렬: new/top/trending은 MVP에선 new/top만)
+* 캐릭터만으로 채팅 시작(옵션으로 시나리오 선택 가능)
+* 좋아요/북마크
+* 내 라이브러리(내 콘텐츠 + 북마크 + 내 대화)
+
+---
+
+## 2) DB 스키마 (Drizzle / Postgres 가정)
+
+핵심은 “본문(JSON)은 그대로 저장, DB에는 메타+권한+탐색 필드”입니다.
+
+### 2.1 공통 Enum
+
+* `visibility`: `private | unlisted | public`
+* `content_status`: `draft | published | hidden`
+* `target_type`: `character | scenario | experience`
+
+### 2.2 테이블 목록
+
+1. `users`
+2. `characters`
+3. `scenarios`
+4. `experiences` (캐릭터×시나리오 조합 템플릿)
+5. `conversations`
+6. `messages`
+7. `likes`
+8. `bookmarks`
+9. `reports`
+
+### 2.3 필드 설계(권장)
+
+#### users
+
+* `id` (uuid)
+* `email` (unique)
+* `password_hash`
+* `display_name`
+* `avatar_url` (optional)
+* `created_at`
+
+#### characters
+
+* `id` (uuid)
+* `owner_id` (users.id)
+* `name`
+* `tagline` (한줄 소개)
+* `description`
+* `tags` (text[])
+* `visibility`
+* `status` (draft/published/hidden)
+* `cover_url` / `avatar_url`
+* `body_json` (jsonb)  ← **기존 persona 포맷 그대로**
+* `source_character_id` (uuid, nullable) ← 리믹스(Phase2)
+* `version` (int default 1)
+* `stats_like_count` (int)  ← MVP에선 denorm optional
+* `stats_chat_count` (int)  ← optional
+* `created_at`, `updated_at`
+
+#### scenarios
+
+* `id`, `owner_id`
+* `title`
+* `summary`
+* `description`
+* `tags`
+* `visibility`, `status`
+* `body_json`(jsonb) ← 기존 scenario 포맷 그대로
+* `source_scenario_id`(nullable)
+* `version`, `created_at`, `updated_at`
+
+#### experiences (조합 공유)
+
+* `id`
+* `owner_id`
+* `character_id`
+* `scenario_id` (nullable 허용 가능: 캐릭터만 조합도 가능)
+* `title`
+* `summary`
+* `visibility`, `status`
+* `options_json` (jsonb) ← 난이도, 안전옵션, 평가룰 등
+* `created_at`, `updated_at`
+
+#### conversations
+
+* `id`
+* `owner_id`
+* `character_id`
+* `scenario_id` (nullable)
+* `experience_id` (nullable)
+* `title`
+* `visibility` (기본 private)
+* `created_at`, `updated_at`
+
+#### messages
+
+* `id`
+* `conversation_id`
+* `role` (`system|user|assistant`)
+* `content` (text)
+* `meta_json` (jsonb) ← token usage, emotion score, latency 등
+* `created_at`
+
+#### likes / bookmarks (타겟 공용)
+
+* `id`
+* `user_id`
+* `target_type`
+* `target_id`
+* `created_at`
+* unique index: `(user_id, target_type, target_id)`
+
+#### reports (신고)
+
+* `id`
+* `reporter_user_id`
+* `target_type`
+* `target_id`
+* `reason_code` (text)
+* `details` (text)
+* `status` (`open|reviewed|actioned`)
+* `created_at`
+
+> MVP에선 `stats_like_count` 같은 denormal은 없어도 됩니다. 다만 탐색에서 정렬(top)을 쓰려면 집계가 필요하니, 처음엔 “likes 집계”를 SQL로 하고, 트래픽 생기면 denorm/배치로 바꾸면 됩니다.
+
+---
+
+## 3) API 설계 (REST 기준, 최소 엔드포인트)
+
+### 3.1 Auth
+
+* `POST /api/auth/signup`
+* `POST /api/auth/login`
+* `GET /api/me`
+
+### 3.2 Explore (검색/목록)
+
+* `GET /api/characters?query=&tags=&visibility=public&sort=new|top&page=`
+* `GET /api/scenarios?query=&tags=&visibility=public&sort=new|top&page=`
+* `GET /api/experiences?query=&tags=&sort=new|top&page=`
+
+**정렬**
+
+* `new`: created_at desc
+* `top`: like_count desc (집계)
+
+### 3.3 Characters
+
+* `POST /api/characters` → draft 생성
+* `PUT /api/characters/:id` → owner만 편집
+* `POST /api/characters/:id/publish` → status=published
+* `POST /api/characters/:id/unpublish` → status=draft (선택)
+* `GET /api/characters/:id` → public이면 누구나, private면 owner만
+
+### 3.4 Scenarios
+
+* Characters와 동일
+
+### 3.5 Experiences (조합 템플릿)
+
+* `POST /api/experiences`
+* `PUT /api/experiences/:id`
+* `POST /api/experiences/:id/publish`
+* `GET /api/experiences/:id`
+
+### 3.6 Conversation / Chat
+
+* `POST /api/conversations`
+
+  * body: `{ characterId, scenarioId?, experienceId?, title? }`
+* `POST /api/conversations/:id/messages`
+
+  * body: `{ content }`
+  * 서버 동작:
+
+    1. conversation 로드
+    2. character/scenario/experience 로드
+    3. 프롬프트 구성(기존 로직 재사용)
+    4. LLM 호출
+    5. messages 저장(user + assistant)
+    6. response 반환
+* `GET /api/conversations/:id`
+* `GET /api/me/conversations`
+
+### 3.7 Likes / Bookmarks
+
+* `POST /api/likes` body: `{ targetType, targetId }` (toggle 방식 추천)
+* `POST /api/bookmarks` body: `{ targetType, targetId }` (toggle)
+* `GET /api/me/bookmarks?targetType=character|scenario|experience`
+
+### 3.8 Reports
+
+* `POST /api/reports` body: `{ targetType, targetId, reasonCode, details? }`
+
+---
+
+## 4) 프론트 라우팅/화면 IA (Vite/React 가정)
+
+### 4.1 라우트
+
+* `/` → Explore
+
+* `/characters` → 캐릭터 탐색 리스트
+
+* `/characters/:id` → 캐릭터 상세 + Start Chat
+
+* `/scenarios` / `/scenarios/:id`
+
+* `/experiences` / `/experiences/:id`
+
+* `/create` → Create Hub (캐릭터/시나리오/조합)
+
+* `/create/character` → 캐릭터 에디터(draft)
+
+* `/create/scenario`
+
+* `/create/experience`
+
+* `/library` → My Library
+
+* `/library/characters` (내 캐릭터)
+
+* `/library/scenarios`
+
+* `/library/bookmarks`
+
+* `/chat/:conversationId` → 채팅 화면
+
+* `/login`, `/signup`
+
+### 4.2 화면 컴포넌트 최소 세트
+
+* `ExplorePage`
+
+  * `SearchBar`, `TagFilter`, `SortDropdown`
+  * `ContentGrid(Card)`
+* `CharacterDetailPage`
+
+  * `StartChatButton`
+  * (옵션) `ScenarioPickerModal` → 시나리오 선택 후 시작
+* `EditorPage(Character/Scenario)`
+
+  * 좌측: 폼(이름/태그/공개범위)
+  * 우측: JSON/프롬프트 편집(기존 포맷 유지)
+  * Publish 버튼
+* `ChatPage`
+
+  * 메시지 리스트 + 입력창
+  * 상단에 현재 character/scenario 배지
+
+---
+
+## 5) “기존 metabeing 구조”를 최소 변경으로 연결하는 방법
+
+핵심은 **기존 personas/scenarios 로딩 지점을 인터페이스화**하는 것입니다.
+
+### 5.1 ContentProvider 인터페이스
+
+서버에서 지금이 “파일 기반 로드”라면, 아래처럼 추상화합니다.
+
+* `getCharacter(id)`
+* `getScenario(id)`
+* `listCharacters(filters)`
+* `listScenarios(filters)`
+
+MVP에서는:
+
+* 기존 파일 로더 = `FileContentProvider`
+* 새 DB 로더 = `DbContentProvider`
+
+그리고 채팅 엔진(프롬프트 구성/LLM 호출)은 **ContentProvider만 바라보게** 바꾸면, 나머지는 거의 건드리지 않습니다.
+
+### 5.2 마이그레이션(Seed) 전략
+
+* `personas/` 폴더의 JSON들을 읽어서 `characters.body_json`로 insert
+* `scenarios/`도 동일
+* ownerId는 관리자(당신 계정)로 넣고, visibility는 `public` 또는 `unlisted`로 시작
+
+---
+
+## 6) 데이터 포맷(본문 JSON) 규약: “그대로 두되, 최소 필드만 강제”
+
+기존 persona/scenario JSON 포맷을 유지하되, UGC에 필요한 최소 키만 가볍게 표준화합니다.
+
+### Character body_json (권장 최소 키)
+
+* `systemPrompt` (필수)
+* `styleGuide` (선택)
+* `openingMessage` (선택)
+* `safety` (선택)
+
+### Scenario body_json (권장 최소 키)
+
+* `context` (배경)
+* `goal` (유저 목표)
+* `constraints` (금지/제약)
+* `openingMessage` (첫 메시지)
+
+**중요**: 기존의 MBTI/난이도/감정요소는 `options_json` 또는 scenario body_json에 남기면 됩니다. MVP에선 “대화 품질”보다 “공유/탐색/사용”이 먼저입니다.
+
+---
+
+## 7) 구현 순서(실제 작업 To-Do)
+
+### Day 1–2: 백엔드 골격
+
+1. Drizzle 테이블 생성 + 마이그레이션
+2. Auth 붙이기
+3. characters/scenarios CRUD + publish
+4. seed 스크립트(기존 파일 → DB)
+
+### Day 3–5: 프론트 기본 UX
+
+1. Explore 리스트 + 상세
+2. Create 에디터(최소 폼 + JSON 편집)
+3. Library(내 콘텐츠)
+
+### Day 6–7: 채팅 연결
+
+1. conversations/messages 저장
+2. ChatPage
+3. Start Chat(캐릭터 단독, 선택적 시나리오)
+
+### Day 8–10: 커뮤니티 최소 기능
+
+1. like/bookmark toggle
+2. top 정렬(집계)
+3. report
+
+이렇게 하면 “Character.ai 유사 구조”의 MVP가 완성됩니다.
+
+---
+
+## 8) 바로 다음으로 할 일
+
+원하면 제가 **metabeing 레포에 맞춰** 아래 3가지를 “코드 레벨 설계”로 내려드릴게요.
+
+1. Drizzle schema 파일 구조 제안(어떤 파일에 어떤 테이블)
+2. `DbContentProvider` 설계 + 기존 로더 교체 포인트(파일 경로/함수명 기준)
+3. API 라우트 파일 트리(Express 라우터 기준) + DTO 스펙
+
+진행은 이 순서가 가장 경제적입니다: **DB 스키마 → seed → CRUD → Explore UI → Chat 연결**.
