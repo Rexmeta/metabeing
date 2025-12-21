@@ -221,7 +221,7 @@ router.post("/characters/:id/publish", isAuthenticated, async (req: Request, res
 });
 
 // Delete character
-router.delete("/characters/:id", async (req: Request, res: Response) => {
+router.delete("/characters/:id", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = (req as any).user?.id;

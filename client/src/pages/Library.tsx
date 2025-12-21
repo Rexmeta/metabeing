@@ -216,6 +216,9 @@ export default function Library() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setLocation(`/create?edit=${char.id}`)}>
+                              <Edit className="h-4 w-4 mr-2" /> 수정
+                            </DropdownMenuItem>
                             {char.status !== "published" && (
                               <DropdownMenuItem onClick={() => publishMutation.mutate({ type: "character", id: char.id })}>
                                 <Eye className="h-4 w-4 mr-2" /> 공개하기
