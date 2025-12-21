@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
-import { Plus, FileText, Bookmark, Trash2, Eye, MoreVertical, Users, User } from "lucide-react";
+import { Plus, FileText, Bookmark, Trash2, Eye, EyeOff, MoreVertical, Users, User, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,6 +53,7 @@ interface Persona {
   mbtiType?: string;
   gender?: string;
   description?: string;
+  visibility?: "public" | "private";
   images?: {
     male?: { expressions?: Record<string, string>; base?: string };
     female?: { expressions?: Record<string, string>; base?: string };
@@ -64,7 +65,7 @@ export default function Library() {
   const searchString = useSearch();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [deleteDialog, setDeleteDialog] = useState<{ type: "scenario"; id: string } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ type: "scenario" | "persona"; id: string; name?: string } | null>(null);
   
   const searchParams = new URLSearchParams(searchString);
   const tabFromUrl = searchParams.get("tab") || "personas";
@@ -158,6 +159,60 @@ export default function Library() {
     },
   });
 
+  const deletePersonaMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/admin/personas/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error("삭제 실패");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/personas"] });
+      toast({ title: "삭제됨", description: "페르소나가 삭제되었습니다." });
+      setDeleteDialog(null);
+    },
+    onError: () => {
+      toast({ title: "오류", description: "삭제에 실패했습니다.", variant: "destructive" });
+    },
+  });
+
+  const updatePersonaVisibilityMutation = useMutation({
+    mutationFn: async ({ id, visibility }: { id: string; visibility: "public" | "private" }) => {
+      const res = await fetch(`/api/admin/personas/${id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ visibility }),
+      });
+      if (!res.ok) throw new Error("변경 실패");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/personas"] });
+      toast({ 
+        title: variables.visibility === "public" ? "공개됨" : "비공개됨", 
+        description: `페르소나가 ${variables.visibility === "public" ? "공개" : "비공개"}로 변경되었습니다.` 
+      });
+    },
+    onError: () => {
+      toast({ title: "오류", description: "변경에 실패했습니다.", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteConfirm = () => {
+    if (!deleteDialog) return;
+    if (deleteDialog.type === "persona") {
+      deletePersonaMutation.mutate(deleteDialog.id);
+    } else {
+      deleteMutation.mutate({ type: "scenario", id: deleteDialog.id });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto px-4 py-8">
@@ -203,11 +258,12 @@ export default function Library() {
                   const gender = persona.gender || "female";
                   const genderImages = gender === "male" ? persona.images?.male : persona.images?.female;
                   const imageUrl = genderImages?.expressions?.["중립"] || genderImages?.base || null;
+                  const isPublic = persona.visibility === "public";
                   
                   return (
                     <Card
                       key={persona.id}
-                      className="overflow-hidden cursor-pointer hover-elevate"
+                      className="overflow-hidden cursor-pointer hover-elevate group"
                       onClick={() => setLocation(`/persona-chat/${persona.id}`)}
                       data-testid={`card-persona-${persona.id}`}
                     >
@@ -224,13 +280,79 @@ export default function Library() {
                           </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                        {mbti && (
-                          <div className="absolute top-3 left-3">
-                            <Badge variant="secondary" className="bg-white/20 backdrop-blur-sm border-white/30 text-white">
-                              {mbti}
+                        
+                        {/* 상단 뱃지 및 메뉴 */}
+                        <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            {mbti && (
+                              <Badge variant="secondary" className="bg-white/20 backdrop-blur-sm border-white/30 text-white">
+                                {mbti}
+                              </Badge>
+                            )}
+                            <Badge 
+                              variant="secondary" 
+                              className={`backdrop-blur-sm border-white/30 text-white ${isPublic ? "bg-green-500/50" : "bg-gray-500/50"}`}
+                            >
+                              {isPublic ? "공개" : "비공개"}
                             </Badge>
                           </div>
-                        )}
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 bg-white/20 backdrop-blur-sm border border-white/30 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                data-testid={`button-persona-menu-${persona.id}`}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLocation(`/admin-management?tab=manage-personas&edit=${persona.id}`);
+                                }}
+                                data-testid={`button-edit-persona-${persona.id}`}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" /> 수정
+                              </DropdownMenuItem>
+                              {isPublic ? (
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updatePersonaVisibilityMutation.mutate({ id: persona.id, visibility: "private" });
+                                  }}
+                                  data-testid={`button-private-persona-${persona.id}`}
+                                >
+                                  <EyeOff className="h-4 w-4 mr-2" /> 비공개로 전환
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updatePersonaVisibilityMutation.mutate({ id: persona.id, visibility: "public" });
+                                  }}
+                                  data-testid={`button-public-persona-${persona.id}`}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" /> 공개로 전환
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteDialog({ type: "persona", id: persona.id, name: persona.displayName || persona.name });
+                                }}
+                                className="text-red-600"
+                                data-testid={`button-delete-persona-${persona.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> 삭제
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        
                         <div className="absolute bottom-3 left-3 right-3">
                           <h3 className="text-white font-bold text-lg drop-shadow-lg">
                             {persona.displayName || persona.name}
@@ -335,13 +457,16 @@ export default function Library() {
           <AlertDialogHeader>
             <AlertDialogTitle>정말 삭제하시겠습니까?</AlertDialogTitle>
             <AlertDialogDescription>
-              이 작업은 되돌릴 수 없습니다. 시나리오가 영구적으로 삭제됩니다.
+              이 작업은 되돌릴 수 없습니다. 
+              {deleteDialog?.type === "persona" 
+                ? `"${deleteDialog.name}" 페르소나가 영구적으로 삭제됩니다.`
+                : "시나리오가 영구적으로 삭제됩니다."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteDialog && deleteMutation.mutate(deleteDialog)}
+              onClick={handleDeleteConfirm}
               className="bg-red-600 hover:bg-red-700"
             >
               삭제
