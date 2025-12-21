@@ -1,16 +1,12 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { ScenarioManager } from "@/components/admin/ScenarioManager";
 import { PersonaManager } from "@/components/admin/PersonaManager";
 import { DifficultySettingsTab } from "@/components/admin/DifficultySettingsTab";
 import { AppHeader } from "@/components/AppHeader";
-import { UserPlus, Brain } from "lucide-react";
 
 export default function AdminManagement() {
   const [activeTab, setActiveTab] = useState("manage-scenarios");
-  const [, setLocation] = useLocation();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -20,27 +16,6 @@ export default function AdminManagement() {
         showBackButton
       />
       <div className="container mx-auto p-6 space-y-6" data-testid="admin-management">
-        {/* Quick Action Buttons */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-          <Button 
-            onClick={() => setLocation("/create")}
-            className="bg-indigo-600 hover:bg-indigo-700"
-            data-testid="button-create-character"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            캐릭터 만들기
-          </Button>
-          <Button 
-            onClick={() => setActiveTab("manage-personas")}
-            variant="outline"
-            className="border-purple-300 text-purple-700 hover:bg-purple-50"
-            data-testid="button-create-persona"
-          >
-            <Brain className="h-4 w-4 mr-2" />
-            페르소나 생성
-          </Button>
-        </div>
-
         {/* Management Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
