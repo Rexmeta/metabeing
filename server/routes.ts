@@ -3630,6 +3630,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/personas/:id", async (req, res) => {
+    try {
+      const persona = await fileManager.getMBTIPersonaById(req.params.id);
+      if (!persona) {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+      res.json(persona);
+    } catch (error) {
+      console.error("Error getting MBTI persona:", error);
+      res.status(500).json({ error: "Failed to get MBTI persona" });
+    }
+  });
+
   app.post("/api/admin/personas", async (req, res) => {
     try {
       const persona = await fileManager.createMBTIPersona(req.body);

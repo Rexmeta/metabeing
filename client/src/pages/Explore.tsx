@@ -127,11 +127,20 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
 }
 
 function PersonaCard({ persona }: { persona: Persona }) {
+  const [, setLocation] = useLocation();
   const displayName = persona.name || persona.mbtiType || "Unknown";
   const displayGender = persona.gender === "male" ? "남성" : persona.gender === "female" ? "여성" : "미지정";
   
+  const handleClick = () => {
+    setLocation(`/persona/${persona.id}/chat`);
+  };
+  
   return (
-    <Card className="hover:shadow-lg transition-shadow">
+    <Card 
+      className="cursor-pointer hover:shadow-lg transition-shadow"
+      onClick={handleClick}
+      data-testid={`card-persona-${persona.id}`}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
           <Avatar className="h-12 w-12">

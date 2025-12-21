@@ -317,6 +317,18 @@ export class FileManagerService {
     }
   }
 
+  // ID로 특정 MBTI 페르소나 조회
+  async getMBTIPersonaById(id: string): Promise<any | null> {
+    try {
+      const filePath = path.join(PERSONAS_DIR, `${id}.json`);
+      const content = await fs.readFile(filePath, 'utf-8');
+      return JSON.parse(content);
+    } catch (error) {
+      console.warn(`Failed to load MBTI persona ${id}:`, error);
+      return null;
+    }
+  }
+
   // MBTI 페르소나 생성
   async createMBTIPersona(personaData: any): Promise<any> {
     try {
