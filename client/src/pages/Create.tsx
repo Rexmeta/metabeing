@@ -349,11 +349,24 @@ export default function Create() {
           status: data.publish ? "published" : "draft",
         }),
       });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "캐릭터 생성 실패");
+      
+      const text = await res.text();
+      let result;
+      try {
+        result = text ? JSON.parse(text) : null;
+      } catch (parseError) {
+        console.error("JSON 파싱 오류:", parseError, "응답:", text);
+        throw new Error("서버 응답 파싱 실패");
       }
-      const result = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(result?.error || "캐릭터 생성 실패");
+      }
+      
+      if (!result || !result.id) {
+        throw new Error("캐릭터 생성 응답이 올바르지 않습니다");
+      }
+      
       return { ...result, generateImages: data.generateImages };
     },
     onSuccess: (data, variables) => {
