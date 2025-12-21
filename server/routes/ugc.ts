@@ -20,6 +20,7 @@ import {
 } from "@shared/schema";
 import { db } from "../storage";
 import { isAuthenticated } from "../auth";
+import { getAIServiceForFeature } from "../services/aiServiceFactory";
 
 const router = Router();
 
@@ -729,6 +730,90 @@ router.post("/reports", isAuthenticated, async (req: Request, res: Response) => 
     res.status(201).json(report);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// Character Chat - AI conversation with character
+router.post("/characters/chat", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "로그인이 필요합니다" });
+    }
+
+    const { characterId, message, history } = req.body;
+
+    if (!characterId || !message) {
+      return res.status(400).json({ error: "캐릭터 ID와 메시지가 필요합니다" });
+    }
+
+    // Validate history structure
+    const historySchema = z.array(z.object({
+      role: z.enum(["user", "assistant"]),
+      content: z.string(),
+    })).optional();
+    
+    const validatedHistory = historySchema.safeParse(history);
+    if (!validatedHistory.success) {
+      return res.status(400).json({ error: "대화 기록 형식이 올바르지 않습니다" });
+    }
+
+    // Get character
+    const [character] = await db.select().from(characters).where(eq(characters.id, characterId));
+    if (!character) {
+      return res.status(404).json({ error: "캐릭터를 찾을 수 없습니다" });
+    }
+
+    // Check access - must be public or owned by user
+    if (character.visibility !== "public" && character.ownerId !== userId) {
+      return res.status(403).json({ error: "캐릭터에 접근할 권한이 없습니다" });
+    }
+
+    // Build conversation context for AI
+    const systemPrompt = character.systemPrompt || `당신은 "${character.name}"입니다. ${character.description || ""}`;
+    
+    // Format history for AI
+    const formattedHistory = (validatedHistory.data || []).map((msg) => ({
+      sender: msg.role === "user" ? "user" : "ai",
+      message: msg.content,
+      timestamp: new Date().toISOString(),
+    }));
+
+    // Get AI service
+    const aiService = await getAIServiceForFeature("conversation");
+    
+    // Create a persona object for the AI service
+    const persona = {
+      id: character.id,
+      name: character.name,
+      role: character.tagline || "대화 상대",
+      department: "",
+      personality: systemPrompt,
+      responseStyle: "자연스럽고 친근한 대화",
+      goals: ["대화를 통해 사용자와 소통"],
+    };
+
+    // Generate response
+    const aiResult = await aiService.generateResponse(
+      systemPrompt, // scenario context (use systemPrompt as context)
+      formattedHistory,
+      persona,
+      message
+    );
+
+    // Update usage count
+    await db.update(characters)
+      .set({ usageCount: sql`${characters.usageCount} + 1` })
+      .where(eq(characters.id, characterId));
+
+    res.json({
+      response: aiResult.content,
+      emotion: aiResult.emotion,
+      emotionReason: aiResult.emotionReason,
+    });
+  } catch (error: any) {
+    console.error("Character chat error:", error);
+    res.status(500).json({ error: error.message || "대화 처리 중 오류가 발생했습니다" });
   }
 });
 

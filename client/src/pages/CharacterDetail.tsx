@@ -23,8 +23,7 @@ export default function CharacterDetail() {
       setShowAuthModal(true);
       return;
     }
-    // TODO: Start chat with character
-    console.log("Start chat with character:", id);
+    setLocation(`/character/${id}/chat`);
   };
 
   if (isLoading) {
