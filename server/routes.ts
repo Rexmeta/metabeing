@@ -19,6 +19,7 @@ import { fileManager } from "./services/fileManager";
 import { generateScenarioWithAI, enhanceScenarioWithAI } from "./services/aiScenarioGenerator";
 import { realtimeVoiceService } from "./services/realtimeVoiceService";
 import { generateIntroVideo, deleteIntroVideo, getVideoGenerationStatus } from "./services/gemini-video-generator";
+import { GlobalMBTICache } from "./utils/globalMBTICache";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 이메일 기반 인증 시스템 설정
@@ -3520,6 +3521,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
         available: false, 
         reason: error.message 
       });
+    }
+  });
+
+  // 일반 사용자용 MBTI 템플릿 API (캐릭터 생성 시 페르소나 자동 채우기용)
+  // GlobalMBTICache를 사용하여 성능 최적화 + camelCase로 정규화
+  app.get("/api/personas/templates", async (req, res) => {
+    try {
+      const cache = GlobalMBTICache.getInstance();
+      const availableTypes = cache.getAvailableTypes();
+      
+      const templates = availableTypes.map(type => {
+        const persona = cache.getMBTIPersona(type);
+        if (!persona) return null;
+        
+        return {
+          id: persona.id || type,
+          mbti: persona.mbti || type.toUpperCase(),
+          personalityTraits: persona.personality_traits || [],
+          communicationStyle: persona.communication_style || "",
+          motivation: persona.motivation || "",
+          fears: persona.fears || [],
+          background: {
+            personalValues: persona.background?.personal_values || [],
+            hobbies: persona.background?.hobbies || [],
+            social: {
+              preference: persona.background?.social?.preference || "",
+              behavior: persona.background?.social?.behavior || "",
+            },
+          },
+          communicationPatterns: {
+            openingStyle: persona.communication_patterns?.opening_style || "",
+            keyPhrases: persona.communication_patterns?.key_phrases || [],
+            winConditions: persona.communication_patterns?.win_conditions || [],
+          },
+          voice: {
+            tone: persona.voice?.tone || "",
+            pace: persona.voice?.pace || "",
+            emotion: persona.voice?.emotion || "",
+          },
+        };
+      }).filter(Boolean);
+      
+      res.json(templates);
+    } catch (error) {
+      console.error("Error getting MBTI templates:", error);
+      res.status(500).json({ error: "Failed to get MBTI templates" });
+    }
+  });
+
+  app.get("/api/personas/templates/:mbti", async (req, res) => {
+    try {
+      const mbtiType = req.params.mbti.toLowerCase();
+      
+      // 보안 검증
+      if (mbtiType.includes('..') || mbtiType.includes('/')) {
+        return res.status(400).json({ error: "Invalid MBTI type" });
+      }
+      
+      const cache = GlobalMBTICache.getInstance();
+      const persona = cache.getMBTIPersona(mbtiType);
+      
+      if (!persona) {
+        return res.status(404).json({ error: "MBTI template not found" });
+      }
+      
+      // camelCase로 정규화하여 반환 (프론트엔드 스키마와 호환)
+      res.json({
+        id: persona.id || mbtiType,
+        mbti: persona.mbti || mbtiType.toUpperCase(),
+        personalityTraits: persona.personality_traits || [],
+        communicationStyle: persona.communication_style || "",
+        motivation: persona.motivation || "",
+        fears: persona.fears || [],
+        background: {
+          personalValues: persona.background?.personal_values || [],
+          hobbies: persona.background?.hobbies || [],
+          social: {
+            preference: persona.background?.social?.preference || "",
+            behavior: persona.background?.social?.behavior || "",
+          },
+        },
+        communicationPatterns: {
+          openingStyle: persona.communication_patterns?.opening_style || "",
+          keyPhrases: persona.communication_patterns?.key_phrases || [],
+          winConditions: persona.communication_patterns?.win_conditions || [],
+        },
+        voice: {
+          tone: persona.voice?.tone || "",
+          pace: persona.voice?.pace || "",
+          emotion: persona.voice?.emotion || "",
+        },
+      });
+    } catch (error) {
+      console.error("Error getting MBTI template:", error);
+      res.status(500).json({ error: "Failed to get MBTI template" });
     }
   });
 
