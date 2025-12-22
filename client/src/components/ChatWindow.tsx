@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, User, ThumbsUp, ThumbsDown, MessageCircle } from "lucide-react";
+import { MessageSquare, User, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -1289,11 +1289,6 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    {/* 누적 대화 턴 수 (SNS 스타일) */}
-                    <div className="flex items-center gap-1 text-white/80 text-xs" data-testid="text-total-turns">
-                      <MessageCircle className="w-3 h-3" />
-                      <span>{formatSNSNumber(personaStats?.totalTurns || 0)}</span>
-                    </div>
                     {/* 좋아요/싫어요 버튼 */}
                     <div className="flex items-center gap-2">
                       <button
