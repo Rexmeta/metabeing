@@ -221,7 +221,7 @@ export default function Library() {
             <h1 className="text-3xl font-bold text-slate-900">내 라이브러리</h1>
             <p className="text-slate-600 mt-1">페르소나, 시나리오, 북마크를 관리하세요</p>
           </div>
-          <Button onClick={() => setLocation("/admin-management?tab=manage-personas")} className="gap-2">
+          <Button onClick={() => setLocation("/content-management?tab=manage-personas")} className="gap-2">
             <Plus className="h-4 w-4" />
             페르소나 만들기
           </Button>
@@ -247,7 +247,7 @@ export default function Library() {
               <div className="text-center py-12">
                 <Users className="h-12 w-12 mx-auto text-slate-300 mb-4" />
                 <h3 className="text-lg font-medium text-slate-600">아직 페르소나가 없습니다</h3>
-                <Button className="mt-4" onClick={() => setLocation("/admin-management?tab=manage-personas")}>
+                <Button className="mt-4" onClick={() => setLocation("/content-management?tab=manage-personas")}>
                   페르소나 만들기
                 </Button>
               </div>
@@ -312,7 +312,7 @@ export default function Library() {
                               <DropdownMenuItem 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setLocation(`/admin-management?tab=manage-personas&edit=${persona.id}`);
+                                  setLocation(`/content-management?tab=manage-personas&edit=${persona.id}`);
                                 }}
                                 data-testid={`button-edit-persona-${persona.id}`}
                               >

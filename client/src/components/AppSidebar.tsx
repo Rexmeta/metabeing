@@ -45,7 +45,7 @@ const mainMenuItems = [
   },
   {
     title: "페르소나 만들기",
-    url: "/admin-management?tab=manage-personas",
+    url: "/content-management?tab=manage-personas",
     icon: Users,
     requiresAuth: true,
   },
