@@ -3893,6 +3893,22 @@ ${personaSnapshot.name}:`;
     }
   });
 
+  // 사용자 본인의 페르소나만 반환 (라이브러리용)
+  app.get("/api/personas/mine", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const personas = await fileManager.getAllMBTIPersonas();
+      // 사용자가 만든 페르소나만 반환 (ownerId가 사용자 ID인 것만)
+      const myPersonas = personas.filter(
+        (p: any) => p.ownerId === userId && p.id
+      );
+      res.json(myPersonas);
+    } catch (error) {
+      console.error("Error getting my personas:", error);
+      res.status(500).json({ error: "Failed to get my personas" });
+    }
+  });
+
   // 페르소나 관리 API
   app.get("/api/admin/personas", async (req, res) => {
     try {

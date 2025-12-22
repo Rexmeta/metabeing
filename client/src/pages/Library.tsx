@@ -116,9 +116,12 @@ export default function Library() {
   });
 
   const { data: personas = [], isLoading: loadingPersonas } = useQuery<Persona[]>({
-    queryKey: ["/api/admin/personas"],
+    queryKey: ["/api/personas/mine"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/personas");
+      const res = await fetch("/api/personas/mine", {
+        credentials: "include",
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) return [];
       return res.json();
     },
@@ -154,7 +157,7 @@ export default function Library() {
       if (!res.ok) throw new Error("삭제 실패");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/personas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] });
       toast({ title: "삭제됨", description: "페르소나가 삭제되었습니다." });
       setDeleteDialog(null);
     },
@@ -178,7 +181,8 @@ export default function Library() {
       return res.json();
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/personas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personas/public"] });
       toast({ 
         title: variables.visibility === "public" ? "공개됨" : "비공개됨", 
         description: `페르소나가 ${variables.visibility === "public" ? "공개" : "비공개"}로 변경되었습니다.` 
@@ -213,7 +217,7 @@ export default function Library() {
                 페르소나 만들기
               </Button>
             }
-            onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/personas"] })}
+            onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] })}
           />
         </div>
 
@@ -243,7 +247,7 @@ export default function Library() {
                       페르소나 만들기
                     </Button>
                   }
-                  onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/personas"] })}
+                  onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] })}
                 />
               </div>
             ) : (
