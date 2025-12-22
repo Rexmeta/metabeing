@@ -3881,9 +3881,10 @@ ${personaSnapshot.name}:`;
   app.get("/api/personas/public", async (req, res) => {
     try {
       const personas = await fileManager.getAllMBTIPersonas();
-      // visibility가 "public"이거나 undefined(레거시)인 페르소나만 반환
+      // visibility가 "public"이거나 없는(레거시) 페르소나만 반환
+      // "private"로 명시적으로 설정된 페르소나만 제외
       const publicPersonas = personas.filter(
-        (p: any) => p.visibility === "public" || p.visibility === undefined
+        (p: any) => p.visibility !== "private" && p.id // id가 없는 비정상 항목 제외
       );
       res.json(publicPersonas);
     } catch (error) {
