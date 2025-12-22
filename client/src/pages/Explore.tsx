@@ -406,9 +406,9 @@ export default function Explore() {
   });
 
   const { data: personas = [], isLoading: loadingPersonas } = useQuery<Persona[]>({
-    queryKey: ["/api/admin/personas"],
+    queryKey: ["/api/personas/public"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/personas");
+      const res = await fetch("/api/personas/public");
       if (!res.ok) throw new Error("Failed to fetch personas");
       return res.json();
     },
@@ -509,47 +509,34 @@ export default function Explore() {
           </TabsContent>
 
           <TabsContent value="personas">
-            {(() => {
-              // 공개 페르소나만 필터링 (visibility가 없는 레거시 페르소나는 공개로 간주)
-              const publicPersonas = personas.filter(p => p.visibility === "public" || p.visibility === undefined);
-              
-              if (loadingPersonas) {
-                return (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    {[...Array(12)].map((_, i) => (
-                      <div key={i} className="aspect-[3/4] rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 animate-pulse overflow-hidden">
-                        <div className="h-full flex flex-col justify-end p-4">
-                          <div className="h-5 bg-slate-400/30 rounded w-3/4 mb-2" />
-                          <div className="h-3 bg-slate-400/30 rounded w-full mb-1" />
-                          <div className="h-3 bg-slate-400/30 rounded w-2/3" />
-                        </div>
-                      </div>
-                    ))}
+            {loadingPersonas ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {[...Array(12)].map((_, i) => (
+                  <div key={i} className="aspect-[3/4] rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 animate-pulse overflow-hidden">
+                    <div className="h-full flex flex-col justify-end p-4">
+                      <div className="h-5 bg-slate-400/30 rounded w-3/4 mb-2" />
+                      <div className="h-3 bg-slate-400/30 rounded w-full mb-1" />
+                      <div className="h-3 bg-slate-400/30 rounded w-2/3" />
+                    </div>
                   </div>
-                );
-              }
-              
-              if (publicPersonas.length === 0) {
-                return (
-                  <div className="text-center py-12">
-                    <User className="h-12 w-12 mx-auto text-slate-300 mb-4" />
-                    <h3 className="text-lg font-medium text-slate-600">아직 공개된 페르소나가 없습니다</h3>
-                    <p className="text-slate-500 mt-1">첫 번째 페르소나를 만들어보세요!</p>
-                    <Button className="mt-4" onClick={() => setLocation("/content-management?tab=manage-personas")}>
-                      페르소나 만들기
-                    </Button>
-                  </div>
-                );
-              }
-              
-              return (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {publicPersonas.map((persona) => (
-                    <PersonaCard key={persona.id} persona={persona} />
-                  ))}
-                </div>
-              );
-            })()}
+                ))}
+              </div>
+            ) : personas.length === 0 ? (
+              <div className="text-center py-12">
+                <User className="h-12 w-12 mx-auto text-slate-300 mb-4" />
+                <h3 className="text-lg font-medium text-slate-600">아직 공개된 페르소나가 없습니다</h3>
+                <p className="text-slate-500 mt-1">첫 번째 페르소나를 만들어보세요!</p>
+                <Button className="mt-4" onClick={() => setLocation("/content-management?tab=manage-personas")}>
+                  페르소나 만들기
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {personas.map((persona) => (
+                  <PersonaCard key={persona.id} persona={persona} />
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

@@ -3877,6 +3877,21 @@ ${personaSnapshot.name}:`;
     }
   });
 
+  // 공개 페르소나만 반환 (탐색 페이지용)
+  app.get("/api/personas/public", async (req, res) => {
+    try {
+      const personas = await fileManager.getAllMBTIPersonas();
+      // visibility가 "public"이거나 undefined(레거시)인 페르소나만 반환
+      const publicPersonas = personas.filter(
+        (p: any) => p.visibility === "public" || p.visibility === undefined
+      );
+      res.json(publicPersonas);
+    } catch (error) {
+      console.error("Error getting public personas:", error);
+      res.status(500).json({ error: "Failed to get public personas" });
+    }
+  });
+
   // 페르소나 관리 API
   app.get("/api/admin/personas", async (req, res) => {
     try {
