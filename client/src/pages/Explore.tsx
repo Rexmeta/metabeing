@@ -32,6 +32,14 @@ interface PersonaStats {
   dislikesCount: number;
 }
 
+interface ScenarioStats {
+  scenarioId: string;
+  creatorId: string | null;
+  creatorName: string;
+  likesCount: number;
+  dislikesCount: number;
+}
+
 interface Scenario {
   id: string;
   name: string;
@@ -69,14 +77,57 @@ interface Persona {
 
 function ScenarioCard({ scenario }: { scenario: Scenario }) {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
 
   const difficultyLabels = ["", "입문", "기본", "도전", "고급"];
-  const difficultyColors = ["", "bg-green-100 text-green-800", "bg-blue-100 text-blue-800", "bg-orange-100 text-orange-800", "bg-red-100 text-red-800"];
+  const difficultyColors = ["", "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300", "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300", "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"];
+
+  // 시나리오 통계 조회
+  const { data: stats } = useQuery<ScenarioStats>({
+    queryKey: ['/api/scenarios', scenario.id, 'stats'],
+    queryFn: async () => {
+      const res = await fetch(`/api/scenarios/${scenario.id}/stats`);
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      return res.json();
+    },
+    staleTime: 30000,
+  });
+  
+  // 사용자 반응 조회
+  const { data: myReaction } = useQuery<{ reaction: 'like' | 'dislike' | null }>({
+    queryKey: ['/api/scenarios', scenario.id, 'my-reaction'],
+    queryFn: async () => {
+      const res = await fetch(`/api/scenarios/${scenario.id}/my-reaction`);
+      if (!res.ok) {
+        if (res.status === 401) return { reaction: null };
+        throw new Error("Failed to fetch reaction");
+      }
+      return res.json();
+    },
+    staleTime: 30000,
+  });
+  
+  // 반응 토글 mutation
+  const reactMutation = useMutation({
+    mutationFn: async (type: 'like' | 'dislike') => {
+      return apiRequest('POST', `/api/scenarios/${scenario.id}/react`, { type });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/scenarios', scenario.id, 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scenarios', scenario.id, 'my-reaction'] });
+    },
+  });
+  
+  const handleReaction = (e: React.MouseEvent, type: 'like' | 'dislike') => {
+    e.stopPropagation();
+    reactMutation.mutate(type);
+  };
 
   return (
     <Card 
       className="cursor-pointer hover:shadow-lg transition-shadow"
       onClick={() => setLocation(`/scenario/${scenario.id}`)}
+      data-testid={`card-scenario-${scenario.id}`}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
@@ -90,6 +141,11 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
         <CardDescription className="line-clamp-2">
           {scenario.tagline || scenario.description || "설명 없음"}
         </CardDescription>
+        {stats?.creatorName && stats.creatorName !== "Unknown" && (
+          <p className="text-xs text-muted-foreground mt-1" data-testid={`text-scenario-creator-${scenario.id}`}>
+            by @{stats.creatorName}
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-1 mb-3">
@@ -97,10 +153,38 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
             <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
           ))}
         </div>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Sparkles className="h-3 w-3" /> {scenario.usageCount}회 사용
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Sparkles className="h-3 w-3" /> {formatSNSNumber(scenario.usageCount)}회 사용
           </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => handleReaction(e, 'like')}
+              disabled={reactMutation.isPending}
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-all ${
+                myReaction?.reaction === 'like'
+                  ? 'bg-green-500/20 text-green-700 dark:text-green-300 border border-green-400/50'
+                  : 'bg-muted text-muted-foreground border border-transparent hover:bg-muted/80'
+              }`}
+              data-testid={`button-scenario-like-${scenario.id}`}
+            >
+              <ThumbsUp className="w-3 h-3" />
+              <span>{formatSNSNumber(stats?.likesCount || 0)}</span>
+            </button>
+            <button
+              onClick={(e) => handleReaction(e, 'dislike')}
+              disabled={reactMutation.isPending}
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-all ${
+                myReaction?.reaction === 'dislike'
+                  ? 'bg-red-500/20 text-red-700 dark:text-red-300 border border-red-400/50'
+                  : 'bg-muted text-muted-foreground border border-transparent hover:bg-muted/80'
+              }`}
+              data-testid={`button-scenario-dislike-${scenario.id}`}
+            >
+              <ThumbsDown className="w-3 h-3" />
+              <span>{formatSNSNumber(stats?.dislikesCount || 0)}</span>
+            </button>
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -4,6 +4,7 @@ import { join } from 'path';
 // MBTI 페르소나 데이터 타입 정의
 export interface MBTIPersona {
   id: string;
+  ownerId?: string; // 생성자 ID (소유권)
   mbti: string;
   personality_traits: string[];
   communication_style: string;

@@ -4,6 +4,7 @@ import { getModelForFeature } from "./aiServiceFactory";
 // 시나리오 타입 정의
 export interface ComplexScenario {
   id: string;
+  ownerId?: string; // 생성자 ID (소유권)
   title: string;
   description: string;
   image?: string; // 시나리오를 상징하는 이미지 URL

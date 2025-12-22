@@ -3582,7 +3582,10 @@ ${personaSnapshot.name}:`;
       // @ts-ignore - req.user는 auth 미들웨어에서 설정됨
       const user = req.user;
       
-      let scenarioData = req.body;
+      let scenarioData = {
+        ...req.body,
+        ownerId: user.id, // 소유자 ID 추가
+      };
       
       // 운영자는 자신의 카테고리에만 시나리오 생성 가능
       if (user.role === 'operator') {
@@ -4138,6 +4141,155 @@ ${personaSnapshot.name}:`;
       }
     } catch (error) {
       console.error("Error toggling persona reaction:", error);
+      res.status(500).json({ error: "Failed to toggle reaction" });
+    }
+  });
+
+  // ==========================================
+  // Scenario Social Stats API (시나리오 소셜 통계)
+  // ==========================================
+
+  // 시나리오 통계 조회 (좋아요/싫어요 수, 제작자 정보)
+  app.get("/api/scenarios/:id/stats", async (req, res) => {
+    try {
+      const scenarioId = req.params.id;
+      
+      // 시나리오 정보 조회
+      const scenarios = await fileManager.getAllScenarios();
+      const scenario = scenarios.find((s: any) => s.id === scenarioId);
+      if (!scenario) {
+        return res.status(404).json({ error: "Scenario not found" });
+      }
+      
+      // 제작자 정보 조회
+      let creatorName = "Unknown";
+      if (scenario.ownerId) {
+        const creator = await storage.getUser(scenario.ownerId);
+        if (creator) {
+          creatorName = creator.name || creator.email?.split('@')[0] || "Unknown";
+        }
+      }
+      
+      // 좋아요/싫어요 수 조회
+      const likesResult = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(likes)
+        .where(and(
+          eq(likes.targetType, 'scenario'),
+          eq(likes.targetId, scenarioId),
+          eq(likes.type, 'like')
+        ));
+      
+      const dislikesResult = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(likes)
+        .where(and(
+          eq(likes.targetType, 'scenario'),
+          eq(likes.targetId, scenarioId),
+          eq(likes.type, 'dislike')
+        ));
+      
+      res.json({
+        scenarioId,
+        creatorId: scenario.ownerId || null,
+        creatorName,
+        likesCount: Number(likesResult[0]?.count || 0),
+        dislikesCount: Number(dislikesResult[0]?.count || 0),
+      });
+    } catch (error) {
+      console.error("Error fetching scenario stats:", error);
+      res.status(500).json({ error: "Failed to fetch scenario stats" });
+    }
+  });
+
+  // 사용자의 시나리오에 대한 좋아요/싫어요 상태 조회
+  app.get("/api/scenarios/:id/my-reaction", isAuthenticated, async (req: any, res) => {
+    try {
+      const scenarioId = req.params.id;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const existingReaction = await db
+        .select()
+        .from(likes)
+        .where(and(
+          eq(likes.userId, userId),
+          eq(likes.targetType, 'scenario'),
+          eq(likes.targetId, scenarioId)
+        ))
+        .limit(1);
+      
+      res.json({
+        reaction: existingReaction.length > 0 ? existingReaction[0].type : null
+      });
+    } catch (error) {
+      console.error("Error fetching user scenario reaction:", error);
+      res.status(500).json({ error: "Failed to fetch reaction" });
+    }
+  });
+
+  // 시나리오 좋아요/싫어요 토글
+  app.post("/api/scenarios/:id/react", isAuthenticated, async (req: any, res) => {
+    try {
+      const scenarioId = req.params.id;
+      const userId = req.user?.id;
+      const { type } = req.body; // 'like' or 'dislike'
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      if (!type || !['like', 'dislike'].includes(type)) {
+        return res.status(400).json({ error: "Invalid reaction type. Must be 'like' or 'dislike'" });
+      }
+      
+      // 시나리오 존재 확인
+      const scenarios = await fileManager.getAllScenarios();
+      const scenario = scenarios.find((s: any) => s.id === scenarioId);
+      if (!scenario) {
+        return res.status(404).json({ error: "Scenario not found" });
+      }
+      
+      // 기존 반응 확인
+      const existingReaction = await db
+        .select()
+        .from(likes)
+        .where(and(
+          eq(likes.userId, userId),
+          eq(likes.targetType, 'scenario'),
+          eq(likes.targetId, scenarioId)
+        ))
+        .limit(1);
+      
+      if (existingReaction.length > 0) {
+        const existing = existingReaction[0];
+        
+        if (existing.type === type) {
+          // 같은 타입이면 삭제 (토글 off)
+          await db.delete(likes).where(eq(likes.id, existing.id));
+          res.json({ action: 'removed', type: null });
+        } else {
+          // 다른 타입이면 업데이트
+          await db.update(likes)
+            .set({ type })
+            .where(eq(likes.id, existing.id));
+          res.json({ action: 'updated', type });
+        }
+      } else {
+        // 새로운 반응 추가
+        await db.insert(likes).values({
+          userId,
+          targetType: 'scenario',
+          targetId: scenarioId,
+          type,
+        });
+        res.json({ action: 'added', type });
+      }
+    } catch (error) {
+      console.error("Error toggling scenario reaction:", error);
       res.status(500).json({ error: "Failed to toggle reaction" });
     }
   });
