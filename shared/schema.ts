@@ -558,16 +558,18 @@ export const experiences = pgTable("experiences", {
   index("idx_experiences_scenario_id").on(table.scenarioId),
 ]);
 
-// 좋아요
+// 좋아요/싫어요
 export const likes = pgTable("likes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   targetType: varchar("target_type").notNull(), // character, scenario, experience
   targetId: varchar("target_id").notNull(),
+  type: varchar("type").notNull().default("like"), // like, dislike
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("idx_likes_user_id").on(table.userId),
   index("idx_likes_target").on(table.targetType, table.targetId),
+  index("idx_likes_type").on(table.type),
 ]);
 
 // 북마크
