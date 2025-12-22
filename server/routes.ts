@@ -3935,9 +3935,11 @@ ${personaSnapshot.name}:`;
         return res.status(403).json({ error: "수정 권한이 없습니다" });
       }
       
+      // 기존 데이터와 병합 (부분 업데이트 지원)
       // ownerId는 서버에서 보존 (클라이언트가 변경 불가)
       const updateData = {
-        ...req.body,
+        ...existingPersona,  // 기존 데이터 유지
+        ...req.body,         // 요청 데이터로 덮어쓰기
         ownerId: existingPersona.ownerId, // 기존 소유자 유지
       };
       
