@@ -1,15 +1,36 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Search, TrendingUp, Clock, Star, FileText, Sparkles, User } from "lucide-react";
+import { Search, TrendingUp, Clock, Star, FileText, Sparkles, User, ThumbsUp, ThumbsDown, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { apiRequest } from "@/lib/queryClient";
 
 type SortType = "trending" | "new" | "top";
+
+// SNS 스타일 숫자 포맷팅 (1K, 1.2M 등)
+function formatSNSNumber(num: number): string {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  }
+  return num.toString();
+}
+
+interface PersonaStats {
+  personaId: string;
+  creatorId: string | null;
+  creatorName: string;
+  totalTurns: number;
+  likesCount: number;
+  dislikesCount: number;
+}
 
 interface Scenario {
   id: string;
@@ -88,9 +109,45 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
 
 function PersonaCard({ persona }: { persona: Persona }) {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const mbtiDisplay = persona.mbtiType || persona.mbti || "";
   const displayName = persona.name || mbtiDisplay || "Unknown";
-  const displayGender = persona.gender === "male" ? "남성" : persona.gender === "female" ? "여성" : "미지정";
+  
+  // 페르소나 통계 조회
+  const { data: stats } = useQuery<PersonaStats>({
+    queryKey: ['/api/personas', persona.id, 'stats'],
+    queryFn: async () => {
+      const res = await fetch(`/api/personas/${persona.id}/stats`);
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      return res.json();
+    },
+    staleTime: 30000,
+  });
+  
+  // 사용자 반응 조회
+  const { data: myReaction } = useQuery<{ reaction: 'like' | 'dislike' | null }>({
+    queryKey: ['/api/personas', persona.id, 'my-reaction'],
+    queryFn: async () => {
+      const res = await fetch(`/api/personas/${persona.id}/my-reaction`);
+      if (!res.ok) {
+        if (res.status === 401) return { reaction: null };
+        throw new Error("Failed to fetch reaction");
+      }
+      return res.json();
+    },
+    staleTime: 30000,
+  });
+  
+  // 반응 토글 mutation
+  const reactMutation = useMutation({
+    mutationFn: async (type: 'like' | 'dislike') => {
+      return apiRequest('POST', `/api/personas/${persona.id}/react`, { type });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/personas', persona.id, 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/personas', persona.id, 'my-reaction'] });
+    },
+  });
   
   // 페르소나 기본 표정 이미지 가져오기
   const getPersonaImage = () => {
@@ -99,12 +156,10 @@ function PersonaCard({ persona }: { persona: Persona }) {
     const gender = persona.gender || 'male';
     const genderImages = persona.images[gender as 'male' | 'female'];
     
-    // 기본 표정(중립) 이미지 사용
     if (genderImages?.expressions?.['중립']) {
       return genderImages.expressions['중립'];
     }
     
-    // base 이미지 폴백
     if (persona.images.base) {
       return persona.images.base;
     }
@@ -116,6 +171,11 @@ function PersonaCard({ persona }: { persona: Persona }) {
   
   const handleClick = () => {
     setLocation(`/persona/${persona.id}/chat`);
+  };
+  
+  const handleReaction = (e: React.MouseEvent, type: 'like' | 'dislike') => {
+    e.stopPropagation();
+    reactMutation.mutate(type);
   };
 
   // MBTI 타입별 그라데이션 색상
@@ -181,10 +241,11 @@ function PersonaCard({ persona }: { persona: Persona }) {
           </div>
         )}
 
-        {/* 좋아요/북마크 스타일 아이콘 (장식용) */}
-        <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <div className="p-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30">
-            <Star className="w-4 h-4 text-white" />
+        {/* 상단 우측: 대화 턴 수 */}
+        <div className="absolute top-3 right-3 z-10">
+          <div className="flex items-center gap-1 px-2 py-1 bg-white/20 backdrop-blur-md rounded-full border border-white/30">
+            <MessageCircle className="w-3 h-3 text-white" />
+            <span className="text-white text-xs font-medium">{formatSNSNumber(stats?.totalTurns || 0)}</span>
           </div>
         </div>
 
@@ -195,12 +256,42 @@ function PersonaCard({ persona }: { persona: Persona }) {
             {displayName}
           </h3>
           
-          {/* 설명 */}
-          {persona.description && (
-            <p className="text-white/80 text-sm line-clamp-2 drop-shadow-md">
-              {persona.description}
+          {/* 제작자 ID */}
+          {stats?.creatorName && stats.creatorName !== "Unknown" && (
+            <p className="text-white/70 text-xs mb-2 drop-shadow-md" data-testid={`text-creator-${persona.id}`}>
+              by @{stats.creatorName}
             </p>
           )}
+          
+          {/* 좋아요/싫어요 버튼 */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => handleReaction(e, 'like')}
+              disabled={reactMutation.isPending}
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-all ${
+                myReaction?.reaction === 'like'
+                  ? 'bg-green-500/40 text-green-100 border border-green-400/50'
+                  : 'bg-white/20 text-white/90 border border-white/30 hover:bg-white/30'
+              }`}
+              data-testid={`button-like-${persona.id}`}
+            >
+              <ThumbsUp className="w-3 h-3" />
+              <span>{formatSNSNumber(stats?.likesCount || 0)}</span>
+            </button>
+            <button
+              onClick={(e) => handleReaction(e, 'dislike')}
+              disabled={reactMutation.isPending}
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-all ${
+                myReaction?.reaction === 'dislike'
+                  ? 'bg-red-500/40 text-red-100 border border-red-400/50'
+                  : 'bg-white/20 text-white/90 border border-white/30 hover:bg-white/30'
+              }`}
+              data-testid={`button-dislike-${persona.id}`}
+            >
+              <ThumbsDown className="w-3 h-3" />
+              <span>{formatSNSNumber(stats?.dislikesCount || 0)}</span>
+            </button>
+          </div>
         </div>
 
         {/* 호버 시 반짝이는 효과 */}
