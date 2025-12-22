@@ -30,16 +30,15 @@ import { Sparkles } from "lucide-react";
 
 interface Scenario {
   id: string;
-  name: string;
-  tagline: string | null;
-  description: string | null;
-  difficulty: number | null;
-  tags: string[];
-  visibility: string;
-  status: string;
-  viewCount: number;
-  usageCount: number;
-  createdAt: string;
+  title: string;
+  tagline?: string;
+  description?: string;
+  difficulty?: number;
+  estimatedTime?: string;
+  skills?: string[];
+  categoryId?: string;
+  image?: string;
+  status?: string;
 }
 
 interface Bookmark {
@@ -93,9 +92,9 @@ export default function Library() {
   };
 
   const { data: myScenarios = [], isLoading: loadingScens } = useQuery<Scenario[]>({
-    queryKey: ["/api/ugc/scenarios", "mine"],
+    queryKey: ["/api/admin/scenarios"],
     queryFn: async () => {
-      const res = await fetch("/api/ugc/scenarios?visibility=mine", { 
+      const res = await fetch("/api/admin/scenarios", { 
         credentials: "include",
         headers: getAuthHeaders(),
       });
@@ -127,7 +126,7 @@ export default function Library() {
 
   const deleteMutation = useMutation({
     mutationFn: async ({ type, id }: { type: "scenario"; id: string }) => {
-      const res = await fetch(`/api/ugc/scenarios/${id}`, {
+      const res = await fetch(`/api/admin/scenarios/${id}`, {
         method: "DELETE",
         credentials: "include",
         headers: getAuthHeaders(),
@@ -135,7 +134,7 @@ export default function Library() {
       if (!res.ok) throw new Error("삭제 실패");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ugc/scenarios"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/scenarios"] });
       toast({ title: "삭제됨", description: "시나리오가 삭제되었습니다." });
       setDeleteDialog(null);
     },
@@ -144,24 +143,6 @@ export default function Library() {
     },
   });
 
-  const publishMutation = useMutation({
-    mutationFn: async ({ type, id }: { type: "scenario"; id: string }) => {
-      const res = await fetch(`/api/ugc/scenarios/${id}/publish`, {
-        method: "POST",
-        credentials: "include",
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error("공개 실패");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ugc/scenarios"] });
-      toast({ title: "공개됨", description: "시나리오가 공개되었습니다." });
-    },
-    onError: () => {
-      toast({ title: "오류", description: "공개에 실패했습니다.", variant: "destructive" });
-    },
-  });
 
   const deletePersonaMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -425,31 +406,26 @@ export default function Library() {
                 {myScenarios.map((scen) => (
                   <Card key={scen.id}>
                     <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-base line-clamp-1">{scen.name}</CardTitle>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant={scen.status === "published" ? "default" : "secondary"}>
-                              {scen.status === "published" ? "공개" : "비공개"}
-                            </Badge>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base line-clamp-1">{scen.title}</CardTitle>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             {scen.difficulty && (
                               <Badge variant="outline">Lv.{scen.difficulty}</Badge>
+                            )}
+                            {scen.estimatedTime && (
+                              <Badge variant="secondary">{scen.estimatedTime}</Badge>
                             )}
                           </div>
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button variant="ghost" size="icon">
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {scen.status !== "published" && (
-                              <DropdownMenuItem onClick={() => publishMutation.mutate({ type: "scenario", id: scen.id })}>
-                                <Eye className="h-4 w-4 mr-2" /> 공개하기
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onClick={() => setDeleteDialog({ type: "scenario", id: scen.id })} className="text-red-600">
+                            <DropdownMenuItem onClick={() => setDeleteDialog({ type: "scenario", id: scen.id, name: scen.title })} className="text-red-600">
                               <Trash2 className="h-4 w-4 mr-2" /> 삭제
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -458,12 +434,15 @@ export default function Library() {
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {scen.tagline || scen.description || "설명 없음"}
+                        {scen.description || "설명 없음"}
                       </p>
-                      <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                        <span>조회 {scen.viewCount}</span>
-                        <span>사용 {scen.usageCount}</span>
-                      </div>
+                      {scen.skills && scen.skills.length > 0 && (
+                        <div className="flex items-center gap-1 mt-3 flex-wrap">
+                          {scen.skills.slice(0, 3).map((skill, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
