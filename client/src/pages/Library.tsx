@@ -24,6 +24,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PersonaCreateDialog } from "@/components/PersonaCreateDialog";
+import { ScenarioCreateDialog } from "@/components/ScenarioCreateDialog";
+import { AIScenarioGenerator } from "@/components/admin/AIScenarioGenerator";
+import { Sparkles } from "lucide-react";
 
 interface Scenario {
   id: string;
@@ -383,15 +386,39 @@ export default function Library() {
           </TabsContent>
 
           <TabsContent value="scenarios">
+            {/* 시나리오 생성 버튼들 */}
+            <div className="flex justify-end gap-2 mb-4">
+              <AIScenarioGenerator 
+                onGenerated={(data) => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/scenarios'] });
+                  toast({
+                    title: "성공",
+                    description: "AI가 시나리오를 생성했습니다. 콘텐츠 관리에서 확인하세요."
+                  });
+                }} 
+              />
+              <ScenarioCreateDialog
+                trigger={
+                  <Button className="gap-2" data-testid="button-create-scenario-direct">
+                    <Plus className="h-4 w-4" />
+                    직접 생성
+                  </Button>
+                }
+                onSuccess={() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/scenarios'] });
+                }}
+              />
+            </div>
+            
             {loadingScens ? (
               <div className="text-center py-8">로딩 중...</div>
             ) : myScenarios.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="h-12 w-12 mx-auto text-slate-300 mb-4" />
                 <h3 className="text-lg font-medium text-slate-600">아직 만든 시나리오가 없습니다</h3>
-                <Button className="mt-4" onClick={() => setLocation("/create")}>
-                  첫 시나리오 만들기
-                </Button>
+                <p className="text-slate-500 mt-2 mb-4">위의 버튼을 사용하여 시나리오를 만들어보세요</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
