@@ -140,7 +140,10 @@ function MainRouter() {
         {() => <AdminRoute component={AdminDashboard} />}
       </Route>
       <Route path="/admin-management">
-        {() => <AdminRoute component={AdminManagement} />}
+        {() => <ProtectedRoute component={AdminManagement} />}
+      </Route>
+      <Route path="/content-management">
+        {() => <ProtectedRoute component={AdminManagement} />}
       </Route>
       <Route path="/ai-generator">
         {() => <AdminRoute component={AIGeneratorPage} />}
