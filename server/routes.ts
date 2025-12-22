@@ -8,8 +8,12 @@ import {
   insertFeedbackSchema,
   insertPersonaSelectionSchema,
   insertStrategyChoiceSchema,
-  insertSequenceAnalysisSchema
+  insertSequenceAnalysisSchema,
+  likes,
+  personaRuns
 } from "@shared/schema";
+import { db } from "./storage";
+import { eq, and, sql } from "drizzle-orm";
 import { generateAIResponse, generateFeedback, generateStrategyReflectionFeedback } from "./services/geminiService";
 import { createSampleData } from "./sampleData";
 import ttsRoutes from "./routes/tts.js";
@@ -3979,6 +3983,162 @@ ${personaSnapshot.name}:`;
     } catch (error) {
       console.error("Error deleting persona:", error);
       res.status(500).json({ error: "Failed to delete persona" });
+    }
+  });
+
+  // ==========================================
+  // Persona Social Stats API (페르소나 소셜 통계)
+  // ==========================================
+
+  // 페르소나 통계 조회 (누적 대화 턴 수, 좋아요/싫어요 수, 제작자 정보)
+  app.get("/api/personas/:id/stats", async (req, res) => {
+    try {
+      const personaId = req.params.id;
+      
+      // 페르소나 정보 조회
+      const persona = await fileManager.getMBTIPersonaById(personaId);
+      if (!persona) {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+      
+      // 제작자 정보 조회
+      let creatorName = "Unknown";
+      if (persona.ownerId) {
+        const creator = await storage.getUser(persona.ownerId);
+        if (creator) {
+          creatorName = creator.name || creator.email?.split('@')[0] || "Unknown";
+        }
+      }
+      
+      // 누적 대화 턴 수 조회 (personaRuns 테이블 사용)
+      const turnCountResult = await db
+        .select({ totalTurns: sql<number>`COALESCE(SUM(${personaRuns.turnCount}), 0)` })
+        .from(personaRuns)
+        .where(eq(personaRuns.personaId, personaId));
+      
+      const totalTurns = turnCountResult[0]?.totalTurns || 0;
+      
+      // 좋아요/싫어요 수 조회
+      const likesResult = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(likes)
+        .where(and(
+          eq(likes.targetType, 'character'),
+          eq(likes.targetId, personaId),
+          eq(likes.type, 'like')
+        ));
+      
+      const dislikesResult = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(likes)
+        .where(and(
+          eq(likes.targetType, 'character'),
+          eq(likes.targetId, personaId),
+          eq(likes.type, 'dislike')
+        ));
+      
+      res.json({
+        personaId,
+        creatorId: persona.ownerId || null,
+        creatorName,
+        totalTurns: Number(totalTurns),
+        likesCount: Number(likesResult[0]?.count || 0),
+        dislikesCount: Number(dislikesResult[0]?.count || 0),
+      });
+    } catch (error) {
+      console.error("Error fetching persona stats:", error);
+      res.status(500).json({ error: "Failed to fetch persona stats" });
+    }
+  });
+
+  // 사용자의 페르소나에 대한 좋아요/싫어요 상태 조회
+  app.get("/api/personas/:id/my-reaction", isAuthenticated, async (req: any, res) => {
+    try {
+      const personaId = req.params.id;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const existingReaction = await db
+        .select()
+        .from(likes)
+        .where(and(
+          eq(likes.userId, userId),
+          eq(likes.targetType, 'character'),
+          eq(likes.targetId, personaId)
+        ))
+        .limit(1);
+      
+      res.json({
+        reaction: existingReaction.length > 0 ? existingReaction[0].type : null
+      });
+    } catch (error) {
+      console.error("Error fetching user reaction:", error);
+      res.status(500).json({ error: "Failed to fetch reaction" });
+    }
+  });
+
+  // 페르소나 좋아요/싫어요 토글
+  app.post("/api/personas/:id/react", isAuthenticated, async (req: any, res) => {
+    try {
+      const personaId = req.params.id;
+      const userId = req.user?.id;
+      const { type } = req.body; // 'like' or 'dislike'
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      if (!type || !['like', 'dislike'].includes(type)) {
+        return res.status(400).json({ error: "Invalid reaction type. Must be 'like' or 'dislike'" });
+      }
+      
+      // 페르소나 존재 확인
+      const persona = await fileManager.getMBTIPersonaById(personaId);
+      if (!persona) {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+      
+      // 기존 반응 확인
+      const existingReaction = await db
+        .select()
+        .from(likes)
+        .where(and(
+          eq(likes.userId, userId),
+          eq(likes.targetType, 'character'),
+          eq(likes.targetId, personaId)
+        ))
+        .limit(1);
+      
+      if (existingReaction.length > 0) {
+        const existing = existingReaction[0];
+        
+        if (existing.type === type) {
+          // 같은 타입이면 삭제 (토글 off)
+          await db.delete(likes).where(eq(likes.id, existing.id));
+          res.json({ action: 'removed', type: null });
+        } else {
+          // 다른 타입이면 업데이트
+          await db.update(likes)
+            .set({ type })
+            .where(eq(likes.id, existing.id));
+          res.json({ action: 'updated', type });
+        }
+      } else {
+        // 새로운 반응 추가
+        await db.insert(likes).values({
+          userId,
+          targetType: 'character',
+          targetId: personaId,
+          type,
+        });
+        res.json({ action: 'added', type });
+      }
+    } catch (error) {
+      console.error("Error toggling persona reaction:", error);
+      res.status(500).json({ error: "Failed to toggle reaction" });
     }
   });
 

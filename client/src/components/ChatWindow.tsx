@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, User } from "lucide-react";
+import { MessageSquare, User, ThumbsUp, ThumbsDown, MessageCircle } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
@@ -65,6 +66,17 @@ const formatElapsedTime = (seconds: number): string => {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
+// SNS 스타일 숫자 포맷팅 함수 (1000 -> 1K, 1200 -> 1.2K, 10000 -> 10K)
+const formatSNSNumber = (num: number): string => {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(num >= 10000000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(num >= 10000 ? 0 : 1).replace(/\.0$/, '') + 'K';
+  }
+  return num.toString();
+};
+
 interface ChatWindowProps {
   scenario: ComplexScenario;
   persona: ScenarioPersona;
@@ -114,6 +126,59 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // 페르소나 통계 조회 (누적 대화 턴 수, 좋아요/싫어요 수, 제작자 정보)
+  const { data: personaStats } = useQuery<{
+    personaId: string;
+    creatorId: string | null;
+    creatorName: string;
+    totalTurns: number;
+    likesCount: number;
+    dislikesCount: number;
+  }>({
+    queryKey: ['/api/personas', persona.id, 'stats'],
+    queryFn: async () => {
+      const res = await fetch(`/api/personas/${persona.id}/stats`);
+      if (!res.ok) throw new Error('Failed to fetch persona stats');
+      return res.json();
+    },
+    staleTime: 30000, // 30초 동안 캐시 유지
+  });
+
+  // 내 반응 조회 (로그인 사용자만)
+  const { data: myReaction } = useQuery<{ reaction: 'like' | 'dislike' | null }>({
+    queryKey: ['/api/personas', persona.id, 'my-reaction'],
+    queryFn: async () => {
+      const res = await fetch(`/api/personas/${persona.id}/my-reaction`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        if (res.status === 401) return { reaction: null };
+        throw new Error('Failed to fetch reaction');
+      }
+      return res.json();
+    },
+    staleTime: 30000,
+  });
+
+  // 좋아요/싫어요 토글
+  const reactMutation = useMutation({
+    mutationFn: async (type: 'like' | 'dislike') => {
+      const res = await apiRequest('POST', `/api/personas/${persona.id}/react`, { type });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/personas', persona.id, 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/personas', persona.id, 'my-reaction'] });
+    },
+    onError: () => {
+      toast({
+        title: '오류',
+        description: '반응을 처리하는 중 오류가 발생했습니다.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const realtimeVoice = useRealtimeVoice({
     conversationId,
@@ -1199,28 +1264,66 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
         <div className="bg-gradient-to-r from-corporate-600 to-corporate-700 px-4 sm:px-6 py-3 sm:py-4 text-white">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-              <div 
-                className="flex-shrink-0" 
-                data-testid="chat-header-persona-image"
-              >
-                <div className="w-14 h-14 sm:w-12 sm:h-12 rounded-xl border-2 border-white/30 overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 shadow-lg">
-                  <img 
-                    src={getCharacterImage(currentEmotion) || persona.image} 
-                    alt={persona.name} 
-                    className="w-full h-full object-cover object-[center_15%] transition-all duration-200 scale-110" 
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(persona.name)}&background=6366f1&color=fff&size=64`;
-                    }}
-                  />
-                </div>
-              </div>
+              {/* 원형 페르소나 아바타 */}
+              <Avatar className="w-14 h-14 sm:w-12 sm:h-12 border-2 border-white/30 shadow-lg" data-testid="chat-header-persona-avatar">
+                <AvatarImage 
+                  src={getCharacterImage(currentEmotion) || persona.image} 
+                  alt={persona.name}
+                  className="object-cover object-[center_15%] scale-110"
+                />
+                <AvatarFallback className="bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600">
+                  {persona.name.slice(0, 2)}
+                </AvatarFallback>
+              </Avatar>
               <div className="min-w-0 flex-1">
                 <div 
                   className="text-left w-full" 
                   data-testid="chat-header-persona-info"
                 >
-                  <h3 className="text-base sm:text-lg font-semibold truncate">{persona.name} ({persona.department})</h3>
-                  <p className="text-blue-100 text-xs sm:text-sm truncate">{scenario.title}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-semibold truncate">{persona.name}</h3>
+                    {personaStats?.creatorName && (
+                      <span className="text-xs text-white/70 bg-white/10 px-2 py-0.5 rounded-full" data-testid="text-creator-name">
+                        by @{personaStats.creatorName}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    {/* 누적 대화 턴 수 (SNS 스타일) */}
+                    <div className="flex items-center gap-1 text-white/80 text-xs" data-testid="text-total-turns">
+                      <MessageCircle className="w-3 h-3" />
+                      <span>{formatSNSNumber(personaStats?.totalTurns || 0)}</span>
+                    </div>
+                    {/* 좋아요/싫어요 버튼 */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => reactMutation.mutate('like')}
+                        disabled={reactMutation.isPending}
+                        className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-all ${
+                          myReaction?.reaction === 'like'
+                            ? 'bg-green-500/30 text-green-100'
+                            : 'bg-white/10 text-white/80 hover:bg-white/20'
+                        }`}
+                        data-testid="button-like"
+                      >
+                        <ThumbsUp className="w-3 h-3" />
+                        <span>{formatSNSNumber(personaStats?.likesCount || 0)}</span>
+                      </button>
+                      <button
+                        onClick={() => reactMutation.mutate('dislike')}
+                        disabled={reactMutation.isPending}
+                        className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-all ${
+                          myReaction?.reaction === 'dislike'
+                            ? 'bg-red-500/30 text-red-100'
+                            : 'bg-white/10 text-white/80 hover:bg-white/20'
+                        }`}
+                        data-testid="button-dislike"
+                      >
+                        <ThumbsDown className="w-3 h-3" />
+                        <span>{formatSNSNumber(personaStats?.dislikesCount || 0)}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
