@@ -29,6 +29,7 @@ import {
   Cog,
   HelpCircle,
   ChartBar,
+  Library,
 } from "lucide-react";
 
 const mainMenuItems = [
@@ -59,15 +60,9 @@ const myContentItems = [
     requiresAuth: true,
   },
   {
-    title: "내 페르소나",
-    url: "/library?tab=personas",
-    icon: Users,
-    requiresAuth: true,
-  },
-  {
-    title: "내 시나리오",
-    url: "/library?tab=scenarios",
-    icon: FileText,
+    title: "내 라이브러리",
+    url: "/library",
+    icon: Library,
     requiresAuth: true,
   },
   {
