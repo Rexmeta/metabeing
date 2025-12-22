@@ -3894,9 +3894,15 @@ ${personaSnapshot.name}:`;
     }
   });
 
-  app.post("/api/admin/personas", async (req, res) => {
+  app.post("/api/admin/personas", isAuthenticated, async (req: any, res) => {
     try {
-      const persona = await fileManager.createMBTIPersona(req.body);
+      const userId = req.user?.id;
+      const personaData = {
+        ...req.body,
+        ownerId: userId, // 소유자 ID 추가
+        visibility: req.body.visibility || "private", // 기본값: 비공개
+      };
+      const persona = await fileManager.createMBTIPersona(personaData);
       res.json(persona);
     } catch (error) {
       console.error("Error creating MBTI persona:", error);
@@ -3904,9 +3910,31 @@ ${personaSnapshot.name}:`;
     }
   });
 
-  app.put("/api/admin/personas/:id", async (req, res) => {
+  app.put("/api/admin/personas/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const persona = await fileManager.updateMBTIPersona(req.params.id, req.body);
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      
+      // 기존 페르소나 확인
+      const existingPersona = await fileManager.getMBTIPersonaById(req.params.id);
+      if (!existingPersona) {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+      
+      // 소유자 또는 관리자만 수정 가능 (레거시 페르소나는 관리자만)
+      const isOwner = existingPersona.ownerId && existingPersona.ownerId === userId;
+      const isAdmin = userRole === 'admin';
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ error: "수정 권한이 없습니다" });
+      }
+      
+      // ownerId는 서버에서 보존 (클라이언트가 변경 불가)
+      const updateData = {
+        ...req.body,
+        ownerId: existingPersona.ownerId, // 기존 소유자 유지
+      };
+      
+      const persona = await fileManager.updateMBTIPersona(req.params.id, updateData);
       res.json(persona);
     } catch (error) {
       console.error("Error updating MBTI persona:", error);
@@ -3914,9 +3942,24 @@ ${personaSnapshot.name}:`;
     }
   });
 
-  app.delete("/api/admin/personas/:id", async (req, res) => {
+  app.delete("/api/admin/personas/:id", isAuthenticated, async (req: any, res) => {
     try {
       const personaId = req.params.id;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      
+      // 기존 페르소나 확인
+      const existingPersona = await fileManager.getMBTIPersonaById(personaId);
+      if (!existingPersona) {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+      
+      // 소유자 또는 관리자만 삭제 가능 (레거시 페르소나는 관리자만)
+      const isOwner = existingPersona.ownerId && existingPersona.ownerId === userId;
+      const isAdmin = userRole === 'admin';
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ error: "삭제 권한이 없습니다" });
+      }
       
       // 연결된 시나리오 확인
       const scenarios = await fileManager.getAllScenarios();
