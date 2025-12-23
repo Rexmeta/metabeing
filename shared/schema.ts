@@ -535,6 +535,8 @@ export const ugcScenarios = pgTable("ugc_scenarios", {
   visibility: varchar("visibility").notNull().default("private"),
   status: varchar("status").notNull().default("draft"),
   sourceScenarioId: varchar("source_scenario_id"), // 리믹스 원본
+  image: text("image"), // 대표 이미지 URL
+  introVideoUrl: text("intro_video_url"), // 인트로 비디오 URL
   viewCount: integer("view_count").notNull().default(0),
   usageCount: integer("usage_count").notNull().default(0),
   version: integer("version").notNull().default(1),

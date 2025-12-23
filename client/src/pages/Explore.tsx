@@ -52,6 +52,7 @@ interface Scenario {
   usageCount?: number;
   createdAt?: string;
   visibility?: "public" | "private";
+  image?: string | null;
   introVideoUrl?: string | null;
 }
 
@@ -134,15 +135,11 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
       data-testid={`card-scenario-${scenario.id}`}
     >
       <div className="relative aspect-video bg-muted">
-        {scenario.introVideoUrl ? (
-          <video 
-            src={scenario.introVideoUrl} 
+        {scenario.image ? (
+          <img 
+            src={scenario.image} 
+            alt={scenario.title || scenario.name || '시나리오'}
             className="w-full h-full object-cover"
-            muted
-            loop
-            playsInline
-            onMouseEnter={(e) => e.currentTarget.play()}
-            onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/30">
