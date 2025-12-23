@@ -223,59 +223,71 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {isAuthenticated && activeConversations && activeConversations.length > 0 && (
+        {isAuthenticated && (
           <>
             <SidebarSeparator />
             <SidebarGroup>
               <SidebarGroupLabel className="flex items-center gap-2">
                 <MessageCircle className="w-3 h-3" />
-                대화 중 ({activeConversations.length})
+                대화 중 {activeConversations && activeConversations.length > 0 && `(${activeConversations.length})`}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <div className="space-y-1 px-2">
-                  {activeConversations.slice(0, 5).map((conv) => (
-                    <Link 
-                      key={conv.id} 
-                      href={`/chat/${conv.conversationId || conv.id}`}
-                    >
-                      <div 
-                        className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
-                        data-testid={`chat-room-${conv.id}`}
-                      >
-                        <Avatar className="w-10 h-10 flex-shrink-0">
-                          <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                            {(conv.personaName || conv.personaId)?.charAt(0)?.toUpperCase() || "P"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium truncate">
-                              {conv.personaName || conv.personaId}
-                            </span>
-                            {conv.lastMessage?.createdAt && (
-                              <span className="text-xs text-muted-foreground flex-shrink-0">
-                                {formatDistanceToNow(new Date(conv.lastMessage.createdAt), { 
-                                  addSuffix: false, 
-                                  locale: ko 
-                                })}
-                              </span>
-                            )}
+                  {conversationsLoading ? (
+                    <div className="text-xs text-center text-muted-foreground py-4">
+                      불러오는 중...
+                    </div>
+                  ) : activeConversations && activeConversations.length > 0 ? (
+                    <>
+                      {activeConversations.slice(0, 5).map((conv) => (
+                        <Link 
+                          key={conv.id} 
+                          href={`/chat/${conv.conversationId || conv.id}`}
+                        >
+                          <div 
+                            className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
+                            data-testid={`chat-room-${conv.id}`}
+                          >
+                            <Avatar className="w-10 h-10 flex-shrink-0">
+                              <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                                {(conv.personaName || conv.personaId)?.charAt(0)?.toUpperCase() || "P"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium truncate">
+                                  {conv.personaName || conv.personaId}
+                                </span>
+                                {conv.lastMessage?.createdAt && (
+                                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                                    {formatDistanceToNow(new Date(conv.lastMessage.createdAt), { 
+                                      addSuffix: false, 
+                                      locale: ko 
+                                    })}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {conv.lastMessage?.message 
+                                  ? (conv.lastMessage.sender === 'user' ? '나: ' : '') + conv.lastMessage.message
+                                  : conv.scenarioRun?.scenarioName || '대화 시작하기'}
+                              </p>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {conv.lastMessage?.message 
-                              ? (conv.lastMessage.sender === 'user' ? '나: ' : '') + conv.lastMessage.message
-                              : conv.scenarioRun?.scenarioName || '대화 시작하기'}
-                          </p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                  {activeConversations.length > 5 && (
-                    <Link href="/mypage">
-                      <div className="text-xs text-center text-muted-foreground py-2 hover-elevate rounded-md cursor-pointer">
-                        +{activeConversations.length - 5}개 더보기
-                      </div>
-                    </Link>
+                        </Link>
+                      ))}
+                      {activeConversations.length > 5 && (
+                        <Link href="/mypage">
+                          <div className="text-xs text-center text-muted-foreground py-2 hover-elevate rounded-md cursor-pointer">
+                            +{activeConversations.length - 5}개 더보기
+                          </div>
+                        </Link>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-xs text-center text-muted-foreground py-4">
+                      진행 중인 대화가 없습니다
+                    </div>
                   )}
                 </div>
               </SidebarGroupContent>
