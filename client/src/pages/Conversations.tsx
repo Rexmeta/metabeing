@@ -68,9 +68,17 @@ export default function Conversations() {
           {activeConversations.map((conv) => {
             const personaInfo = personas[conv.personaId];
             const personaImage = getPersonaImage(personaInfo);
+            
+            // 유효한 날짜 확인 및 포맷팅
+            const getValidDate = (dateStr?: string) => {
+              if (!dateStr) return new Date();
+              const parsed = new Date(dateStr);
+              return isNaN(parsed.getTime()) ? new Date() : parsed;
+            };
+            
             const lastMessageTime = conv.lastMessage?.createdAt 
-              ? format(new Date(conv.lastMessage.createdAt), 'MM/dd HH:mm')
-              : format(new Date(conv.createdAt), 'MM/dd HH:mm');
+              ? format(getValidDate(conv.lastMessage.createdAt), 'MM/dd HH:mm')
+              : format(getValidDate(conv.createdAt), 'MM/dd HH:mm');
             
             return (
               <Link key={conv.id} href={`/chat/${conv.id}`}>

@@ -961,7 +961,17 @@ function ScenarioRunDetails({
             
             const personaImage = getPersonaImage();
             const displayName = `${persona.department ? persona.department + ' ' : ''}${persona.name}${persona.position ? ' ' + persona.position : ''}`;
-            const lastMessageTime = personaRun?.completedAt ? format(new Date(personaRun.completedAt), 'MM/dd HH:mm') : '미시작';
+            
+            // 유효한 날짜 확인
+            const getValidDate = (dateStr?: string) => {
+              if (!dateStr) return null;
+              const parsed = new Date(dateStr);
+              return isNaN(parsed.getTime()) ? null : parsed;
+            };
+            
+            const lastMessageTime = personaRun?.completedAt 
+              ? format(getValidDate(personaRun.completedAt) || new Date(), 'MM/dd HH:mm') 
+              : '미시작';
             
             return (
               <div 
