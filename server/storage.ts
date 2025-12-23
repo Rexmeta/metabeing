@@ -1050,10 +1050,12 @@ export class PostgreSQLStorage implements IStorage {
           }
         }
       }
-      // actualStartedAt으로 정렬
+      // lastActivityAt으로 정렬 (카카오톡 스타일 - 최신 메시지 순)
       activePersonaRuns.sort((a, b) => {
-        const aTime = a.actualStartedAt ? new Date(a.actualStartedAt).getTime() : 0;
-        const bTime = b.actualStartedAt ? new Date(b.actualStartedAt).getTime() : 0;
+        const aTime = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 
+                      (a.actualStartedAt ? new Date(a.actualStartedAt).getTime() : 0);
+        const bTime = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 
+                      (b.actualStartedAt ? new Date(b.actualStartedAt).getTime() : 0);
         return bTime - aTime;
       });
 

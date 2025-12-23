@@ -20,7 +20,9 @@ interface ActiveConversation {
     message: string;
     sender: string;
     createdAt: string;
-  };
+  } | string; // 새로운 필드는 string 직접 저장
+  lastActivityAt?: string;
+  unreadCount?: number;
   createdAt: string;
 }
 
@@ -102,17 +104,32 @@ export default function Conversations() {
               return isNaN(parsed.getTime()) ? new Date() : parsed;
             };
             
-            const lastMessageTime = conv.lastMessage?.createdAt 
-              ? format(getValidDate(conv.lastMessage.createdAt), 'MM/dd HH:mm')
+            // lastActivityAt 우선 사용 (메신저 스타일)
+            const lastMessageTime = conv.lastActivityAt 
+              ? format(getValidDate(conv.lastActivityAt), 'MM/dd HH:mm')
               : format(getValidDate(conv.createdAt), 'MM/dd HH:mm');
+            
+            // lastMessage 파싱 (객체 또는 문자열 형태)
+            const getLastMessageText = () => {
+              if (!conv.lastMessage) return "대화를 시작해보세요";
+              if (typeof conv.lastMessage === 'string') {
+                return conv.lastMessage;
+              }
+              if (typeof conv.lastMessage === 'object' && conv.lastMessage.message) {
+                return (conv.lastMessage.sender === "user" ? "나: " : "") + conv.lastMessage.message;
+              }
+              return "대화를 시작해보세요";
+            };
+            
+            const hasUnread = (conv.unreadCount ?? 0) > 0;
             
             return (
               <Link key={conv.id} href={`/chat/${conv.id}`}>
                 <div 
-                  className="flex items-center gap-3 p-3 rounded-lg border bg-white border-gray-200 transition-all cursor-pointer group hover:bg-blue-50 hover:border-blue-200"
+                  className="flex items-center gap-3 p-3 rounded-lg border bg-card transition-all cursor-pointer group hover-elevate"
                   data-testid={`conversation-card-${conv.id}`}
                 >
-                  {/* 페르소나 이미지 */}
+                  {/* 페르소나 이미지 + 읽지 않음 배지 */}
                   <div className="relative flex-shrink-0">
                     {personaImage ? (
                       <img 
@@ -121,8 +138,14 @@ export default function Conversations() {
                         className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-sm"
                       />
                     ) : (
-                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center text-white font-bold shadow-sm">
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-muted to-muted-foreground/50 flex items-center justify-center text-primary-foreground font-bold shadow-sm">
                         {(conv.personaName || conv.personaId).charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    {/* 읽지 않은 메시지 배지 */}
+                    {hasUnread && (
+                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                        {conv.unreadCount}
                       </div>
                     )}
                   </div>
@@ -130,24 +153,22 @@ export default function Conversations() {
                   {/* 대화 정보 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2 mb-1">
-                      <span className="font-semibold text-slate-900 truncate text-sm">
+                      <span className="font-semibold truncate text-sm">
                         {conv.personaName || conv.personaId}
                       </span>
-                      <span className="text-xs text-slate-500 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
                         {lastMessageTime}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mb-1">
                       {conv.scenarioRun?.scenarioName && (
-                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                        <Badge variant="outline" className="text-xs">
                           {conv.scenarioRun.scenarioName}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-slate-600 truncate">
-                      {conv.lastMessage?.message
-                        ? (conv.lastMessage.sender === "user" ? "나: " : "") + conv.lastMessage.message
-                        : "대화를 시작해보세요"}
+                    <p className={`text-xs truncate ${hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                      {getLastMessageText()}
                     </p>
                   </div>
 
