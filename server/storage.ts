@@ -1175,7 +1175,20 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getChatMessagesByPersonaRun(personaRunId: string): Promise<ChatMessage[]> {
-    return await db.select().from(chatMessages).where(eq(chatMessages.personaRunId, personaRunId)).orderBy(asc(chatMessages.turnIndex));
+    try {
+      const result = await db.select().from(chatMessages).where(eq(chatMessages.personaRunId, personaRunId)).orderBy(asc(chatMessages.turnIndex));
+      return result || [];
+    } catch (error) {
+      console.error('getChatMessagesByPersonaRun error, retrying:', error);
+      // Neon HTTP 드라이버 간헐적 null 반환 문제 - 재시도
+      try {
+        const retryResult = await db.select().from(chatMessages).where(eq(chatMessages.personaRunId, personaRunId)).orderBy(asc(chatMessages.turnIndex));
+        return retryResult || [];
+      } catch (retryError) {
+        console.error('getChatMessagesByPersonaRun retry failed:', retryError);
+        return [];
+      }
+    }
   }
 
   async getAllEmotionStats(scenarioIds?: string[]): Promise<{ emotion: string; count: number }[]> {
