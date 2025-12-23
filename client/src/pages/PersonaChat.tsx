@@ -29,6 +29,7 @@ interface Persona {
 
 interface PersonaChatSession {
   id: string;
+  personaRunId: string; // 실제 DB의 persona_runs.id - chatMessages 저장용
   scenarioId: string;
   scenarioName: string;
   personaId: string;
@@ -215,6 +216,7 @@ export default function PersonaChat() {
         scenario={dummyScenario}
         persona={personaSnapshot}
         conversationId={chatSession.id}
+        personaRunId={chatSession.personaRunId} // 실제 DB의 persona_runs.id - chatMessages 저장용
         onChatComplete={handleChatComplete}
         onExit={handleExit}
         initialChatMode="character"
