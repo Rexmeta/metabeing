@@ -1,18 +1,15 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Search, TrendingUp, Clock, Star, FileText, Sparkles, User, ThumbsUp, ThumbsDown, MessageCircle } from "lucide-react";
+import { Search, TrendingUp, Clock, Star, FileText, Sparkles, User, ThumbsUp, ThumbsDown, MessageCircle, ChevronRight, Flame, Heart, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { apiRequest } from "@/lib/queryClient";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
-type SortType = "trending" | "new" | "top";
-
-// SNS 스타일 숫자 포맷팅 (1K, 1.2M 등)
 function formatSNSNumber(num: number): string {
   if (num >= 1000000) {
     return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
@@ -78,6 +75,8 @@ interface Persona {
   createdAt?: string;
   images?: PersonaImages;
   visibility?: "public" | "private";
+  viewCount?: number;
+  usageCount?: number;
 }
 
 function ScenarioCard({ scenario }: { scenario: Scenario }) {
@@ -87,7 +86,6 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
   const difficultyLabels = ["", "입문", "기본", "도전", "고급"];
   const difficultyColors = ["", "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300", "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300", "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"];
 
-  // 시나리오 통계 조회
   const { data: stats } = useQuery<ScenarioStats>({
     queryKey: ['/api/scenarios', scenario.id, 'stats'],
     queryFn: async () => {
@@ -97,8 +95,7 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
     },
     staleTime: 30000,
   });
-  
-  // 사용자 반응 조회
+
   const { data: myReaction } = useQuery<{ reaction: 'like' | 'dislike' | null }>({
     queryKey: ['/api/scenarios', scenario.id, 'my-reaction'],
     queryFn: async () => {
@@ -112,7 +109,6 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
     staleTime: 30000,
   });
   
-  // 반응 토글 mutation
   const reactMutation = useMutation({
     mutationFn: async (type: 'like' | 'dislike') => {
       return apiRequest('POST', `/api/scenarios/${scenario.id}/react`, { type });
@@ -130,7 +126,7 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
 
   return (
     <Card 
-      className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden"
+      className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden flex-shrink-0 w-[280px]"
       onClick={() => setLocation(`/scenario/${scenario.id}`)}
       data-testid={`card-scenario-${scenario.id}`}
     >
@@ -202,10 +198,26 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
 function PersonaCard({ persona }: { persona: Persona }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const mbtiDisplay = persona.mbtiType || persona.mbti || "";
-  const displayName = persona.name || mbtiDisplay || "Unknown";
   
-  // 페르소나 통계 조회
+  const getProfileImage = () => {
+    const gender = persona.gender || 'female';
+    const genderKey = gender.toLowerCase() === 'male' ? 'male' : 'female';
+    
+    if (persona.images?.[genderKey]?.expressions?.base) {
+      return persona.images[genderKey].expressions.base;
+    }
+    if (persona.images?.base) {
+      return persona.images.base;
+    }
+    if (persona.profileImage) {
+      return persona.profileImage;
+    }
+    return null;
+  };
+  
+  const profileImage = getProfileImage();
+  const mbti = persona.mbtiType || persona.mbti || persona.id?.toUpperCase();
+
   const { data: stats } = useQuery<PersonaStats>({
     queryKey: ['/api/personas', persona.id, 'stats'],
     queryFn: async () => {
@@ -215,8 +227,7 @@ function PersonaCard({ persona }: { persona: Persona }) {
     },
     staleTime: 30000,
   });
-  
-  // 사용자 반응 조회
+
   const { data: myReaction } = useQuery<{ reaction: 'like' | 'dislike' | null }>({
     queryKey: ['/api/personas', persona.id, 'my-reaction'],
     queryFn: async () => {
@@ -230,7 +241,6 @@ function PersonaCard({ persona }: { persona: Persona }) {
     staleTime: 30000,
   });
   
-  // 반응 토글 mutation
   const reactMutation = useMutation({
     mutationFn: async (type: 'like' | 'dislike') => {
       return apiRequest('POST', `/api/personas/${persona.id}/react`, { type });
@@ -241,131 +251,58 @@ function PersonaCard({ persona }: { persona: Persona }) {
     },
   });
   
-  // 페르소나 기본 표정 이미지 가져오기
-  const getPersonaImage = () => {
-    if (!persona.images) return null;
-    
-    const gender = persona.gender || 'male';
-    const genderImages = persona.images[gender as 'male' | 'female'];
-    
-    if (genderImages?.expressions?.['중립']) {
-      return genderImages.expressions['중립'];
-    }
-    
-    if (persona.images.base) {
-      return persona.images.base;
-    }
-    
-    return null;
-  };
-  
-  const personaImage = getPersonaImage();
-  
-  const handleClick = () => {
-    setLocation(`/persona/${persona.id}/chat`);
-  };
-  
   const handleReaction = (e: React.MouseEvent, type: 'like' | 'dislike') => {
     e.stopPropagation();
     reactMutation.mutate(type);
   };
 
-  // MBTI 타입별 그라데이션 색상
-  const getMbtiGradient = (mbti: string) => {
-    const mbtiLower = mbti.toLowerCase();
-    const gradients: Record<string, string> = {
-      'intj': 'from-indigo-600 via-purple-600 to-violet-700',
-      'intp': 'from-cyan-500 via-blue-500 to-indigo-600',
-      'entj': 'from-amber-500 via-orange-500 to-red-600',
-      'entp': 'from-yellow-400 via-orange-400 to-pink-500',
-      'infj': 'from-purple-500 via-pink-500 to-rose-500',
-      'infp': 'from-pink-400 via-purple-400 to-indigo-500',
-      'enfj': 'from-emerald-400 via-teal-500 to-cyan-600',
-      'enfp': 'from-orange-400 via-pink-500 to-purple-600',
-      'istj': 'from-slate-500 via-gray-600 to-zinc-700',
-      'isfj': 'from-rose-400 via-pink-400 to-fuchsia-500',
-      'estj': 'from-blue-600 via-indigo-600 to-violet-700',
-      'esfj': 'from-pink-500 via-rose-500 to-red-500',
-      'istp': 'from-gray-500 via-slate-600 to-zinc-700',
-      'isfp': 'from-green-400 via-emerald-500 to-teal-600',
-      'estp': 'from-red-500 via-orange-500 to-yellow-500',
-      'esfp': 'from-fuchsia-500 via-pink-500 to-rose-500',
-    };
-    return gradients[mbtiLower] || 'from-slate-600 via-gray-700 to-zinc-800';
-  };
-  
   return (
     <div 
-      className="group relative cursor-pointer"
-      onClick={handleClick}
+      className="relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer group flex-shrink-0 w-[180px]"
+      onClick={() => setLocation(`/persona/${persona.id}`)}
       data-testid={`card-persona-${persona.id}`}
     >
-      {/* 카드 컨테이너 - 인스타그램 스타일 */}
-      <div className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-lg transition-all duration-500 group-hover:shadow-2xl group-hover:scale-[1.02]">
-        
-        {/* 배경 이미지 또는 그라데이션 */}
-        {personaImage ? (
-          <>
-            <img 
-              src={personaImage} 
-              alt={displayName}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-            />
-            {/* 다크 오버레이 그라데이션 */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-          </>
-        ) : (
-          /* 이미지 없을 때 MBTI 기반 그라데이션 */
-          <div className={`absolute inset-0 bg-gradient-to-br ${getMbtiGradient(mbtiDisplay)}`}>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <User className="w-24 h-24 text-white/30" />
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-          </div>
-        )}
-
-        {/* 상단 MBTI 뱃지 */}
-        {mbtiDisplay && (
-          <div className="absolute top-3 left-3 z-10">
-            <div className="px-3 py-1.5 bg-white/20 backdrop-blur-md rounded-full border border-white/30">
-              <span className="text-white font-bold text-sm tracking-wider">{mbtiDisplay}</span>
-            </div>
-          </div>
-        )}
-
-        {/* 상단 우측: 대화 턴 수 */}
-        <div className="absolute top-3 right-3 z-10">
-          <div className="flex items-center gap-1 px-2 py-1 bg-white/20 backdrop-blur-md rounded-full border border-white/30">
-            <MessageCircle className="w-3 h-3 text-white" />
-            <span className="text-white text-xs font-medium">{formatSNSNumber(stats?.totalTurns || 0)}</span>
-          </div>
+      {profileImage ? (
+        <img 
+          src={profileImage} 
+          alt={persona.name}
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
+          <User className="w-16 h-16 text-primary/50" />
         </div>
-
-        {/* 하단 정보 영역 */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
-          {/* 이름 */}
-          <h3 className="text-xl font-bold text-white mb-1 drop-shadow-lg">
-            {displayName}
-          </h3>
-          
-          {/* 제작자 ID */}
-          {stats?.creatorName && stats.creatorName !== "Unknown" && (
-            <p className="text-white/70 text-xs mb-2 drop-shadow-md" data-testid={`text-creator-${persona.id}`}>
-              by @{stats.creatorName}
-            </p>
-          )}
-          
-          {/* 좋아요/싫어요 버튼 */}
+      )}
+      
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      
+      <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="font-bold text-lg line-clamp-1">{persona.name}</h3>
+          <Badge variant="secondary" className="text-xs bg-white/20 text-white border-0">
+            {mbti}
+          </Badge>
+        </div>
+        
+        {persona.description && (
+          <p className="text-sm text-white/80 line-clamp-2 mb-2">{persona.description}</p>
+        )}
+        
+        <div className="flex items-center gap-3 text-xs text-white/70">
+          <span className="flex items-center gap-1">
+            <MessageCircle className="w-3 h-3" />
+            {formatSNSNumber(stats?.totalTurns || 0)}
+          </span>
           <div className="flex items-center gap-2">
             <button
               onClick={(e) => handleReaction(e, 'like')}
               disabled={reactMutation.isPending}
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-all ${
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full transition-all ${
                 myReaction?.reaction === 'like'
-                  ? 'bg-green-500/40 text-green-100 border border-green-400/50'
-                  : 'bg-white/20 text-white/90 border border-white/30 hover:bg-white/30'
+                  ? 'bg-green-500/30 text-green-300'
+                  : 'bg-white/10 hover:bg-white/20'
               }`}
-              data-testid={`button-like-${persona.id}`}
+              data-testid={`button-persona-like-${persona.id}`}
             >
               <ThumbsUp className="w-3 h-3" />
               <span>{formatSNSNumber(stats?.likesCount || 0)}</span>
@@ -373,53 +310,49 @@ function PersonaCard({ persona }: { persona: Persona }) {
             <button
               onClick={(e) => handleReaction(e, 'dislike')}
               disabled={reactMutation.isPending}
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full transition-all ${
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-full transition-all ${
                 myReaction?.reaction === 'dislike'
-                  ? 'bg-red-500/40 text-red-100 border border-red-400/50'
-                  : 'bg-white/20 text-white/90 border border-white/30 hover:bg-white/30'
+                  ? 'bg-red-500/30 text-red-300'
+                  : 'bg-white/10 hover:bg-white/20'
               }`}
-              data-testid={`button-dislike-${persona.id}`}
+              data-testid={`button-persona-dislike-${persona.id}`}
             >
               <ThumbsDown className="w-3 h-3" />
               <span>{formatSNSNumber(stats?.dislikesCount || 0)}</span>
             </button>
           </div>
         </div>
-
-        {/* 호버 시 반짝이는 효과 */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
       </div>
     </div>
   );
 }
 
+function SectionHeader({ icon: Icon, title, onViewAll }: { icon: any; title: string; onViewAll?: () => void }) {
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+        <Icon className="h-5 w-5 text-primary" />
+        {title}
+      </h2>
+      {onViewAll && (
+        <Button variant="ghost" size="sm" onClick={onViewAll} className="gap-1">
+          전체 보기 <ChevronRight className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export default function Explore() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortType, setSortType] = useState<SortType>("trending");
   const [, setLocation] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: scenarios = [], isLoading: loadingScenarios } = useQuery<Scenario[]>({
-    queryKey: ["/api/scenarios/public", searchQuery, sortType],
+    queryKey: ["/api/scenarios/public"],
     queryFn: async () => {
       const res = await fetch("/api/scenarios/public");
       if (!res.ok) throw new Error("Failed to fetch scenarios");
-      let data = await res.json();
-      
-      // 클라이언트 측 검색 필터링
-      if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase();
-        data = data.filter((s: Scenario) => 
-          s.title?.toLowerCase().includes(searchLower) ||
-          s.description?.toLowerCase().includes(searchLower)
-        );
-      }
-      
-      // 클라이언트 측 정렬
-      if (sortType === "trending" || sortType === "new") {
-        data = data.slice().reverse();
-      }
-      
-      return data;
+      return res.json();
     },
   });
 
@@ -431,6 +364,10 @@ export default function Explore() {
       return res.json();
     },
   });
+
+  const recommendedPersonas = personas.slice(0, 10);
+  const popularPersonas = [...personas].sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).slice(0, 10);
+  const trendingPersonas = [...personas].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0)).slice(0, 10);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -446,117 +383,145 @@ export default function Explore() {
           </Button>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="페르소나 또는 시나리오 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant={sortType === "trending" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSortType("trending")}
-              className="gap-1"
-            >
-              <TrendingUp className="h-4 w-4" /> 인기
-            </Button>
-            <Button
-              variant={sortType === "new" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSortType("new")}
-              className="gap-1"
-            >
-              <Clock className="h-4 w-4" /> 최신
-            </Button>
-            <Button
-              variant={sortType === "top" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSortType("top")}
-              className="gap-1"
-            >
-              <Star className="h-4 w-4" /> 조회순
-            </Button>
-          </div>
+        <div className="relative mb-8">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="페르소나 또는 시나리오 검색..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 max-w-md"
+          />
         </div>
 
-        <Tabs defaultValue="personas" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="personas" className="gap-2">
-              <User className="h-4 w-4" /> 페르소나
-            </TabsTrigger>
-            <TabsTrigger value="scenarios" className="gap-2">
-              <FileText className="h-4 w-4" /> 시나리오
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="scenarios">
-            {loadingScenarios ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-10">
+          {/* 1. 추천 섹션 */}
+          <section>
+            <SectionHeader icon={Star} title="추천" />
+            {loadingPersonas ? (
+              <div className="flex gap-4 overflow-hidden">
                 {[...Array(6)].map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="space-y-2">
+                  <div key={i} className="aspect-[3/4] w-[180px] flex-shrink-0 rounded-2xl bg-slate-200 animate-pulse" />
+                ))}
+              </div>
+            ) : recommendedPersonas.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">추천 페르소나가 없습니다</div>
+            ) : (
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex gap-4 pb-4">
+                  {recommendedPersonas.map((persona) => (
+                    <PersonaCard key={persona.id} persona={persona} />
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            )}
+          </section>
+
+          {/* 2. 시나리오 섹션 */}
+          <section>
+            <SectionHeader icon={FileText} title="시나리오" />
+            {loadingScenarios ? (
+              <div className="flex gap-4 overflow-hidden">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="w-[280px] flex-shrink-0">
+                    <Card className="animate-pulse">
+                      <div className="aspect-video bg-slate-200" />
+                      <CardHeader>
                         <div className="h-5 bg-slate-200 rounded w-3/4" />
-                        <div className="h-3 bg-slate-200 rounded w-full" />
-                      </div>
-                    </CardHeader>
-                  </Card>
+                      </CardHeader>
+                    </Card>
+                  </div>
                 ))}
               </div>
             ) : scenarios.length === 0 ? (
-              <div className="text-center py-12">
+              <div className="text-center py-8">
                 <FileText className="h-12 w-12 mx-auto text-slate-300 mb-4" />
                 <h3 className="text-lg font-medium text-slate-600">아직 공개된 시나리오가 없습니다</h3>
-                <p className="text-slate-500 mt-1">첫 번째 시나리오를 만들어보세요!</p>
                 <Button className="mt-4" onClick={() => setLocation("/create")}>
                   시나리오 만들기
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {scenarios.map((scenario) => (
-                  <ScenarioCard key={scenario.id} scenario={scenario} />
-                ))}
-              </div>
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex gap-4 pb-4">
+                  {scenarios.map((scenario) => (
+                    <ScenarioCard key={scenario.id} scenario={scenario} />
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
             )}
-          </TabsContent>
+          </section>
 
-          <TabsContent value="personas">
+          {/* 3. 맞춤 추천 섹션 */}
+          <section>
+            <SectionHeader icon={Heart} title="맞춤 추천" />
             {loadingPersonas ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {[...Array(12)].map((_, i) => (
-                  <div key={i} className="aspect-[3/4] rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 animate-pulse overflow-hidden">
-                    <div className="h-full flex flex-col justify-end p-4">
-                      <div className="h-5 bg-slate-400/30 rounded w-3/4 mb-2" />
-                      <div className="h-3 bg-slate-400/30 rounded w-full mb-1" />
-                      <div className="h-3 bg-slate-400/30 rounded w-2/3" />
-                    </div>
-                  </div>
+              <div className="flex gap-4 overflow-hidden">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="aspect-[3/4] w-[180px] flex-shrink-0 rounded-2xl bg-slate-200 animate-pulse" />
                 ))}
               </div>
             ) : personas.length === 0 ? (
-              <div className="text-center py-12">
-                <User className="h-12 w-12 mx-auto text-slate-300 mb-4" />
-                <h3 className="text-lg font-medium text-slate-600">아직 공개된 페르소나가 없습니다</h3>
-                <p className="text-slate-500 mt-1">첫 번째 페르소나를 만들어보세요!</p>
-                <Button className="mt-4" onClick={() => setLocation("/admin-management?tab=manage-personas")}>
-                  페르소나 만들기
-                </Button>
-              </div>
+              <div className="text-center py-8 text-slate-500">맞춤 추천 페르소나가 없습니다</div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {personas.map((persona) => (
-                  <PersonaCard key={persona.id} persona={persona} />
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex gap-4 pb-4">
+                  {personas.slice(0, 10).map((persona) => (
+                    <PersonaCard key={persona.id} persona={persona} />
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            )}
+          </section>
+
+          {/* 4. 인기 섹션 */}
+          <section>
+            <SectionHeader icon={TrendingUp} title="인기" />
+            {loadingPersonas ? (
+              <div className="flex gap-4 overflow-hidden">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="aspect-[3/4] w-[180px] flex-shrink-0 rounded-2xl bg-slate-200 animate-pulse" />
                 ))}
               </div>
+            ) : popularPersonas.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">인기 페르소나가 없습니다</div>
+            ) : (
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex gap-4 pb-4">
+                  {popularPersonas.map((persona) => (
+                    <PersonaCard key={persona.id} persona={persona} />
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
             )}
-          </TabsContent>
-        </Tabs>
+          </section>
+
+          {/* 5. 인기 트렌드 섹션 */}
+          <section>
+            <SectionHeader icon={Flame} title="인기 트렌드" />
+            {loadingPersonas ? (
+              <div className="flex gap-4 overflow-hidden">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="aspect-[3/4] w-[180px] flex-shrink-0 rounded-2xl bg-slate-200 animate-pulse" />
+                ))}
+              </div>
+            ) : trendingPersonas.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">트렌드 페르소나가 없습니다</div>
+            ) : (
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex gap-4 pb-4">
+                  {trendingPersonas.map((persona) => (
+                    <PersonaCard key={persona.id} persona={persona} />
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
