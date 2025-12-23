@@ -938,120 +938,111 @@ function ScenarioRunDetails({
         </DialogContent>
       </Dialog>
       
-      {/* 모든 페르소나들 (시작 전/진행 중/완료) */}
+      {/* 모든 페르소나들 (카카오톡 스타일 대화방) */}
       <div className="space-y-2">
         <h5 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-          <Users className="w-4 h-4 text-blue-600" />
-          페르소나 목록 ({scenario?.personas?.length || 0}개)
+          <MessageSquare className="w-4 h-4 text-blue-600" />
+          대화 목록 ({scenario?.personas?.length || 0}명)
         </h5>
-        <div className="space-y-2">
+        <div className="space-y-1">
           {scenario?.personas?.map((persona: any, index: number) => {
             const personaRun = personaRuns.find(pr => pr.personaId === persona.id);
             const isCompleted = personaRun?.status === 'completed';
             const isActive = personaRun?.status === 'active';
             const isNotStarted = !personaRun;
             
+            // 페르소나 이미지 가져오기
+            const getPersonaImage = () => {
+              if (!persona.images) return null;
+              const gender = persona.gender || 'male';
+              const genderImages = persona.images[gender as 'male' | 'female'];
+              return genderImages?.expressions?.['중립'] || persona.images.base || null;
+            };
+            
+            const personaImage = getPersonaImage();
+            const displayName = `${persona.department ? persona.department + ' ' : ''}${persona.name}${persona.position ? ' ' + persona.position : ''}`;
+            const lastMessageTime = personaRun?.completedAt ? format(new Date(personaRun.completedAt), 'MM/dd HH:mm') : '미시작';
+            
             return (
               <div 
                 key={persona.id}
-                className="flex items-center justify-between p-3 bg-white border rounded-lg hover:bg-slate-50 transition-colors"
+                className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer group hover:bg-blue-50 ${
+                  isActive ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:border-blue-200'
+                }`}
+                onClick={() => {
+                  if (!isNotStarted) {
+                    window.location.href = `/chat/${personaRun.id}`;
+                  }
+                }}
                 data-testid={`persona-${persona.id}`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    isCompleted ? 'bg-green-100 text-green-600' :
-                    isActive ? 'bg-yellow-100 text-yellow-600' :
-                    'bg-gray-100 text-gray-600'
-                  }`}>
-                    {personaRun?.phase || '?'}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-slate-900">
-                      {persona.department && <span className="text-slate-600 font-normal">{persona.department} </span>}
-                      {persona.name}
-                      {(persona.position || persona.role) && (
-                        <span className="text-slate-600 font-normal"> {persona.position || persona.role}</span>
-                      )}
-                    </span>
-                    {persona.mbti && (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                        {persona.mbti}
-                      </Badge>
-                    )}
-                    {personaRun && (
-                      <Badge variant="outline" className="text-xs">
-                        {personaRun.turnCount}턴
-                      </Badge>
-                    )}
-                    <Badge className={
-                      isCompleted ? 'bg-green-600' :
-                      isActive ? 'bg-yellow-600' :
-                      'bg-gray-400'
-                    }>
-                      {isCompleted ? '완료' : isActive ? '진행 중' : '시작 전'}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {personaRun?.score !== null && personaRun?.score !== undefined && (
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 text-yellow-500" />
-                      <span className={`font-semibold ${personaRun.score >= 80 ? 'text-green-600' : personaRun.score >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
-                        {personaRun.score}점
-                      </span>
+                {/* 페르소나 이미지 */}
+                <div className="relative flex-shrink-0">
+                  {personaImage ? (
+                    <img 
+                      src={personaImage} 
+                      alt={persona.name}
+                      className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center text-white font-bold shadow-sm">
+                      {persona.name.charAt(0)}
                     </div>
                   )}
-                  <div className="flex gap-2">
-                    {isNotStarted ? (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => window.location.href = `/home?scenarioId=${scenarioRun.scenarioId}&scenarioRunId=${scenarioRun.id}`}
-                        data-testid={`start-persona-${persona.id}`}
-                      >
-                        시나리오 페르소나 선택
-                      </Button>
-                    ) : isActive ? (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.location.href = `/chat/${personaRun.id}`}
-                          data-testid={`view-chat-${personaRun.id}`}
-                        >
-                          대화 보기
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => window.location.href = `/home?resumePersonaRunId=${personaRun.id}`}
-                          data-testid={`resume-persona-${personaRun.id}`}
-                          className="bg-yellow-600 hover:bg-yellow-700"
-                        >
-                          대화 계속하기
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.location.href = `/chat/${personaRun.id}`}
-                          data-testid={`view-chat-${personaRun.id}`}
-                        >
-                          대화 보기
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => window.location.href = `/feedback/${personaRun.id}`}
-                          data-testid={`view-feedback-${personaRun.id}`}
-                        >
-                          피드백 보기
-                        </Button>
-                      </>
+                  {/* 상태 표시기 */}
+                  {isActive && (
+                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-yellow-500 rounded-full border-2 border-white" />
+                  )}
+                  {isCompleted && (
+                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center text-white text-xs">✓</div>
+                  )}
+                </div>
+                
+                {/* 대화 정보 */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-2 mb-1">
+                    <span className="font-semibold text-slate-900 truncate text-sm">
+                      {displayName}
+                    </span>
+                    <span className="text-xs text-slate-500 flex-shrink-0">
+                      {lastMessageTime}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-600 truncate">
+                      {!isNotStarted ? `${personaRun.turnCount}턴 대화` : '미시작'}
+                    </span>
+                    {personaRun?.score !== null && personaRun?.score !== undefined && (
+                      <Badge className={`text-xs ${
+                        personaRun.score >= 80 ? 'bg-green-100 text-green-700' : 
+                        personaRun.score >= 60 ? 'bg-yellow-100 text-yellow-700' : 
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {personaRun.score}점
+                      </Badge>
+                    )}
+                    {isActive && (
+                      <Badge className="text-xs bg-yellow-100 text-yellow-700">진행 중</Badge>
                     )}
                   </div>
+                </div>
+                
+                {/* 액션 버튼 (호버시 표시) */}
+                <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {!isNotStarted && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.location.href = `/chat/${personaRun.id}`;
+                      }}
+                      data-testid={`view-chat-${personaRun.id}`}
+                    >
+                      보기
+                    </Button>
+                  )}
                 </div>
               </div>
             );
