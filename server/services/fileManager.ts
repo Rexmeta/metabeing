@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ComplexScenario, ScenarioPersona } from '@/lib/scenario-system';
-import { enrichPersonaWithMBTI, enrichPersonaWithBasicMBTI } from '../utils/mbtiLoader';
+import { enrichPersonaWithMBTI, enrichPersonaWithBasicMBTI, invalidateMBTICache } from '../utils/mbtiLoader';
 
 const SCENARIOS_DIR = 'scenarios';
 const PERSONAS_DIR = 'personas';
@@ -370,7 +370,11 @@ export class FileManagerService {
       // ID가 변경된 경우 기존 파일 삭제
       if (id !== personaData.id) {
         await fs.unlink(filePath);
+        invalidateMBTICache(id); // 기존 ID 캐시 무효화
       }
+      
+      // 캐시 무효화 (다음 조회 시 파일에서 다시 로드)
+      invalidateMBTICache(personaData.id);
       
       return personaData;
     } catch (error) {

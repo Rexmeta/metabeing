@@ -233,3 +233,24 @@ export function clearMBTICache(): void {
   mbtiCache.clear();
   console.log('🗑️ MBTI cache cleared');
 }
+
+/**
+ * 특정 MBTI 페르소나의 캐시를 업데이트하는 함수
+ * @param personaRef - 예: "istj.json" 또는 "istj"
+ * @param data - 업데이트된 페르소나 데이터
+ */
+export function updateMBTICache(personaRef: string, data: MBTIPersona): void {
+  const normalizedRef = personaRef.endsWith('.json') ? personaRef : `${personaRef}.json`;
+  mbtiCache.set(normalizedRef, data);
+  console.log(`🔄 MBTI cache updated: ${data.mbti} (${data.id})`);
+}
+
+/**
+ * 특정 MBTI 페르소나의 캐시를 삭제하는 함수
+ * @param personaRef - 예: "istj.json" 또는 "istj"
+ */
+export function invalidateMBTICache(personaRef: string): void {
+  const normalizedRef = personaRef.endsWith('.json') ? personaRef : `${personaRef}.json`;
+  mbtiCache.delete(normalizedRef);
+  console.log(`🗑️ MBTI cache invalidated: ${personaRef}`);
+}
