@@ -71,6 +71,7 @@ export default function Library() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deleteDialog, setDeleteDialog] = useState<{ type: "scenario" | "persona"; id: string; name?: string } | null>(null);
+  const [editingPersona, setEditingPersona] = useState<Persona | null>(null);
   
   const searchParams = new URLSearchParams(searchString);
   const tabFromUrl = searchParams.get("tab") || "personas";
@@ -341,7 +342,7 @@ export default function Library() {
                               <DropdownMenuItem 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setLocation(`/content-management?tab=manage-personas&edit=${persona.id}`);
+                                  setEditingPersona(persona);
                                 }}
                                 data-testid={`button-edit-persona-${persona.id}`}
                               >
@@ -558,6 +559,20 @@ export default function Library() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 페르소나 수정 다이얼로그 */}
+      <PersonaCreateDialog
+        open={!!editingPersona}
+        onOpenChange={(open) => {
+          if (!open) setEditingPersona(null);
+        }}
+        mode="edit"
+        initialData={editingPersona}
+        onSuccess={() => {
+          setEditingPersona(null);
+          queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] });
+        }}
+      />
     </div>
   );
 }

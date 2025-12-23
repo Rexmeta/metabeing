@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil } from 'lucide-react';
 
 interface MBTIPersonaFormData {
   id: string;
@@ -114,9 +114,11 @@ interface PersonaCreateDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onSuccess?: () => void;
+  initialData?: any;
+  mode?: 'create' | 'edit';
 }
 
-export function PersonaCreateDialog({ trigger, open: controlledOpen, onOpenChange, onSuccess }: PersonaCreateDialogProps) {
+export function PersonaCreateDialog({ trigger, open: controlledOpen, onOpenChange, onSuccess, initialData, mode = 'create' }: PersonaCreateDialogProps) {
   const { toast } = useToast();
   const [internalOpen, setInternalOpen] = useState(false);
   const [formData, setFormData] = useState<MBTIPersonaFormData>(emptyFormData);
@@ -124,10 +126,68 @@ export function PersonaCreateDialog({ trigger, open: controlledOpen, onOpenChang
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : internalOpen;
   const setIsOpen = isControlled ? onOpenChange! : setInternalOpen;
+  const isEditMode = mode === 'edit' && initialData;
 
   const resetForm = () => {
     setFormData(emptyFormData);
   };
+
+  useEffect(() => {
+    if (isEditMode && isOpen && initialData) {
+      const mappedData: MBTIPersonaFormData = {
+        id: initialData.id || '',
+        mbti: initialData.mbti || initialData.mbtiType || initialData.mbpiType || '',
+        gender: initialData.gender || 'female',
+        name: initialData.name || initialData.displayName || '',
+        department: initialData.department || '',
+        position: initialData.position || initialData.role || '',
+        experience: initialData.experience || '',
+        stance: initialData.stance || '',
+        goal: initialData.goal || '',
+        tradeoff: initialData.tradeoff || '',
+        personality_traits: initialData.personality_traits || [],
+        communication_style: initialData.communication_style || initialData.communicationStyle || '',
+        motivation: initialData.motivation || '',
+        fears: initialData.fears || [],
+        background: {
+          personal_values: initialData.background?.personal_values || [],
+          hobbies: initialData.background?.hobbies || [],
+          social: {
+            preference: initialData.background?.social?.preference || '',
+            behavior: initialData.background?.social?.behavior || ''
+          }
+        },
+        communication_patterns: {
+          opening_style: initialData.communication_patterns?.opening_style || '',
+          key_phrases: initialData.communication_patterns?.key_phrases || [],
+          response_to_arguments: initialData.communication_patterns?.response_to_arguments || {},
+          win_conditions: initialData.communication_patterns?.win_conditions || []
+        },
+        voice: {
+          tone: initialData.voice?.tone || '',
+          pace: initialData.voice?.pace || '',
+          emotion: initialData.voice?.emotion || ''
+        },
+        images: {
+          base: initialData.images?.male?.base || initialData.images?.female?.base || '',
+          style: '',
+          expressions: {
+            중립: initialData.images?.male?.expressions?.neutral || initialData.images?.female?.expressions?.neutral || '',
+            기쁨: initialData.images?.male?.expressions?.joy || initialData.images?.female?.expressions?.joy || '',
+            슬픔: initialData.images?.male?.expressions?.sad || initialData.images?.female?.expressions?.sad || '',
+            분노: initialData.images?.male?.expressions?.angry || initialData.images?.female?.expressions?.angry || '',
+            놀람: initialData.images?.male?.expressions?.surprise || initialData.images?.female?.expressions?.surprise || '',
+            호기심: initialData.images?.male?.expressions?.curious || initialData.images?.female?.expressions?.curious || '',
+            불안: '',
+            단호: '',
+            실망: '',
+            당혹: ''
+          }
+        }
+      };
+      setFormData(mappedData);
+    }
+  }, [isEditMode, isOpen, initialData]);
 
   const createMutation = useMutation({
     mutationFn: async (personaData: MBTIPersonaFormData) => {
@@ -136,6 +196,7 @@ export function PersonaCreateDialog({ trigger, open: controlledOpen, onOpenChang
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/personas'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/personas/mine'] });
       setIsOpen(false);
       resetForm();
       toast({
@@ -153,9 +214,39 @@ export function PersonaCreateDialog({ trigger, open: controlledOpen, onOpenChang
     }
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async (personaData: MBTIPersonaFormData) => {
+      const response = await apiRequest("PUT", `/api/admin/personas/${initialData.id}`, personaData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/personas'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/personas/mine'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/personas/public'] });
+      setIsOpen(false);
+      resetForm();
+      toast({
+        title: "성공",
+        description: "페르소나가 수정되었습니다."
+      });
+      onSuccess?.();
+    },
+    onError: () => {
+      toast({
+        title: "오류",
+        description: "페르소나 수정에 실패했습니다.",
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate(formData);
+    if (isEditMode) {
+      updateMutation.mutate(formData);
+    } else {
+      createMutation.mutate(formData);
+    }
   };
 
   return (
@@ -173,8 +264,8 @@ export function PersonaCreateDialog({ trigger, open: controlledOpen, onOpenChang
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-50">
         <DialogHeader className="bg-indigo-600 -m-6 mb-4 p-6 rounded-t-lg">
           <DialogTitle className="text-white text-xl flex items-center gap-2">
-            <Plus className="w-5 h-5" />
-            페르소나 생성
+            {isEditMode ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+            {isEditMode ? '페르소나 수정' : '페르소나 생성'}
           </DialogTitle>
         </DialogHeader>
         
