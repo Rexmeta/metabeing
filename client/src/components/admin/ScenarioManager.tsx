@@ -64,7 +64,20 @@ interface ScenarioFormData {
   recommendedFlow: string[];
 }
 
-export function ScenarioManager() {
+// dialogOnly 모드용 Props
+interface ScenarioManagerProps {
+  dialogOnly?: boolean;
+  externalOpen?: boolean;
+  externalScenario?: ComplexScenario | null;
+  onExternalClose?: () => void;
+}
+
+export function ScenarioManager({
+  dialogOnly = false,
+  externalOpen = false,
+  externalScenario = null,
+  onExternalClose
+}: ScenarioManagerProps = {}) {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingScenario, setEditingScenario] = useState<ComplexScenario | null>(null);
@@ -170,12 +183,16 @@ export function ScenarioManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scenarios/mine'] });
       setIsCreateOpen(false);
       resetForm();
       toast({
         title: "시나리오 생성 완료",
         description: "새로운 시나리오가 성공적으로 생성되었습니다.",
       });
+      if (dialogOnly) {
+        onExternalClose?.();
+      }
     },
     onError: () => {
       toast({
@@ -193,13 +210,17 @@ export function ScenarioManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scenarios/mine'] });
       setEditingScenario(null);
       resetForm();
-      setIsCreateOpen(false); // 다이얼로그 닫기
+      setIsCreateOpen(false);
       toast({
         title: "시나리오 수정 완료",
         description: "시나리오가 성공적으로 수정되었습니다.",
       });
+      if (dialogOnly) {
+        onExternalClose?.();
+      }
     },
     onError: () => {
       toast({
@@ -313,6 +334,43 @@ export function ScenarioManager() {
     });
     setIsCreateOpen(true);
   };
+
+  // dialogOnly 모드: 외부 상태로 다이얼로그 제어
+  React.useEffect(() => {
+    if (dialogOnly) {
+      if (externalOpen && externalScenario) {
+        // 수정 모드
+        handleEdit(externalScenario);
+      } else if (externalOpen && !externalScenario) {
+        // 생성 모드
+        resetForm();
+        setEditingScenario(null);
+        setIsCreateOpen(true);
+      } else if (!externalOpen) {
+        // 닫기
+        setIsCreateOpen(false);
+        setEditingScenario(null);
+        resetForm();
+      }
+    }
+  }, [dialogOnly, externalOpen, externalScenario]);
+
+  // dialogOnly 모드: 다이얼로그 닫기 핸들러
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      setIsCreateOpen(false);
+      setEditingScenario(null);
+      resetForm();
+      if (dialogOnly) {
+        onExternalClose?.();
+      }
+    } else {
+      setIsCreateOpen(true);
+    }
+  };
+
+  // dialogOnly 모드에서 다이얼로그 open 상태
+  const isDialogOpen = dialogOnly ? externalOpen : isCreateOpen;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -495,11 +553,117 @@ export function ScenarioManager() {
     }));
   };
 
-  if (isLoading) {
+  if (isLoading && !dialogOnly) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-corporate-600"></div>
       </div>
+    );
+  }
+
+  // dialogOnly 모드: 다이얼로그와 프리뷰 모달만 렌더링
+  if (dialogOnly) {
+    return (
+      <>
+        <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-50">
+            <DialogHeader className="bg-white px-6 py-4 -mx-6 -mt-6 border-b border-slate-200">
+              <DialogTitle className="text-xl text-slate-900">
+                {editingScenario ? '시나리오 편집' : '새 시나리오 생성'}
+              </DialogTitle>
+            </DialogHeader>
+          
+          <form onSubmit={handleSubmit} className="space-y-6 pt-6">
+            {/* 기본 정보 */}
+            <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
+              <h3 className="text-lg font-semibold text-slate-900 pb-3 border-b border-slate-200">기본 정보</h3>
+              
+              {/* 카테고리 선택 */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-slate-700">카테고리 *</Label>
+                <Select
+                  value={formData.categoryId || ''}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
+                >
+                  <SelectTrigger className="bg-white" data-testid="select-category">
+                    <SelectValue placeholder="카테고리 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories?.map((cat) => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 제목 */}
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-sm font-medium text-slate-700">제목 *</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="시나리오 제목"
+                  required
+                  className="bg-white"
+                  data-testid="input-scenario-title"
+                />
+              </div>
+
+              {/* 설명 */}
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-medium text-slate-700">설명</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="시나리오 설명"
+                  className="min-h-[80px] bg-white"
+                  data-testid="textarea-scenario-description"
+                />
+              </div>
+
+              {/* 예상 시간 */}
+              <div className="space-y-2">
+                <Label htmlFor="estimatedTime" className="text-sm font-medium text-slate-700">예상 시간</Label>
+                <Input
+                  id="estimatedTime"
+                  value={formData.estimatedTime}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estimatedTime: e.target.value }))}
+                  placeholder="예: 15분"
+                  className="bg-white"
+                  data-testid="input-estimated-time"
+                />
+              </div>
+            </div>
+
+            {/* 저장 버튼 */}
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => handleDialogClose(false)}>
+                취소
+              </Button>
+              <Button type="submit" className="bg-corporate-600 hover:bg-corporate-700">
+                {editingScenario ? '수정' : '생성'}
+              </Button>
+            </div>
+          </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* 이미지 전체보기 모달 */}
+        <Dialog open={!!imagePreviewUrl} onOpenChange={(open) => !open && setImagePreviewUrl(null)}>
+          <DialogContent className="max-w-4xl w-full">
+            <DialogHeader>
+              <DialogTitle>이미지 전체보기</DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center justify-center bg-slate-100 rounded-lg overflow-hidden max-h-[70vh]">
+              <img src={imagePreviewUrl || ''} alt="전체보기" className="max-w-full max-h-[70vh] object-contain" />
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 
@@ -527,7 +691,7 @@ export function ScenarioManager() {
           </Button>
         </div>
 
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
           
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-50">
               <DialogHeader className="bg-white px-6 py-4 -mx-6 -mt-6 border-b border-slate-200">

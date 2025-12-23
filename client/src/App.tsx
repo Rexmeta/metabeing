@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation, useSearch } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -25,6 +25,23 @@ import Library from "@/pages/Library";
 import ProfileSettings from "@/pages/ProfileSettings";
 import PersonaChat from "@/pages/PersonaChat";
 import Conversations from "@/pages/Conversations";
+
+function ContentManagementRedirect() {
+  const [, setLocation] = useLocation();
+  const search = useSearch();
+  
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const tab = params.get("tab");
+    let libraryTab = "personas";
+    if (tab === "manage-personas") libraryTab = "personas";
+    else if (tab === "manage-scenarios") libraryTab = "scenarios";
+    else if (tab === "difficulty") libraryTab = "difficulty";
+    setLocation(`/library?tab=${libraryTab}`, { replace: true });
+  }, [search, setLocation]);
+  
+  return null;
+}
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, setShowAuthModal } = useAuth();
@@ -142,9 +159,8 @@ function MainRouter() {
       <Route path="/admin-management">
         {() => <ProtectedRoute component={AdminManagement} />}
       </Route>
-      <Route path="/content-management">
-        {() => <ProtectedRoute component={AdminManagement} />}
-      </Route>
+      {/* content-management redirects to library */}
+      <Route path="/content-management" component={ContentManagementRedirect} />
       <Route path="/ai-generator">
         {() => <AdminRoute component={AIGeneratorPage} />}
       </Route>

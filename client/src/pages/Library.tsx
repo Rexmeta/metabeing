@@ -24,9 +24,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PersonaManager } from "@/components/admin/PersonaManager";
+import { ScenarioManager } from "@/components/admin/ScenarioManager";
+import { DifficultySettingsTab } from "@/components/admin/DifficultySettingsTab";
 import { ScenarioCreateDialog } from "@/components/ScenarioCreateDialog";
 import { AIScenarioGenerator } from "@/components/admin/AIScenarioGenerator";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Settings } from "lucide-react";
 
 interface Scenario {
   id: string;
@@ -73,6 +75,8 @@ export default function Library() {
   const [deleteDialog, setDeleteDialog] = useState<{ type: "scenario" | "persona"; id: string; name?: string } | null>(null);
   const [editingPersona, setEditingPersona] = useState<Persona | null>(null);
   const [personaDialogOpen, setPersonaDialogOpen] = useState(false);
+  const [editingScenario, setEditingScenario] = useState<Scenario | null>(null);
+  const [scenarioDialogOpen, setScenarioDialogOpen] = useState(false);
   
   const searchParams = new URLSearchParams(searchString);
   const tabFromUrl = searchParams.get("tab") || "personas";
@@ -81,7 +85,7 @@ export default function Library() {
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     const tab = params.get("tab");
-    if (tab && ["personas", "scenarios", "bookmarks"].includes(tab)) {
+    if (tab && ["personas", "scenarios", "bookmarks", "difficulty"].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchString]);
@@ -265,6 +269,9 @@ export default function Library() {
             </TabsTrigger>
             <TabsTrigger value="bookmarks" className="gap-2">
               <Bookmark className="h-4 w-4" /> 북마크 ({myBookmarks.length})
+            </TabsTrigger>
+            <TabsTrigger value="difficulty" className="gap-2">
+              <Settings className="h-4 w-4" /> 난이도 설정
             </TabsTrigger>
           </TabsList>
 
@@ -474,7 +481,10 @@ export default function Library() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem 
-                                onClick={() => setLocation(`/content-management?tab=manage-scenarios&edit=${scen.id}`)}
+                                onClick={() => {
+                                  setEditingScenario(scen);
+                                  setScenarioDialogOpen(true);
+                                }}
                                 data-testid={`button-edit-scenario-${scen.id}`}
                               >
                                 <Pencil className="h-4 w-4 mr-2" /> 수정
@@ -540,6 +550,10 @@ export default function Library() {
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="difficulty">
+            <DifficultySettingsTab />
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -575,6 +589,18 @@ export default function Library() {
           setPersonaDialogOpen(false);
           setEditingPersona(null);
           queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] });
+        }}
+      />
+
+      {/* 시나리오 생성/수정 다이얼로그 - ScenarioManager dialogOnly 모드 */}
+      <ScenarioManager
+        dialogOnly={true}
+        externalOpen={scenarioDialogOpen}
+        externalScenario={editingScenario as any}
+        onExternalClose={() => {
+          setScenarioDialogOpen(false);
+          setEditingScenario(null);
+          queryClient.invalidateQueries({ queryKey: ["/api/scenarios/mine"] });
         }}
       />
     </div>

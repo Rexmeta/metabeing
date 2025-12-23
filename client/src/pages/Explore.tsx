@@ -539,7 +539,7 @@ export default function Explore() {
                 <User className="h-12 w-12 mx-auto text-slate-300 mb-4" />
                 <h3 className="text-lg font-medium text-slate-600">아직 공개된 페르소나가 없습니다</h3>
                 <p className="text-slate-500 mt-1">첫 번째 페르소나를 만들어보세요!</p>
-                <Button className="mt-4" onClick={() => setLocation("/content-management?tab=manage-personas")}>
+                <Button className="mt-4" onClick={() => setLocation("/library?tab=personas")}>
                   페르소나 만들기
                 </Button>
               </div>
