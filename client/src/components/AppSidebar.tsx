@@ -63,12 +63,6 @@ const mainMenuItems = [
     url: "/explore",
     icon: Compass,
   },
-  {
-    title: "페르소나 만들기",
-    url: "/admin-management?tab=manage-personas",
-    icon: Users,
-    requiresAuth: true,
-  },
 ];
 
 const myContentItems = [
