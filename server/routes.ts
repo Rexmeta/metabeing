@@ -1054,15 +1054,32 @@ ${personaSnapshot.name}:`;
 
       // ✨ chat_messages 조회
       const chatMessages = await storage.getChatMessagesByPersonaRun(personaRunId);
-
-      // 레거시 conversations 구조로 변환하여 반환
-      const messages = chatMessages.map(msg => ({
-        sender: msg.sender,
-        message: msg.message,
-        timestamp: msg.createdAt ? (typeof msg.createdAt === 'string' ? msg.createdAt : msg.createdAt.toISOString()) : new Date().toISOString(),
-        emotion: msg.emotion,
-        emotionReason: msg.emotionReason
-      }));
+      
+      // null 체크 및 안전한 메시지 처리
+      const messages = (chatMessages || []).map(msg => {
+        // 안전한 날짜 변환
+        let timestamp = new Date().toISOString();
+        if (msg.createdAt) {
+          if (typeof msg.createdAt === 'string') {
+            const parsed = new Date(msg.createdAt);
+            if (!isNaN(parsed.getTime())) {
+              timestamp = msg.createdAt;
+            }
+          } else if (msg.createdAt instanceof Date) {
+            if (!isNaN(msg.createdAt.getTime())) {
+              timestamp = msg.createdAt.toISOString();
+            }
+          }
+        }
+        
+        return {
+          sender: msg.sender,
+          message: msg.message,
+          timestamp,
+          emotion: msg.emotion,
+          emotionReason: msg.emotionReason
+        };
+      });
 
       res.json({
         id: personaRun.id,
@@ -1195,7 +1212,7 @@ ${personaSnapshot.name}:`;
 
       // ✨ 새 구조: chat_messages에서 기존 메시지 조회
       const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId);
-      const currentTurnIndex = Math.floor(existingMessages.length / 2); // user + ai = 1 turn
+      const currentTurnIndex = Math.floor((existingMessages || []).length / 2); // user + ai = 1 turn
 
       // ✨ 대화 재개 감지: 마지막 메시지 이후 5분 이상 지났으면 actualStartedAt 업데이트
       if (existingMessages.length > 0) {
@@ -1314,7 +1331,7 @@ ${personaSnapshot.name}:`;
       const updatedMessages = await storage.getChatMessagesByPersonaRun(personaRunId);
       
       // ✨ 응답 형식을 기존과 동일하게 유지 (호환성)
-      const messagesInOldFormat = updatedMessages.map(msg => ({
+      const messagesInOldFormat = (updatedMessages || []).map(msg => ({
         sender: msg.sender,
         message: msg.message,
         timestamp: (msg.createdAt || new Date()).toISOString(),
@@ -1385,7 +1402,7 @@ ${personaSnapshot.name}:`;
       // ✨ 새로운 구조: 각 메시지를 chat_messages에 저장
       let turnIndex = 0;
       const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId);
-      turnIndex = existingMessages.length;
+      turnIndex = (existingMessages || []).length;
 
       for (const msg of messages) {
         await storage.createChatMessage({
@@ -1882,7 +1899,7 @@ ${personaSnapshot.name}:`;
       }
       
       const messages = await storage.getChatMessagesByPersonaRun(req.params.id);
-      res.json(messages);
+      res.json(messages || []);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch chat messages" });
     }
