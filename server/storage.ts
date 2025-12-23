@@ -820,14 +820,40 @@ export class PostgreSQLStorage implements IStorage {
 
   // 새로운 데이터 구조: Scenario Runs
   async createScenarioRun(insertScenarioRun: InsertScenarioRun): Promise<ScenarioRun> {
-    const result = await withRetry(async () => {
-      const rows = await db.insert(scenarioRuns).values(insertScenarioRun as any).returning();
-      if (!rows || rows.length === 0) {
-        throw new Error('createScenarioRun returned empty result');
+    // UUID를 미리 생성해서 INSERT 후 SELECT로 조회 가능하도록 함
+    const id = randomUUID();
+    const insertData = { ...insertScenarioRun, id } as any;
+    
+    // INSERT 시도 (재시도 포함)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const rows = await db.insert(scenarioRuns).values(insertData).returning();
+        if (rows && rows.length > 0 && rows[0]) {
+          return rows[0];
+        }
+      } catch (error: any) {
+        // Neon null 오류는 INSERT는 성공했지만 결과 반환이 실패한 것일 수 있음
+        if (error?.message?.includes('Cannot read properties of null')) {
+          console.log(`createScenarioRun: Neon null error on attempt ${attempt + 1}, checking if row was inserted...`);
+        } else if (attempt === 2) {
+          throw error;
+        }
       }
-      return rows[0];
-    }, 3);
-    return result;
+      
+      // INSERT 후 결과가 없으면 SELECT로 조회 시도
+      await new Promise(resolve => setTimeout(resolve, 100));
+      try {
+        const [existing] = await db.select().from(scenarioRuns).where(eq(scenarioRuns.id, id));
+        if (existing) {
+          console.log(`createScenarioRun: Found row via SELECT after INSERT`);
+          return existing;
+        }
+      } catch (selectError) {
+        console.error('createScenarioRun: SELECT fallback failed:', selectError);
+      }
+    }
+    
+    throw new Error('createScenarioRun failed after all retries');
   }
 
   async getScenarioRun(id: string): Promise<ScenarioRun | undefined> {
