@@ -970,8 +970,16 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getPersonaRun(id: string): Promise<PersonaRun | undefined> {
-    const [personaRun] = await db.select().from(personaRuns).where(eq(personaRuns.id, id));
-    return personaRun;
+    try {
+      const result = await withRetry(async () => {
+        const [personaRun] = await db.select().from(personaRuns).where(eq(personaRuns.id, id));
+        return personaRun;
+      }, 3, 100);
+      return result;
+    } catch (error) {
+      console.error('Error in getPersonaRun:', error);
+      return undefined;
+    }
   }
 
   async getPersonaRunByConversationId(conversationId: string): Promise<PersonaRun | undefined> {
@@ -990,11 +998,16 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async updatePersonaRun(id: string, updates: Partial<PersonaRun>): Promise<PersonaRun> {
-    const [personaRun] = await db.update(personaRuns).set(updates).where(eq(personaRuns.id, id)).returning();
-    if (!personaRun) {
+    // Neon HTTP 드라이버 재시도 로직 적용
+    const result = await withRetry(async () => {
+      const [personaRun] = await db.update(personaRuns).set(updates).where(eq(personaRuns.id, id)).returning();
+      return personaRun;
+    }, 3, 100);
+    
+    if (!result) {
       throw new Error("PersonaRun not found");
     }
-    return personaRun;
+    return result;
   }
 
   async getPersonaRunsByScenarioRun(scenarioRunId: string): Promise<PersonaRun[]> {
@@ -1180,18 +1193,14 @@ export class PostgreSQLStorage implements IStorage {
 
   async getChatMessagesByPersonaRun(personaRunId: string): Promise<ChatMessage[]> {
     try {
-      const result = await db.select().from(chatMessages).where(eq(chatMessages.personaRunId, personaRunId)).orderBy(asc(chatMessages.turnIndex));
-      return result || [];
+      const result = await withRetry(async () => {
+        const messages = await db.select().from(chatMessages).where(eq(chatMessages.personaRunId, personaRunId)).orderBy(asc(chatMessages.turnIndex));
+        return messages || [];
+      }, 3, 100);
+      return result;
     } catch (error) {
-      console.error('getChatMessagesByPersonaRun error, retrying:', error);
-      // Neon HTTP 드라이버 간헐적 null 반환 문제 - 재시도
-      try {
-        const retryResult = await db.select().from(chatMessages).where(eq(chatMessages.personaRunId, personaRunId)).orderBy(asc(chatMessages.turnIndex));
-        return retryResult || [];
-      } catch (retryError) {
-        console.error('getChatMessagesByPersonaRun retry failed:', retryError);
-        return [];
-      }
+      console.error('getChatMessagesByPersonaRun failed:', error);
+      return [];
     }
   }
 
