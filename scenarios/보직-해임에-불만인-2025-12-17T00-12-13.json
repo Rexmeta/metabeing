@@ -54,5 +54,7 @@
   "introVideoUrl": "/scenarios/videos/intro-보직-해임에-불만인-2025-12-17T00-12-13-2025-12-17T00-13-56.webm",
   "imagePrompt": "텍스트를 포함하지 않는다. 실사형으로 한국인, 보직 해임에 불만인 핵심 리더의 이탈 방지를 위한 1:1 미팅",
   "videoPrompt": "",
-  "categoryId": "318cdfbb-0cb9-45ec-be28-ea03882160ae"
+  "categoryId": "318cdfbb-0cb9-45ec-be28-ea03882160ae",
+  "ownerId": "bb0371f6-9706-439d-8416-498a92c65b56",
+  "visibility": "public"
 }

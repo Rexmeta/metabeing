@@ -69,5 +69,7 @@
     "공급망 관리"
   ],
   "image": "/scenarios/images/제조업-협력사-신규-부품-단가-협상-품질-가격-납기-균형점-찾기-2025-11-21T09-25-03.webp",
-  "imagePrompt": "협력사와 물류를 배경으로 "
+  "imagePrompt": "협력사와 물류를 배경으로 ",
+  "ownerId": "bb0371f6-9706-439d-8416-498a92c65b56",
+  "visibility": "public"
 }
