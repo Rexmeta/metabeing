@@ -42,14 +42,16 @@ interface ScenarioStats {
 
 interface Scenario {
   id: string;
-  name: string;
-  tagline: string | null;
-  description: string | null;
-  difficulty: number | null;
-  tags: string[];
-  viewCount: number;
-  usageCount: number;
-  createdAt: string;
+  name?: string;
+  title?: string;
+  tagline?: string | null;
+  description?: string | null;
+  difficulty?: number | null;
+  tags?: string[];
+  viewCount?: number;
+  usageCount?: number;
+  createdAt?: string;
+  visibility?: "public" | "private";
 }
 
 interface PersonaImages {
@@ -392,16 +394,27 @@ export default function Explore() {
   const [, setLocation] = useLocation();
 
   const { data: scenarios = [], isLoading: loadingScenarios } = useQuery<Scenario[]>({
-    queryKey: ["/api/ugc/scenarios", searchQuery, sortType],
+    queryKey: ["/api/scenarios/public", searchQuery, sortType],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        sort: sortType,
-        visibility: "public",
-        ...(searchQuery && { query: searchQuery }),
-      });
-      const res = await fetch(`/api/ugc/scenarios?${params}`);
+      const res = await fetch("/api/scenarios/public");
       if (!res.ok) throw new Error("Failed to fetch scenarios");
-      return res.json();
+      let data = await res.json();
+      
+      // 클라이언트 측 검색 필터링
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        data = data.filter((s: Scenario) => 
+          s.title?.toLowerCase().includes(searchLower) ||
+          s.description?.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // 클라이언트 측 정렬
+      if (sortType === "trending" || sortType === "new") {
+        data = data.slice().reverse();
+      }
+      
+      return data;
     },
   });
 

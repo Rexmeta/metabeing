@@ -3567,40 +3567,6 @@ ${personaSnapshot.name}:`;
     }
   });
 
-  // UGC 시나리오 API (탐색 페이지용 - 검색, 정렬 지원)
-  app.get("/api/ugc/scenarios", async (req, res) => {
-    try {
-      const { query, sort, visibility } = req.query;
-      let scenarios = await fileManager.getAllScenarios();
-      
-      // 공개 시나리오만 필터링
-      scenarios = scenarios.filter((s: any) => s.visibility !== "private" && s.id);
-      
-      // 검색어 필터링
-      if (query && typeof query === "string") {
-        const searchLower = query.toLowerCase();
-        scenarios = scenarios.filter((s: any) => 
-          s.title?.toLowerCase().includes(searchLower) ||
-          s.description?.toLowerCase().includes(searchLower) ||
-          s.tagline?.toLowerCase().includes(searchLower)
-        );
-      }
-      
-      // 정렬 (기본: 최신순)
-      if (sort === "trending") {
-        // 트렌딩은 나중에 반응 수 기반으로 정렬 가능
-        scenarios = scenarios.slice().reverse();
-      } else if (sort === "newest") {
-        scenarios = scenarios.slice().reverse();
-      }
-      
-      res.json(scenarios);
-    } catch (error) {
-      console.error("Error getting UGC scenarios:", error);
-      res.status(500).json({ error: "Failed to get scenarios" });
-    }
-  });
-
   // Admin API routes for scenario and persona management
   
   // 운영자/관리자 권한 확인 미들웨어
