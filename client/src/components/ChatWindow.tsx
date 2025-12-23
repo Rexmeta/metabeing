@@ -666,6 +666,9 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
 
   // ElevenLabs TTS 기능들
   const speakMessage = async (text: string, isAutoPlay: boolean = false, emotion?: string) => {
+    // 메신저 모드에서는 음성 재생 비활성화
+    if (chatMode === 'messenger') return;
+    
     // 음성 모드가 꺼져있고 자동재생인 경우 실행하지 않음
     if (inputMode === 'text' && isAutoPlay) return;
     
