@@ -90,5 +90,7 @@
         "당혹": "/personas/istj/female/confused.webp"
       }
     }
-  }
+  },
+  "ownerId": "bb0371f6-9706-439d-8416-498a92c65b56",
+  "visibility": "public"
 }
