@@ -348,6 +348,7 @@ export default function Library() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditingPersona(persona);
+                                  setPersonaDialogOpen(true);
                                 }}
                                 data-testid={`button-edit-persona-${persona.id}`}
                               >
@@ -568,7 +569,7 @@ export default function Library() {
       {/* 페르소나 생성/수정 다이얼로그 - PersonaManager dialogOnly 모드 */}
       <PersonaManager
         dialogOnly={true}
-        externalOpen={personaDialogOpen || !!editingPersona}
+        externalOpen={personaDialogOpen}
         externalPersona={editingPersona as any}
         onExternalClose={() => {
           setPersonaDialogOpen(false);
