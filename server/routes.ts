@@ -1034,11 +1034,16 @@ ${personaSnapshot.name}:`;
           emotionReason: '',
         });
         
-        // persona_run의 turnCount와 lastActivityAt 업데이트
+        // 메시지 미리보기 생성 (최대 50자)
+        const messagePreview = aiResponse.length > 50 ? aiResponse.substring(0, 50) + '...' : aiResponse;
+        
+        // persona_run 메신저 필드 업데이트
         const userTurnCount = Math.floor((nextTurnIndex + 2) / 2); // 사용자 턴 수 계산
         await storage.updatePersonaRun(sessionId, {
           turnCount: userTurnCount,
           lastActivityAt: new Date(),
+          lastMessage: messagePreview,
+          unreadCount: 1, // AI 메시지가 왔으니 읽지 않음 표시
         });
         
         console.log(`✅ 메시지 저장 완료: sessionId=${sessionId}, turnIndex=${nextTurnIndex}, ${nextTurnIndex + 1}`);
@@ -1088,6 +1093,11 @@ ${personaSnapshot.name}:`;
       const scenarioRun = await storage.getScenarioRun(personaRun.scenarioRunId);
       if (!scenarioRun || scenarioRun.userId !== userId) {
         return res.status(403).json({ error: "Unauthorized access" });
+      }
+
+      // ✨ 대화방 열람 시 읽음 처리 (unreadCount 리셋)
+      if (personaRun.unreadCount && personaRun.unreadCount > 0) {
+        await storage.updatePersonaRun(personaRunId, { unreadCount: 0 });
       }
 
       // ✨ chat_messages 조회

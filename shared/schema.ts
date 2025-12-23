@@ -140,7 +140,7 @@ export const scenarioRuns = pgTable("scenario_runs", {
   index("idx_scenario_runs_conversation_type").on(table.conversationType),
 ]);
 
-// 페르소나별 대화 세션
+// 페르소나별 대화 세션 (카카오톡 스타일 채팅방)
 export const personaRuns = pgTable("persona_runs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   scenarioRunId: varchar("scenario_run_id").notNull().references(() => scenarioRuns.id, { onDelete: 'cascade' }),
@@ -159,10 +159,15 @@ export const personaRuns = pgTable("persona_runs", {
   actualStartedAt: timestamp("actual_started_at").notNull().default(sql`CURRENT_TIMESTAMP`), // 실제 대화 시작/재개 시간 (매 재개마다 업데이트)
   completedAt: timestamp("completed_at"),
   closedAt: timestamp("closed_at"), // 사용자가 명시적으로 대화방 닫은 시간 (null이면 목록에 표시)
+  lastActivityAt: timestamp("last_activity_at").default(sql`CURRENT_TIMESTAMP`), // 마지막 메시지 시간 (정렬용)
+  lastMessage: text("last_message"), // 마지막 메시지 미리보기 (목록 표시용)
+  unreadCount: integer("unread_count").notNull().default(0), // 읽지 않은 메시지 수
 }, (table) => [
   index("idx_persona_runs_scenario_run_id").on(table.scenarioRunId),
   index("idx_persona_runs_persona_id").on(table.personaId),
   index("idx_persona_runs_conversation_id").on(table.conversationId),
+  index("idx_persona_runs_last_activity").on(table.lastActivityAt), // 최신순 정렬 최적화
+  index("idx_persona_runs_closed_at").on(table.closedAt), // 열린 대화방 필터링 최적화
 ]);
 
 // 실제 대화 메시지 턴

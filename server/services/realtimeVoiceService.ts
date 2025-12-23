@@ -1204,10 +1204,15 @@ export class RealtimeVoiceService {
         emotionReason,
       });
       
-      // persona_run lastActivityAt 업데이트
+      // 메시지 미리보기 생성 (최대 50자)
+      const messagePreview = message.length > 50 ? message.substring(0, 50) + '...' : message;
+      
+      // persona_run 메신저 필드 업데이트
       await storage.updatePersonaRun(personaRunId, {
         lastActivityAt: new Date(),
+        lastMessage: messagePreview,
         turnCount: Math.floor((nextTurnIndex + 1) / 2) + 1,
+        unreadCount: sender === 'ai' ? 1 : 0, // AI 메시지면 읽지 않음 표시
       });
       
       console.log(`💾 Auto-saved ${sender} message to DB: personaRunId=${personaRunId}, turnIndex=${nextTurnIndex}`);
