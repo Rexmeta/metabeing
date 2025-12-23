@@ -868,7 +868,8 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
   // dialogOnly 모드: 다이얼로그만 렌더링
   if (dialogOnly) {
     return (
-      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
+      <>
+        <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-50">
             <DialogHeader className="bg-indigo-600 -m-6 mb-4 p-6 rounded-t-lg">
               <DialogTitle className="text-white text-xl flex items-center gap-2">
@@ -1483,6 +1484,52 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
             </form>
           </DialogContent>
         </Dialog>
+        
+        {/* 이미지 원본 보기 모달 - dialogOnly 모드에서도 필요 */}
+        {viewingImage && (
+          <Dialog open={!!viewingImage} onOpenChange={() => setViewingImage(null)}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>{viewingImage.emotion} 표정 이미지</DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center justify-center p-4 bg-slate-50 rounded-lg">
+                <img 
+                  src={viewingImage.url} 
+                  alt={viewingImage.emotion}
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={() => setViewingImage(null)}>닫기</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+        
+        {/* 기본 이미지 재생성 확인 다이얼로그 - dialogOnly 모드에서도 필요 */}
+        <AlertDialog open={showBaseImageConfirm} onOpenChange={setShowBaseImageConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>기본 이미지 재생성</AlertDialogTitle>
+              <AlertDialogDescription>
+                이미 생성된 기본 이미지가 있습니다. 기존 이미지를 삭제하고 새로운 기본 이미지를 생성하시겠어요?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowBaseImageConfirm(false);
+                  generateBaseImage();
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                재생성
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     );
   }
 
