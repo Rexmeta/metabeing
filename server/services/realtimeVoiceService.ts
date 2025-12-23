@@ -69,6 +69,7 @@ interface RealtimeSession {
   conversationId: string;
   scenarioId: string;
   personaId: string;
+  personaRunId: string; // chatMessages 테이블 저장용
   personaName: string;
   userId: string;
   clientWs: WebSocket;
@@ -186,6 +187,7 @@ export class RealtimeVoiceService {
     conversationId: string,
     scenarioId: string,
     personaId: string,
+    personaRunId: string,  // chatMessages 테이블 저장용
     userId: string,
     clientWs: WebSocket,
     userSelectedDifficulty?: number // 사용자가 선택한 난이도 (1-4)
@@ -376,6 +378,7 @@ export class RealtimeVoiceService {
       conversationId,
       scenarioId,
       personaId,
+      personaRunId,  // chatMessages 테이블 저장용
       personaName: scenarioPersona.name,
       userId,
       clientWs,
@@ -1299,28 +1302,28 @@ export class RealtimeVoiceService {
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // conversationId는 sessionId 형식: userId-personaRunId-timestamp
-        const parts = conversationId.split('-');
-        let personaRunId = conversationId;
+        // 세션이 있으면 직접 personaRunId 사용 (가장 신뢰할 수 있는 방법)
+        let personaRunId: string;
         
-        // 전체 형식: userId(5) + personaRunId(5) + timestamp(1) = 11 parts
-        if (parts.length >= 11) {
-          personaRunId = parts.slice(5, 10).join('-');
-        } else if (parts.length >= 5) {
-          personaRunId = conversationId;
-        }
-        
-        console.log(`🔍 [Attempt ${attempt}/${maxRetries}] Saving ${sender} message to personaRunId: ${personaRunId}`);
-        
-        // 먼저 personaRun 존재 확인
-        const personaRun = await storage.getPersonaRun(personaRunId);
-        if (!personaRun) {
+        if (session && session.personaRunId) {
+          personaRunId = session.personaRunId;
+          console.log(`🔍 [Attempt ${attempt}/${maxRetries}] Using session.personaRunId: ${personaRunId}`);
+        } else {
+          // 세션이 없으면 conversationId로 personaRun 조회
           const personaRunByConvId = await storage.getPersonaRunByConversationId(conversationId);
           if (personaRunByConvId) {
             personaRunId = personaRunByConvId.id;
+            console.log(`🔍 [Attempt ${attempt}/${maxRetries}] Found personaRunId via conversationId lookup: ${personaRunId}`);
           } else {
-            console.log(`⚠️ PersonaRun not found for personaRunId: ${personaRunId}, conversationId: ${conversationId}`);
-            return;
+            // conversationId 자체가 personaRunId일 수 있음 (fallback)
+            const personaRun = await storage.getPersonaRun(conversationId);
+            if (personaRun) {
+              personaRunId = conversationId;
+              console.log(`🔍 [Attempt ${attempt}/${maxRetries}] conversationId is personaRunId: ${personaRunId}`);
+            } else {
+              console.log(`⚠️ PersonaRun not found for conversationId: ${conversationId}`);
+              return;
+            }
           }
         }
         

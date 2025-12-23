@@ -88,6 +88,7 @@ interface ChatWindowProps {
   scenario: ComplexScenario;
   persona: ScenarioPersona;
   conversationId: string;
+  personaRunId?: string; // chatMessages 저장용 - 없으면 conversationId 사용
   onChatComplete: () => void;
   onExit: () => void;
   initialChatMode?: 'messenger' | 'character';
@@ -98,7 +99,9 @@ interface ChatWindowProps {
   initialMessages?: ConversationMessage[];
 }
 
-export default function ChatWindow({ scenario, persona, conversationId, onChatComplete, onExit, onPersonaChange, onReady, onConversationEnding, initialChatMode = 'character', isPersonaChat = false, initialMessages = [] }: ChatWindowProps) {
+export default function ChatWindow({ scenario, persona, conversationId, personaRunId, onChatComplete, onExit, onPersonaChange, onReady, onConversationEnding, initialChatMode = 'character', isPersonaChat = false, initialMessages = [] }: ChatWindowProps) {
+  // personaRunId가 없으면 conversationId를 사용 (대부분의 경우 conversationId가 personaRunId임)
+  const effectivePersonaRunId = personaRunId || conversationId;
   const [location, setLocation] = useLocation();
   const [userInput, setUserInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -194,6 +197,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
     conversationId,
     scenarioId: scenario.id,
     personaId: persona.id,
+    personaRunId: effectivePersonaRunId, // chatMessages 저장용
     enabled: false, // 자동 연결 비활성화, 수동 시작
     onMessageComplete: (message, emotion, emotionReason) => {
       console.log('✅ AI message complete:', message);

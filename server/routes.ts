@@ -5335,13 +5335,14 @@ ${personaSnapshot.name}:`;
     const conversationId = url.searchParams.get('conversationId');
     const scenarioId = url.searchParams.get('scenarioId');
     const personaId = url.searchParams.get('personaId');
+    const personaRunId = url.searchParams.get('personaRunId'); // chatMessages 저장용
     const token = url.searchParams.get('token');
 
     // Validate required parameters
-    if (!conversationId || !personaId) {
+    if (!conversationId || !personaId || !personaRunId) {
       ws.send(JSON.stringify({ 
         type: 'error', 
-        error: 'Missing required parameters: conversationId, personaId' 
+        error: 'Missing required parameters: conversationId, personaId, personaRunId' 
       }));
       ws.close(1008, 'Missing parameters');
       return;
@@ -5411,6 +5412,7 @@ ${personaSnapshot.name}:`;
         conversationId,
         scenarioId,
         personaId,
+        personaRunId,  // chatMessages 테이블 저장용
         userId,
         ws,
         userSelectedDifficulty

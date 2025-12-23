@@ -10,6 +10,7 @@ interface UseRealtimeVoiceProps {
   conversationId: string;
   scenarioId: string;
   personaId: string;
+  personaRunId: string; // chatMessages 테이블에 저장하기 위한 personaRunId
   enabled: boolean;
   onMessage?: (message: string) => void;
   onMessageComplete?: (message: string, emotion?: string, emotionReason?: string) => void;
@@ -34,6 +35,7 @@ export function useRealtimeVoice({
   conversationId,
   scenarioId,
   personaId,
+  personaRunId,
   enabled,
   onMessage,
   onMessageComplete,
@@ -91,8 +93,8 @@ export function useRealtimeVoice({
   const getWebSocketUrl = useCallback((token: string) => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    return `${protocol}//${host}/api/realtime-voice?conversationId=${conversationId}&scenarioId=${scenarioId}&personaId=${personaId}&token=${token}`;
-  }, [conversationId, scenarioId, personaId]);
+    return `${protocol}//${host}/api/realtime-voice?conversationId=${conversationId}&scenarioId=${scenarioId}&personaId=${personaId}&personaRunId=${personaRunId}&token=${token}`;
+  }, [conversationId, scenarioId, personaId, personaRunId]);
 
   const getRealtimeToken = useCallback(async (): Promise<string> => {
     // localStorage에 authToken이 있으면 사용
