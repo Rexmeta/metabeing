@@ -36,9 +36,7 @@ export default function Conversations() {
   // 대화방 닫기 mutation
   const closeMutation = useMutation({
     mutationFn: async (conversationId: string) => {
-      return await apiRequest(`/api/conversations/${conversationId}/close`, {
-        method: "POST",
-      });
+      return await apiRequest("POST", `/api/conversations/${conversationId}/close`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/active-conversations"] });
