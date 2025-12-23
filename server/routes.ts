@@ -1859,6 +1859,30 @@ ${personaSnapshot.name}:`;
     }
   });
 
+  // Get single persona run
+  app.get("/api/persona-runs/:id", isAuthenticated, async (req, res) => {
+    try {
+      // @ts-ignore - req.user는 auth 미들웨어에서 설정됨
+      const userId = req.user?.id;
+      const personaRun = await storage.getPersonaRun(req.params.id);
+      
+      if (!personaRun) {
+        return res.status(404).json({ error: "Persona run not found" });
+      }
+      
+      // 권한 확인
+      const scenarioRun = await storage.getScenarioRun(personaRun.scenarioRunId);
+      if (!scenarioRun || scenarioRun.userId !== userId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      res.json(personaRun);
+    } catch (error) {
+      console.error("Error fetching persona run:", error);
+      res.status(500).json({ error: "Failed to fetch persona run" });
+    }
+  });
+
   // Get persona runs for a scenario run
   app.get("/api/scenario-runs/:id/persona-runs", isAuthenticated, async (req, res) => {
     try {

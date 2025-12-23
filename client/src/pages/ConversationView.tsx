@@ -1,129 +1,212 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { type Conversation, type ConversationMessage } from "@shared/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MessageSquare } from "lucide-react";
-import { format } from "date-fns";
+import { ArrowLeft } from "lucide-react";
+import ChatWindow from "@/components/ChatWindow";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { ComplexScenario, ScenarioPersona } from "@/lib/scenario-system";
+
+interface PersonaRunData {
+  id: string;
+  personaId: string;
+  personaName?: string;
+  personaSnapshot: any;
+  scenarioRunId: string;
+  status: string;
+  mode: string;
+  difficulty: number;
+  turnCount: number;
+}
+
+interface ScenarioRunData {
+  id: string;
+  scenarioId?: string;
+  scenarioName: string;
+  conversationType: string;
+}
+
+interface ChatMessageData {
+  id: string;
+  sender: string;
+  message: string;
+  emotion?: string;
+  emotionReason?: string;
+  createdAt: string;
+}
 
 export default function ConversationView() {
   const [, params] = useRoute("/chat/:conversationId");
-  const conversationId = params?.conversationId;
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const personaRunId = params?.conversationId;
 
-  const { data: conversation, isLoading: conversationLoading } = useQuery<Conversation>({
-    queryKey: ["/api/conversations", conversationId],
-    enabled: !!conversationId,
-    staleTime: 1000 * 60 * 5, // 5분간 캐시 유지
-    gcTime: 1000 * 60 * 10,   // 10분간 메모리 유지
+  // personaRun 조회
+  const { data: personaRun, isLoading: prLoading } = useQuery<PersonaRunData>({
+    queryKey: ["/api/persona-runs", personaRunId],
+    enabled: !!personaRunId,
   });
 
-  // 서버에서 모든 시나리오 데이터 가져오기
-  const { data: scenarios = [], isLoading: scenariosLoading } = useQuery<any[]>({
-    queryKey: ["/api/scenarios"],
-    staleTime: 1000 * 60 * 30, // 30분간 캐시 유지 (시나리오는 자주 변경되지 않음)
-    gcTime: 1000 * 60 * 60,     // 1시간 메모리 유지
+  // scenarioRun 조회
+  const { data: scenarioRun, isLoading: srLoading } = useQuery<ScenarioRunData>({
+    queryKey: ["/api/scenario-runs", personaRun?.scenarioRunId],
+    enabled: !!personaRun?.scenarioRunId,
   });
 
-  // ⚡ 성능 최적화: Map 기반 O(1) 조회
-  const scenariosMap = useMemo(() => 
-    new Map(scenarios.map(s => [s.id, s])),
-    [scenarios]
-  );
+  // 채팅 메시지 조회
+  const { data: messages = [], isLoading: msgLoading } = useQuery<ChatMessageData[]>({
+    queryKey: ["/api/persona-runs", personaRunId, "messages"],
+    enabled: !!personaRunId,
+  });
 
-  const isLoading = conversationLoading || scenariosLoading;
+  const isLoading = prLoading || srLoading || msgLoading;
 
-  if (isLoading || !conversation) {
+  // ChatWindow용 더미 시나리오 생성
+  const dummyScenario = useMemo((): ComplexScenario | null => {
+    if (!personaRun || !scenarioRun) return null;
+    const personaSnapshot = personaRun.personaSnapshot || {};
+    return {
+      id: scenarioRun.scenarioId || `persona-direct-${personaRun.personaId}`,
+      title: scenarioRun.scenarioName || "자유 대화",
+      description: `${personaSnapshot.name || personaRun.personaId} 페르소나와의 대화`,
+      context: {
+        situation: `${personaSnapshot.name || personaRun.personaId}와 대화하는 상황입니다.`,
+        timeline: "제한 없음",
+        stakes: "자유 대화",
+        playerRole: {
+          position: "사용자",
+          department: "일반",
+          experience: "N/A",
+          responsibility: "자유 대화"
+        }
+      },
+      objectives: ["자유롭게 대화하기"],
+      successCriteria: {
+        optimal: "좋은 대화",
+        good: "보통 대화",
+        acceptable: "대화 진행",
+        failure: "N/A"
+      },
+      personas: [personaRun.personaId],
+      recommendedFlow: [personaRun.personaId],
+      difficulty: personaRun.difficulty || 2,
+      estimatedTime: "무제한",
+      skills: ["의사소통"]
+    };
+  }, [personaRun, scenarioRun]);
+
+  // ChatWindow용 페르소나 스냅샷 생성
+  const personaSnapshot = useMemo((): ScenarioPersona | null => {
+    if (!personaRun) return null;
+    const snapshot = personaRun.personaSnapshot || {};
+    return {
+      id: snapshot.id || personaRun.personaId,
+      name: snapshot.name || personaRun.personaName || personaRun.personaId,
+      mbti: snapshot.mbti || "",
+      role: snapshot.role || "대화 상대",
+      department: snapshot.department || "일반",
+      experience: "N/A",
+      gender: snapshot.gender === "male" ? "male" : snapshot.gender === "female" ? "female" : undefined,
+      personality: {
+        traits: snapshot.personality?.traits || ["친절함"],
+        communicationStyle: snapshot.personality?.communicationStyle || "친근한 대화 스타일",
+        motivation: snapshot.personality?.motivation || "대화 상대와의 소통",
+        fears: snapshot.personality?.fears || [],
+      },
+      background: {
+        education: "N/A",
+        previousExperience: "N/A",
+        majorProjects: [],
+        expertise: []
+      },
+      currentSituation: {
+        workload: "보통",
+        pressure: "낮음",
+        concerns: [],
+        position: snapshot.role || "대화 상대"
+      },
+      communicationPatterns: snapshot.communicationPatterns || {
+        openingStyle: "친근하게 인사",
+        keyPhrases: [],
+        responseToArguments: {},
+        winConditions: []
+      },
+      image: "",
+      voice: snapshot.voice || {
+        tone: "친근한",
+        pace: "보통",
+        emotion: "따뜻한"
+      }
+    };
+  }, [personaRun]);
+
+  // 초기 메시지 변환
+  const initialMessages = useMemo(() => {
+    return messages.map((msg) => ({
+      sender: msg.sender as 'user' | 'ai',
+      message: msg.message,
+      timestamp: msg.createdAt || new Date().toISOString(),
+      emotion: msg.emotion,
+      emotionReason: msg.emotionReason
+    }));
+  }, [messages]);
+
+  const handleChatComplete = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/active-conversations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/persona-runs", personaRunId] });
+    toast({
+      title: "대화 완료",
+      description: "대화가 성공적으로 완료되었습니다.",
+    });
+    setLocation("/conversations");
+  };
+
+  const handleExit = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/active-conversations"] });
+    setLocation("/conversations");
+  };
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">대화를 불러오는 중...</p>
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">대화 불러오는 중...</p>
         </div>
       </div>
     );
   }
 
-  // ⚡ 서버 데이터에서 시나리오와 페르소나 찾기 (O(1) 조회)
-  const scenario = scenariosMap.get(conversation.scenarioId);
-  const persona = scenario?.personas?.find((p: any) => p.id === conversation.personaId);
+  if (!personaRun || !dummyScenario || !personaSnapshot) {
+    return (
+      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive mb-4">대화를 찾을 수 없습니다.</p>
+          <Button onClick={() => setLocation("/conversations")} data-testid="button-back-conversations">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            대화 목록으로 돌아가기
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // 완료된 대화는 읽기 전용으로 표시
+  const isCompleted = personaRun.status === 'completed';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="mb-6 flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={() => window.location.href = '/mypage'}
-            data-testid="back-button"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            마이페이지로
-          </Button>
-          {conversation.status === 'completed' && (
-            <Button
-              onClick={() => window.location.href = `/feedback/${conversationId}`}
-              data-testid="view-feedback-button"
-            >
-              피드백 보기
-            </Button>
-          )}
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5" />
-              대화 기록 - {scenario?.title || conversation.scenarioId || '시나리오'}
-            </CardTitle>
-            <div className="text-sm text-slate-600">
-              대화 상대: {persona ? [persona.department, persona.name, persona.role].filter(Boolean).join(' ') : '알 수 없음'}
-            </div>
-            <div className="text-xs text-slate-500">
-              {format(new Date(conversation.createdAt), 'yyyy년 MM월 dd일 HH:mm')}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {conversation.messages.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium">아직 대화 내용이 없습니다</p>
-                  <p className="text-sm mt-2">이 대화는 메시지가 저장되지 않았거나 아직 시작되지 않았습니다.</p>
-                </div>
-              ) : (
-                conversation.messages.map((message: ConversationMessage, index: number) => (
-                  <div
-                    key={index}
-                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                    data-testid={`message-${index}`}
-                  >
-                    <div
-                      className={`max-w-[70%] rounded-lg px-4 py-3 ${
-                        message.sender === 'user'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 text-slate-900'
-                      }`}
-                    >
-                      {message.sender !== 'user' && (
-                        <div className="font-semibold text-sm mb-1">
-                          {persona ? [persona.department, persona.name, persona.role].filter(Boolean).join(' ') : '대화 상대'}
-                        </div>
-                      )}
-                      <div className="whitespace-pre-wrap">{message.message}</div>
-                      {message.emotion && message.sender !== 'user' && (
-                        <div className="text-xs mt-2 opacity-75">
-                          감정: {message.emotion}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="h-[calc(100vh-3.5rem)] w-full relative">
+      <ChatWindow
+        scenario={dummyScenario}
+        persona={personaSnapshot}
+        conversationId={personaRun.id}
+        onChatComplete={handleChatComplete}
+        onExit={handleExit}
+        isPersonaChat={true}
+        initialMessages={initialMessages}
+      />
     </div>
   );
 }

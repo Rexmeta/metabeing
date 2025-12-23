@@ -61,6 +61,12 @@ Preferred communication style: Simple, everyday language.
     - Expression images displayed in chat based on AI emotion analysis response.
     - Supports gender (male/female) and MBTI-based visual traits.
 - **Unified Persona Management**: Library page uses `PersonaManager` component (dialogOnly mode) for consistent persona creation/editing experience across admin and user interfaces. Supports external control via props (`externalOpen`, `externalPersona`, `onExternalClose`, `dialogOnly`).
+- **KakaoTalk-style Conversation UX**: 
+    - Conversations page (`/conversations`) shows all active/open chat rooms
+    - Clicking a chat room opens a full messenger view with existing messages and input capability
+    - Chat rooms persist until explicitly closed by user (closedAt field in personaRuns)
+    - X button to close/remove conversations from the list
+    - 10-second auto-refresh for real-time updates
 
 # External Dependencies
 
