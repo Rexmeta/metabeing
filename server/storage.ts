@@ -903,9 +903,12 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getActivePersonaRunsWithLastMessage(userId: string): Promise<(PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[]> {
-    // 1. 해당 유저의 active persona runs 가져오기
+    // 1. 해당 유저의 active persona runs와 마지막 메시지를 함께 가져오기
     const activeRuns = await db
-      .select()
+      .select({
+        personaRun: personaRuns,
+        scenarioRun: scenarioRuns
+      })
       .from(personaRuns)
       .innerJoin(scenarioRuns, eq(personaRuns.scenarioRunId, scenarioRuns.id))
       .where(and(
@@ -914,25 +917,34 @@ export class PostgreSQLStorage implements IStorage {
       ))
       .orderBy(desc(personaRuns.actualStartedAt));
 
-    // 2. 각 persona run의 마지막 메시지 가져오기
-    const result: (PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[] = [];
-    
-    for (const row of activeRuns) {
-      const lastMessages = await db
-        .select()
-        .from(chatMessages)
-        .where(eq(chatMessages.personaRunId, row.persona_runs.id))
-        .orderBy(desc(chatMessages.turnIndex))
-        .limit(1);
-      
-      result.push({
-        ...row.persona_runs,
-        lastMessage: lastMessages[0] || undefined,
-        scenarioRun: row.scenario_runs
-      });
+    if (activeRuns.length === 0) {
+      return [];
     }
-    
-    return result;
+
+    // 2. 모든 active persona run IDs 수집
+    const personaRunIds = activeRuns.map(r => r.personaRun.id);
+
+    // 3. 각 persona run의 마지막 메시지를 한 번의 쿼리로 가져오기
+    const lastMessagesRaw = await db
+      .select()
+      .from(chatMessages)
+      .where(inArray(chatMessages.personaRunId, personaRunIds))
+      .orderBy(desc(chatMessages.turnIndex));
+
+    // 4. personaRunId별로 가장 최신 메시지만 추출
+    const lastMessageMap = new Map<string, ChatMessage>();
+    for (const msg of lastMessagesRaw) {
+      if (!lastMessageMap.has(msg.personaRunId)) {
+        lastMessageMap.set(msg.personaRunId, msg);
+      }
+    }
+
+    // 5. 결과 조합
+    return activeRuns.map(row => ({
+      ...row.personaRun,
+      lastMessage: lastMessageMap.get(row.personaRun.id) || undefined,
+      scenarioRun: row.scenarioRun
+    }));
   }
 
   // Chat Messages

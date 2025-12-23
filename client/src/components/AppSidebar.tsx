@@ -47,7 +47,10 @@ import {
   ShieldCheck,
   BarChart3,
   ChevronUp,
+  MessageCircle,
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ko } from "date-fns/locale";
 
 const roleConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   admin: { label: "시스템관리자", color: "text-red-700", bgColor: "bg-red-100" },
@@ -137,6 +140,29 @@ export function AppSidebar() {
     enabled: !!user?.assignedCategoryId,
   });
 
+  // 진행 중인 대화 목록 조회
+  const { data: activeConversations, isLoading: conversationsLoading } = useQuery<{
+    id: string;
+    personaId: string;
+    personaName: string | null;
+    conversationId: string | null;
+    status: string;
+    actualStartedAt: string;
+    lastMessage?: {
+      message: string;
+      sender: string;
+      createdAt: string;
+    };
+    scenarioRun?: {
+      scenarioId: string;
+      scenarioName: string;
+    };
+  }[]>({
+    queryKey: ['/api/active-conversations'],
+    enabled: isAuthenticated,
+    refetchInterval: 30000, // 30초마다 갱신
+  });
+
   const isAdmin = user?.role === "admin";
   const isOperator = user?.role === "operator";
   const showAdminMenu = isAdmin || isOperator;
@@ -196,6 +222,66 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAuthenticated && activeConversations && activeConversations.length > 0 && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel className="flex items-center gap-2">
+                <MessageCircle className="w-3 h-3" />
+                대화 중 ({activeConversations.length})
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <div className="space-y-1 px-2">
+                  {activeConversations.slice(0, 5).map((conv) => (
+                    <Link 
+                      key={conv.id} 
+                      href={`/chat/${conv.conversationId || conv.id}`}
+                    >
+                      <div 
+                        className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
+                        data-testid={`chat-room-${conv.id}`}
+                      >
+                        <Avatar className="w-10 h-10 flex-shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                            {(conv.personaName || conv.personaId)?.charAt(0)?.toUpperCase() || "P"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium truncate">
+                              {conv.personaName || conv.personaId}
+                            </span>
+                            {conv.lastMessage?.createdAt && (
+                              <span className="text-xs text-muted-foreground flex-shrink-0">
+                                {formatDistanceToNow(new Date(conv.lastMessage.createdAt), { 
+                                  addSuffix: false, 
+                                  locale: ko 
+                                })}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {conv.lastMessage?.message 
+                              ? (conv.lastMessage.sender === 'user' ? '나: ' : '') + conv.lastMessage.message
+                              : conv.scenarioRun?.scenarioName || '대화 시작하기'}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                  {activeConversations.length > 5 && (
+                    <Link href="/mypage">
+                      <div className="text-xs text-center text-muted-foreground py-2 hover-elevate rounded-md cursor-pointer">
+                        +{activeConversations.length - 5}개 더보기
+                      </div>
+                    </Link>
+                  )}
+                </div>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
 
         {isAuthenticated && (
           <>
