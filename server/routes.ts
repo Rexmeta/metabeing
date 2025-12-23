@@ -1273,18 +1273,29 @@ ${personaSnapshot.name}:`;
     try {
       // @ts-ignore - req.user는 auth 미들웨어에서 설정됨
       const userId = req.user?.id;
-      const personaRunId = req.params.id;
+      const idParam = req.params.id;
 
       const { messages } = req.body;
       if (!Array.isArray(messages)) {
         return res.status(400).json({ error: "Messages must be an array" });
       }
 
-      // ✨ 새로운 구조: persona_run 조회
-      const personaRun = await storage.getPersonaRun(personaRunId);
+      // ✨ UUID 형식이면 id로, 아니면 conversationId로 조회
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idParam);
+      let personaRun;
+      
+      if (isUUID) {
+        personaRun = await storage.getPersonaRun(idParam);
+      } else {
+        personaRun = await storage.getPersonaRunByConversationId(idParam);
+      }
+      
       if (!personaRun) {
+        console.error(`Persona run not found for id: ${idParam} (isUUID: ${isUUID})`);
         return res.status(404).json({ error: "Persona run not found" });
       }
+      
+      const personaRunId = personaRun.id;
 
       // ✨ scenario_run 조회하여 권한 확인
       const scenarioRun = await storage.getScenarioRun(personaRun.scenarioRunId);
