@@ -668,24 +668,100 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
     });
   };
 
-  // 외부에서 다이얼로그 제어
+  // 외부에서 다이얼로그 제어 (dialogOnly 모드)
   useEffect(() => {
-    if (externalOpen && externalPersona) {
-      // 수정 모드
-      handleEdit(externalPersona);
-    } else if (externalOpen && !externalPersona) {
-      // 생성 모드
-      resetForm();
-      setIsCreateOpen(true);
+    if (dialogOnly) {
+      if (externalOpen && externalPersona) {
+        // 수정 모드 - 폼 데이터 설정
+        setFormData({
+          id: externalPersona.id,
+          mbti: externalPersona.mbti,
+          gender: externalPersona.gender || 'male',
+          name: externalPersona.name || '',
+          department: externalPersona.department || '',
+          position: externalPersona.position || '',
+          experience: externalPersona.experience || '',
+          stance: externalPersona.stance || '',
+          goal: externalPersona.goal || '',
+          tradeoff: externalPersona.tradeoff || '',
+          personality_traits: externalPersona.personality_traits || [],
+          communication_style: externalPersona.communication_style || '',
+          motivation: externalPersona.motivation || '',
+          fears: externalPersona.fears || [],
+          background: {
+            personal_values: externalPersona.background?.personal_values || [],
+            hobbies: externalPersona.background?.hobbies || [],
+            social: {
+              preference: externalPersona.background?.social?.preference || '',
+              behavior: externalPersona.background?.social?.behavior || ''
+            }
+          },
+          communication_patterns: {
+            opening_style: externalPersona.communication_patterns?.opening_style || '',
+            key_phrases: externalPersona.communication_patterns?.key_phrases || [],
+            response_to_arguments: externalPersona.communication_patterns?.response_to_arguments || {},
+            win_conditions: externalPersona.communication_patterns?.win_conditions || []
+          },
+          voice: {
+            tone: externalPersona.voice?.tone || '',
+            pace: externalPersona.voice?.pace || '',
+            emotion: externalPersona.voice?.emotion || ''
+          },
+          images: {
+            base: externalPersona.images?.base || '',
+            style: externalPersona.images?.style || '',
+            male: {
+              expressions: {
+                중립: externalPersona.images?.male?.expressions?.중립 || '',
+                기쁨: externalPersona.images?.male?.expressions?.기쁨 || '',
+                슬픔: externalPersona.images?.male?.expressions?.슬픔 || '',
+                분노: externalPersona.images?.male?.expressions?.분노 || '',
+                놀람: externalPersona.images?.male?.expressions?.놀람 || '',
+                호기심: externalPersona.images?.male?.expressions?.호기심 || '',
+                불안: externalPersona.images?.male?.expressions?.불안 || '',
+                단호: externalPersona.images?.male?.expressions?.단호 || '',
+                실망: externalPersona.images?.male?.expressions?.실망 || '',
+                당혹: externalPersona.images?.male?.expressions?.당혹 || ''
+              }
+            },
+            female: {
+              expressions: {
+                중립: externalPersona.images?.female?.expressions?.중립 || '',
+                기쁨: externalPersona.images?.female?.expressions?.기쁨 || '',
+                슬픔: externalPersona.images?.female?.expressions?.슬픔 || '',
+                분노: externalPersona.images?.female?.expressions?.분노 || '',
+                놀람: externalPersona.images?.female?.expressions?.놀람 || '',
+                호기심: externalPersona.images?.female?.expressions?.호기심 || '',
+                불안: externalPersona.images?.female?.expressions?.불안 || '',
+                단호: externalPersona.images?.female?.expressions?.단호 || '',
+                실망: externalPersona.images?.female?.expressions?.실망 || '',
+                당혹: externalPersona.images?.female?.expressions?.당혹 || ''
+              }
+            }
+          }
+        });
+        setEditingPersona(externalPersona);
+      } else if (externalOpen && !externalPersona) {
+        // 생성 모드 - 폼 초기화
+        resetForm();
+        setEditingPersona(null);
+      } else if (!externalOpen) {
+        // 다이얼로그 닫힘 - 모든 내부 상태 초기화
+        setIsCreateOpen(false);
+        setEditingPersona(null);
+        resetForm();
+      }
     }
-  }, [externalOpen, externalPersona]);
+  }, [dialogOnly, externalOpen, externalPersona]);
 
   const handleDialogClose = (open: boolean) => {
     if (!open) {
       setIsCreateOpen(false);
       setEditingPersona(null);
       resetForm();
-      onExternalClose?.();
+      if (dialogOnly) {
+        onExternalClose?.();
+      }
     }
   };
 
@@ -775,7 +851,8 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
   };
 
   // dialogOnly 모드이면 다이얼로그만 렌더링
-  const isDialogOpen = externalOpen || isCreateOpen || !!editingPersona;
+  // dialogOnly 모드에서는 externalOpen만으로 다이얼로그 열림 제어
+  const isDialogOpen = dialogOnly ? externalOpen : (isCreateOpen || !!editingPersona);
 
   if (isLoading && !dialogOnly) {
     return <div className="text-center py-8">로딩 중...</div>;
