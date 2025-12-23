@@ -201,7 +201,12 @@ export class RealtimeVoiceService {
     console.log(`🎙️ Creating realtime voice session: ${sessionId} (${currentSessionCount + 1}/${MAX_CONCURRENT_SESSIONS})`);
 
     // ✨ 페르소나 직접 대화인지 확인 (시나리오 없이 페르소나만으로 대화)
-    const isPersonaDirectChat = scenarioId.startsWith('persona-chat-');
+    let isPersonaDirectChat = scenarioId && scenarioId.trim() ? scenarioId.startsWith('persona-chat-') : true;
+    
+    // scenarioId가 없으면 페르소나 직접 대화로 전환
+    if (!scenarioId || !scenarioId.trim()) {
+      isPersonaDirectChat = true;
+    }
     
     let scenarioObj: any = null;
     let scenarioPersona: any = null;

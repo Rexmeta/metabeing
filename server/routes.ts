@@ -5290,10 +5290,10 @@ ${personaSnapshot.name}:`;
     const token = url.searchParams.get('token');
 
     // Validate required parameters
-    if (!conversationId || !scenarioId || !personaId) {
+    if (!conversationId || !personaId) {
       ws.send(JSON.stringify({ 
         type: 'error', 
-        error: 'Missing required parameters: conversationId, scenarioId, personaId' 
+        error: 'Missing required parameters: conversationId, personaId' 
       }));
       ws.close(1008, 'Missing parameters');
       return;

@@ -68,7 +68,7 @@ export default function ConversationView() {
     if (!personaRun || !scenarioRun) return null;
     const personaSnapshot = personaRun.personaSnapshot || {};
     return {
-      id: scenarioRun.scenarioId || `persona-direct-${personaRun.personaId}`,
+      id: scenarioRun.scenarioId || '',
       title: scenarioRun.scenarioName || "자유 대화",
       description: `${personaSnapshot.name || personaRun.personaId} 페르소나와의 대화`,
       context: {
