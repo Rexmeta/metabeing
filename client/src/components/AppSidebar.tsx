@@ -39,12 +39,6 @@ const mainMenuItems = [
     icon: Compass,
   },
   {
-    title: "캐릭터 만들기",
-    url: "/create",
-    icon: Sparkles,
-    requiresAuth: true,
-  },
-  {
     title: "페르소나 만들기",
     url: "/content-management?tab=manage-personas",
     icon: Users,

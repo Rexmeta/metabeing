@@ -21,7 +21,6 @@ import FeedbackView from "@/pages/FeedbackView";
 import HelpPage from "@/pages/HelpPage";
 import NotFound from "@/pages/not-found";
 import Explore from "@/pages/Explore";
-import Create from "@/pages/Create";
 import Library from "@/pages/Library";
 import ProfileSettings from "@/pages/ProfileSettings";
 import PersonaChat from "@/pages/PersonaChat";
@@ -152,9 +151,6 @@ function MainRouter() {
         {() => <AdminRoute component={SystemAdminPage} />}
       </Route>
       <Route path="/help" component={HelpPage} />
-      <Route path="/create">
-        {() => <ProtectedRoute component={Create} />}
-      </Route>
       <Route path="/library">
         {() => <ProtectedRoute component={Library} />}
       </Route>
