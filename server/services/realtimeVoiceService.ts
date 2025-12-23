@@ -1066,6 +1066,36 @@ export class RealtimeVoiceService {
         });
         break;
 
+      case 'user.message':
+        // 🎤 클라이언트에서 Web Speech API로 전사된 사용자 메시지 저장
+        if (message.transcript && message.transcript.trim()) {
+          const userTranscript = message.transcript.trim();
+          console.log(`🎤 User message received from client STT: "${userTranscript}"`);
+          
+          // 사용자 메시지 누적
+          session.totalUserTranscriptLength += userTranscript.length;
+          
+          // DB에 사용자 메시지 즉시 저장 (비동기, 에러 무시)
+          setImmediate(() => {
+            this.saveMessageToDb(
+              session.conversationId,
+              'user',
+              userTranscript,
+              null,
+              null
+            ).catch(err => {
+              console.error('❌ Failed to save user message:', err);
+            });
+          });
+          
+          // 클라이언트에 확인 메시지 전송
+          this.sendToClient(session, {
+            type: 'user.message.saved',
+            transcript: userTranscript,
+          });
+        }
+        break;
+
       case 'response.cancel':
         // User interrupted AI (barge-in) - cancel current response
         console.log(`⚡ Barge-in: Canceling turn ${session.turnSeq}`);
