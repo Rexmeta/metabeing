@@ -24,6 +24,7 @@ import Explore from "@/pages/Explore";
 import Library from "@/pages/Library";
 import ProfileSettings from "@/pages/ProfileSettings";
 import PersonaChat from "@/pages/PersonaChat";
+import Conversations from "@/pages/Conversations";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated, isLoading, setShowAuthModal } = useAuth();
@@ -153,6 +154,9 @@ function MainRouter() {
       <Route path="/help" component={HelpPage} />
       <Route path="/library">
         {() => <ProtectedRoute component={Library} />}
+      </Route>
+      <Route path="/conversations">
+        {() => <ProtectedRoute component={Conversations} />}
       </Route>
       <Route component={NotFound} />
     </Switch>
