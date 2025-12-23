@@ -1194,28 +1194,37 @@ export class RealtimeVoiceService {
       const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId) || [];
       const nextTurnIndex = existingMessages.length;
       
-      // 메시지 저장
-      await storage.createChatMessage({
-        personaRunId,
-        turnIndex: nextTurnIndex,
-        sender,
-        message,
-        emotion,
-        emotionReason,
-      });
+      // 메시지 저장 (핵심 - 반드시 성공해야 함)
+      try {
+        await storage.createChatMessage({
+          personaRunId,
+          turnIndex: nextTurnIndex,
+          sender,
+          message,
+          emotion,
+          emotionReason,
+        });
+        console.log(`💾 Chat message saved: personaRunId=${personaRunId}, turnIndex=${nextTurnIndex}, sender=${sender}`);
+      } catch (msgError) {
+        console.error(`❌ Failed to save chat message: personaRunId=${personaRunId}`, msgError);
+        return; // 메시지 저장 실패시 종료
+      }
       
       // 메시지 미리보기 생성 (최대 50자)
       const messagePreview = message.length > 50 ? message.substring(0, 50) + '...' : message;
       
-      // persona_run 메신저 필드 업데이트
-      await storage.updatePersonaRun(personaRunId, {
-        lastActivityAt: new Date(),
-        lastMessage: messagePreview,
-        turnCount: Math.floor((nextTurnIndex + 1) / 2) + 1,
-        unreadCount: sender === 'ai' ? 1 : 0, // AI 메시지면 읽지 않음 표시
-      });
-      
-      console.log(`💾 Auto-saved ${sender} message to DB: personaRunId=${personaRunId}, turnIndex=${nextTurnIndex}`);
+      // persona_run 메신저 필드 업데이트 (선택적 - 실패해도 메시지는 저장됨)
+      try {
+        await storage.updatePersonaRun(personaRunId, {
+          lastActivityAt: new Date(),
+          lastMessage: messagePreview,
+          turnCount: Math.floor((nextTurnIndex + 1) / 2) + 1,
+          unreadCount: sender === 'ai' ? 1 : 0,
+        });
+        console.log(`📝 PersonaRun metadata updated: personaRunId=${personaRunId}`);
+      } catch (updateError) {
+        console.warn(`⚠️ Failed to update personaRun metadata (message was saved): personaRunId=${personaRunId}`, updateError);
+      }
     } catch (error) {
       console.error('❌ Failed to save message to DB:', error);
     }
