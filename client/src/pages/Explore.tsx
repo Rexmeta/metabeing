@@ -52,6 +52,7 @@ interface Scenario {
   usageCount?: number;
   createdAt?: string;
   visibility?: "public" | "private";
+  introVideoUrl?: string | null;
 }
 
 interface PersonaImages {
@@ -128,37 +129,44 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
 
   return (
     <Card 
-      className="cursor-pointer hover:shadow-lg transition-shadow"
+      className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden"
       onClick={() => setLocation(`/scenario/${scenario.id}`)}
       data-testid={`card-scenario-${scenario.id}`}
     >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-lg line-clamp-2">{scenario.title || scenario.name}</CardTitle>
-          {scenario.difficulty && (
-            <Badge className={difficultyColors[scenario.difficulty]}>
-              {difficultyLabels[scenario.difficulty]}
-            </Badge>
-          )}
-        </div>
-        <CardDescription className="line-clamp-2">
-          {scenario.tagline || scenario.description || "설명 없음"}
-        </CardDescription>
+      <div className="relative aspect-video bg-muted">
+        {scenario.introVideoUrl ? (
+          <video 
+            src={scenario.introVideoUrl} 
+            className="w-full h-full object-cover"
+            muted
+            loop
+            playsInline
+            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/30">
+            <FileText className="w-12 h-12 text-primary/50" />
+          </div>
+        )}
+        {scenario.difficulty && (
+          <Badge className={`absolute top-2 right-2 ${difficultyColors[scenario.difficulty]}`}>
+            {difficultyLabels[scenario.difficulty]}
+          </Badge>
+        )}
+      </div>
+      <CardHeader className="pb-2 pt-3">
+        <CardTitle className="text-base line-clamp-1">{scenario.title || scenario.name}</CardTitle>
         {stats?.creatorName && stats.creatorName !== "Unknown" && (
-          <p className="text-xs text-muted-foreground mt-1" data-testid={`text-scenario-creator-${scenario.id}`}>
+          <p className="text-xs text-muted-foreground" data-testid={`text-scenario-creator-${scenario.id}`}>
             by @{stats.creatorName}
           </p>
         )}
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-1 mb-3">
-          {(scenario.tags || []).slice(0, 3).map((tag, i) => (
-            <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
-          ))}
-        </div>
+      <CardContent className="pt-0">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Sparkles className="h-3 w-3" /> {formatSNSNumber(scenario.usageCount || 0)}회 사용
+            <Sparkles className="h-3 w-3" /> {formatSNSNumber(scenario.usageCount || 0)}
           </span>
           <div className="flex items-center gap-2">
             <button
