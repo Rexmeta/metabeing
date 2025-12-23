@@ -4155,6 +4155,45 @@ ${personaSnapshot.name}:`;
     }
   });
 
+  // PATCH: 시나리오 공개/비공개 토글
+  app.patch("/api/scenarios/:id/visibility", isAuthenticated, async (req: any, res) => {
+    try {
+      const scenarioId = req.params.id;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const { visibility } = req.body;
+      
+      if (!visibility || !['public', 'private'].includes(visibility)) {
+        return res.status(400).json({ error: "Invalid visibility value" });
+      }
+      
+      // 기존 시나리오 확인
+      const scenarios = await fileManager.getAllScenarios();
+      const existingScenario = scenarios.find((s: any) => s.id === scenarioId);
+      if (!existingScenario) {
+        return res.status(404).json({ error: "Scenario not found" });
+      }
+      
+      // 관리자만 수정 가능
+      const isAdmin = userRole === 'admin';
+      if (!isAdmin) {
+        return res.status(403).json({ error: "수정 권한이 없습니다" });
+      }
+      
+      // visibility만 업데이트
+      const updateData = {
+        ...existingScenario,
+        visibility,
+      };
+      
+      const scenario = await fileManager.updateScenario(scenarioId, updateData);
+      res.json(scenario);
+    } catch (error) {
+      console.error("Error updating scenario visibility:", error);
+      res.status(500).json({ error: "Failed to update scenario visibility" });
+    }
+  });
+
   app.delete("/api/admin/personas/:id", isAuthenticated, async (req: any, res) => {
     try {
       const personaId = req.params.id;

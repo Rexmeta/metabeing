@@ -252,6 +252,24 @@ export function ScenarioManager({
     }
   });
 
+  const updateVisibilityMutation = useMutation({
+    mutationFn: async ({ id, visibility }: { id: string; visibility: string }) => {
+      const res = await apiRequest("PATCH", `/api/scenarios/${id}/visibility`, { visibility });
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scenarios/public'] });
+      toast({
+        title: variables.visibility === "public" ? "공개됨" : "비공개됨",
+        description: `시나리오가 ${variables.visibility === "public" ? "공개" : "비공개"}로 변경되었습니다.`,
+      });
+    },
+    onError: () => {
+      toast({ title: "오류", description: "변경에 실패했습니다.", variant: "destructive" });
+    },
+  });
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -1547,6 +1565,25 @@ export function ScenarioManager({
                         >
                           <i className="fas fa-edit mr-2 w-4 h-4 text-center"></i>
                           수정
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            const newVisibility = (scenario as any).visibility === 'public' ? 'private' : 'public';
+                            updateVisibilityMutation.mutate({ id: scenario.id, visibility: newVisibility });
+                          }}
+                          data-testid={`button-toggle-visibility-${scenario.id}`}
+                        >
+                          {(scenario as any).visibility === 'public' ? (
+                            <>
+                              <i className="fas fa-eye-slash mr-2 w-4 h-4 text-center"></i>
+                              비공개 설정
+                            </>
+                          ) : (
+                            <>
+                              <i className="fas fa-eye mr-2 w-4 h-4 text-center"></i>
+                              공개 설정
+                            </>
+                          )}
                         </DropdownMenuItem>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
