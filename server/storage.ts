@@ -1194,10 +1194,22 @@ export class PostgreSQLStorage implements IStorage {
   async getChatMessagesByPersonaRun(personaRunId: string): Promise<ChatMessage[]> {
     try {
       const result = await withRetry(async () => {
-        const messages = await db.select().from(chatMessages).where(eq(chatMessages.personaRunId, personaRunId)).orderBy(asc(chatMessages.turnIndex));
-        return messages || [];
-      }, 3, 100);
-      return result;
+        try {
+          const messages = await db.select().from(chatMessages).where(eq(chatMessages.personaRunId, personaRunId)).orderBy(asc(chatMessages.turnIndex));
+          if (!messages || !Array.isArray(messages)) {
+            console.log('getChatMessagesByPersonaRun: Neon returned null/invalid, returning empty array');
+            return [];
+          }
+          return messages;
+        } catch (queryError: any) {
+          if (queryError?.message?.includes('Cannot read properties of null')) {
+            console.log('getChatMessagesByPersonaRun: Neon null response, retrying...');
+            throw queryError;
+          }
+          throw queryError;
+        }
+      }, 5, 200);
+      return result || [];
     } catch (error) {
       console.error('getChatMessagesByPersonaRun failed:', error);
       return [];
