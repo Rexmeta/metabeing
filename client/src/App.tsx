@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Switch, Route, useLocation, useSearch } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -28,17 +28,16 @@ import Conversations from "@/pages/Conversations";
 
 function ContentManagementRedirect() {
   const [, setLocation] = useLocation();
-  const search = useSearch();
   
   useEffect(() => {
-    const params = new URLSearchParams(search);
+    const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
     let libraryTab = "personas";
     if (tab === "manage-personas") libraryTab = "personas";
     else if (tab === "manage-scenarios") libraryTab = "scenarios";
     else if (tab === "difficulty") libraryTab = "difficulty";
     setLocation(`/library?tab=${libraryTab}`, { replace: true });
-  }, [search, setLocation]);
+  }, [setLocation]);
   
   return null;
 }

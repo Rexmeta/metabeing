@@ -86,6 +86,12 @@ const myContentItems = [
     requiresAuth: true,
   },
   {
+    title: "콘텐츠 관리",
+    url: "/library?tab=scenarios",
+    icon: Cog,
+    requiresAuth: true,
+  },
+  {
     title: "분석 리포트",
     url: "/analytics",
     icon: ChartBar,
