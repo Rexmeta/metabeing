@@ -90,6 +90,7 @@ interface ChatWindowProps {
   conversationId: string;
   onChatComplete: () => void;
   onExit: () => void;
+  initialChatMode?: 'messenger' | 'character';
   onPersonaChange?: () => void;
   onReady?: () => void;
   onConversationEnding?: () => void;
@@ -97,7 +98,7 @@ interface ChatWindowProps {
   initialMessages?: ConversationMessage[];
 }
 
-export default function ChatWindow({ scenario, persona, conversationId, onChatComplete, onExit, onPersonaChange, onReady, onConversationEnding, isPersonaChat = false, initialMessages = [] }: ChatWindowProps) {
+export default function ChatWindow({ scenario, persona, conversationId, onChatComplete, onExit, onPersonaChange, onReady, onConversationEnding, initialChatMode = 'character', isPersonaChat = false, initialMessages = [] }: ChatWindowProps) {
   const [location, setLocation] = useLocation();
   const [userInput, setUserInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -108,7 +109,7 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
   const [elapsedTime, setElapsedTime] = useState(0);
   const [conversationStartTime, setConversationStartTime] = useState<Date | null>(null);
   const [localMessages, setLocalMessages] = useState<ConversationMessage[]>(initialMessages);
-  const [chatMode, setChatMode] = useState<'messenger' | 'character'>('character');
+  const [chatMode, setChatMode] = useState<'messenger' | 'character'>(initialChatMode);
   const [isWideScreen, setIsWideScreen] = useState(false);
   const [showInputMode, setShowInputMode] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);

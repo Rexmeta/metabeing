@@ -217,6 +217,7 @@ export default function PersonaChat() {
         conversationId={chatSession.id}
         onChatComplete={handleChatComplete}
         onExit={handleExit}
+        initialChatMode="character"
         isPersonaChat={true}
         initialMessages={initialMessages}
       />

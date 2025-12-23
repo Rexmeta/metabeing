@@ -204,6 +204,7 @@ export default function ConversationView() {
         conversationId={personaRun.id}
         onChatComplete={handleChatComplete}
         onExit={handleExit}
+        initialChatMode="messenger"
         isPersonaChat={true}
         initialMessages={initialMessages}
       />
