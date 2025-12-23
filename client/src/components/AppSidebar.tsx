@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useLocation, Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Sidebar,
@@ -15,6 +17,16 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { ProfileEditDialog } from "@/components/ProfileEditDialog";
 import {
   Compass,
   User,
@@ -30,7 +42,18 @@ import {
   HelpCircle,
   ChartBar,
   Library,
+  History,
+  UserCog,
+  ShieldCheck,
+  BarChart3,
+  ChevronUp,
 } from "lucide-react";
+
+const roleConfig: Record<string, { label: string; color: string; bgColor: string }> = {
+  admin: { label: "시스템관리자", color: "text-red-700", bgColor: "bg-red-100" },
+  operator: { label: "운영자", color: "text-blue-700", bgColor: "bg-blue-100" },
+  user: { label: "일반유저", color: "text-slate-600", bgColor: "bg-slate-100" },
+};
 
 const mainMenuItems = [
   {
@@ -107,13 +130,24 @@ const adminItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, isAuthenticated, logout, setShowAuthModal } = useAuth();
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+
+  const { data: categories } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['/api/categories'],
+    enabled: !!user?.assignedCategoryId,
+  });
 
   const isAdmin = user?.role === "admin";
   const isOperator = user?.role === "operator";
   const showAdminMenu = isAdmin || isOperator;
 
+  const role = user?.role || "user";
+  const roleInfo = roleConfig[role] || roleConfig.user;
+  const assignedCategory = categories?.find(c => String(c.id) === String(user?.assignedCategoryId));
+
   const handleLogout = async () => {
     await logout();
+    window.location.href = '/';
   };
 
   const handleLogin = () => {
@@ -251,28 +285,121 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-4">
         {isAuthenticated && user ? (
-          <div className="flex items-center gap-3">
-            <Avatar className="w-9 h-9">
-              <AvatarImage src={user.profileImage || undefined} />
-              <AvatarFallback>{user.name?.charAt(0) || "U"}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate" data-testid="text-username">
-                {user.name}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {user.role === "admin" ? "관리자" : user.role === "operator" ? "운영자" : "사용자"}
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              data-testid="button-logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button 
+                  className="flex items-center gap-3 w-full p-2 rounded-md hover-elevate cursor-pointer text-left"
+                  data-testid="button-profile-menu"
+                >
+                  <Avatar className="w-9 h-9">
+                    <AvatarImage src={user.profileImage || undefined} />
+                    <AvatarFallback>{user.name?.charAt(0) || "U"}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" data-testid="text-username">
+                      {user.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {roleInfo.label}
+                    </p>
+                  </div>
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user?.name || "사용자"}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      {assignedCategory && (
+                        <Badge className="bg-green-100 text-green-700 text-xs w-fit" data-testid="menu-category-badge">
+                          {assignedCategory.name}
+                        </Badge>
+                      )}
+                      <Badge className={`${roleInfo.bgColor} ${roleInfo.color} text-xs w-fit`} data-testid="menu-role-badge">
+                        {roleInfo.label}
+                      </Badge>
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => window.location.href = '/mypage'}
+                  data-testid="menu-history"
+                >
+                  <History className="w-4 h-4 mr-2" />
+                  History
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem
+                  onClick={() => setShowProfileEdit(true)}
+                  data-testid="menu-profile-edit"
+                >
+                  <UserCog className="w-4 h-4 mr-2" />
+                  회원정보 수정
+                </DropdownMenuItem>
+                
+                {user?.role === 'admin' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => window.location.href = '/system-admin'}
+                      data-testid="menu-system-admin"
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-2" />
+                      시스템 관리자
+                    </DropdownMenuItem>
+                  </>
+                )}
+                
+                {(user?.role === 'admin' || user?.role === 'operator') && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => window.location.href = '/admin'}
+                      data-testid="menu-admin-dashboard"
+                    >
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      운영자 대시보드
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => window.location.href = '/admin-management'}
+                      data-testid="menu-content-management"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      콘텐츠 관리
+                    </DropdownMenuItem>
+                  </>
+                )}
+                
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  data-testid="menu-logout"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  로그아웃
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {user && (
+              <ProfileEditDialog
+                open={showProfileEdit}
+                onOpenChange={setShowProfileEdit}
+                currentUser={{
+                  id: user.id,
+                  email: user.email || "",
+                  name: user.name || "",
+                  role: user.role,
+                  profileImage: user.profileImage,
+                  tier: user.tier,
+                }}
+              />
+            )}
+          </>
         ) : (
           <Button
             className="w-full"

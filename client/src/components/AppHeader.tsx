@@ -1,5 +1,4 @@
 import { Link } from "wouter";
-import { UserProfileMenu } from "@/components/UserProfileMenu";
 
 interface AppHeaderProps {
   title?: string;
@@ -56,7 +55,6 @@ export function AppHeader({
             </div>
             <div className="flex gap-3">
               {rightContent}
-              <UserProfileMenu />
             </div>
           </div>
         </div>
@@ -102,7 +100,6 @@ export function AppHeader({
           )}
           <div className="flex items-center space-x-2">
             {rightContent}
-            <UserProfileMenu />
           </div>
         </div>
       </div>

@@ -258,17 +258,6 @@ export default function MyPage() {
         variant="mypage"
         userName={user.name || user.email?.split('@')[0] || '사용자'}
         userEmail={user.email}
-        rightContent={
-          <Button
-            onClick={() => window.location.href = '/home'}
-            variant="outline"
-            data-testid="scenario-list-button"
-            className="flex items-center gap-2"
-          >
-            <i className="fas fa-list"></i>
-            시나리오 리스트
-          </Button>
-        }
       />
 
       {/* Main Content */}
