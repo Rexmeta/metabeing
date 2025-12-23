@@ -804,8 +804,14 @@ export class PostgreSQLStorage implements IStorage {
 
   // 새로운 데이터 구조: Scenario Runs
   async createScenarioRun(insertScenarioRun: InsertScenarioRun): Promise<ScenarioRun> {
-    const [scenarioRun] = await db.insert(scenarioRuns).values(insertScenarioRun as any).returning();
-    return scenarioRun;
+    const result = await withRetry(async () => {
+      const rows = await db.insert(scenarioRuns).values(insertScenarioRun as any).returning();
+      if (!rows || rows.length === 0) {
+        throw new Error('createScenarioRun returned empty result');
+      }
+      return rows[0];
+    }, 3);
+    return result;
   }
 
   async getScenarioRun(id: string): Promise<ScenarioRun | undefined> {
@@ -891,8 +897,14 @@ export class PostgreSQLStorage implements IStorage {
 
   // Persona Runs
   async createPersonaRun(insertPersonaRun: InsertPersonaRun): Promise<PersonaRun> {
-    const [personaRun] = await db.insert(personaRuns).values(insertPersonaRun).returning();
-    return personaRun;
+    const result = await withRetry(async () => {
+      const rows = await db.insert(personaRuns).values(insertPersonaRun).returning();
+      if (!rows || rows.length === 0) {
+        throw new Error('createPersonaRun returned empty result');
+      }
+      return rows[0];
+    }, 3);
+    return result;
   }
 
   async getPersonaRun(id: string): Promise<PersonaRun | undefined> {
