@@ -704,6 +704,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`🎭 페르소나 직접 대화 시작: personaId=${personaId}, mode=${mode}`);
       
+      // 🔍 기존 대화방 검색 - 같은 유저와 페르소나의 활성 대화가 있는지 확인
+      const existingChat = await storage.findExistingPersonaDirectChat(userId, personaId);
+      
+      if (existingChat) {
+        console.log(`♻️ 기존 대화방 발견: personaRunId=${existingChat.id}, messages=${existingChat.messages.length}개`);
+        
+        // 기존 대화방의 메시지를 포맷팅
+        const formattedMessages = existingChat.messages.map(msg => ({
+          sender: msg.sender as 'user' | 'ai',
+          message: msg.message,
+          timestamp: msg.createdAt?.toISOString() || new Date().toISOString(),
+          emotion: msg.emotion || 'neutral'
+        }));
+        
+        // 세션 ID 생성 (WebSocket용)
+        const sessionId = `persona-session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        return res.json({
+          id: sessionId,
+          personaRunId: existingChat.id,
+          scenarioRunId: existingChat.scenarioRunId,
+          scenarioId: `persona-chat-${personaId}`,
+          scenarioName: existingChat.scenarioRun.scenarioName,
+          personaId,
+          personaSnapshot: existingChat.personaSnapshot,
+          messages: formattedMessages,
+          turnCount: existingChat.messages.length,
+          status: 'active',
+          mode,
+          difficulty: existingChat.scenarioRun.difficulty || 2,
+          userId,
+          isPersonaChat: true,
+          isResumed: true, // 기존 대화 이어가기 표시
+          createdAt: existingChat.startedAt?.toISOString() || new Date().toISOString()
+        });
+      }
+      
+      console.log(`🆕 새 대화방 생성: personaId=${personaId}`);
+      
       // 페르소나 정보 가져오기
       const persona = await fileManager.getMBTIPersonaById(personaId);
       if (!persona) {

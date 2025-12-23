@@ -98,6 +98,7 @@ export interface IStorage {
   
   // Active Conversations (진행 중인 대화)
   getActivePersonaRunsWithLastMessage(userId: string): Promise<(PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[]>;
+  findExistingPersonaDirectChat(userId: string, personaId: string): Promise<(PersonaRun & { scenarioRun: ScenarioRun; messages: ChatMessage[] }) | null>;
   getAllEmotionStats(scenarioIds?: string[]): Promise<{ emotion: string; count: number }[]>; // Admin analytics - 감정 빈도
   getEmotionStatsByScenario(scenarioIds?: string[]): Promise<{ scenarioId: string; scenarioName: string; emotions: { emotion: string; count: number }[]; totalCount: number }[]>;
   getEmotionStatsByMbti(scenarioIds?: string[]): Promise<{ mbti: string; emotions: { emotion: string; count: number }[]; totalCount: number }[]>;
@@ -383,6 +384,10 @@ export class MemStorage implements IStorage {
 
   async getActivePersonaRunsWithLastMessage(userId: string): Promise<(PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[]> {
     throw new Error("MemStorage does not support Active Persona Runs");
+  }
+
+  async findExistingPersonaDirectChat(userId: string, personaId: string): Promise<(PersonaRun & { scenarioRun: ScenarioRun; messages: ChatMessage[] }) | null> {
+    throw new Error("MemStorage does not support findExistingPersonaDirectChat");
   }
 
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
@@ -1094,6 +1099,60 @@ export class PostgreSQLStorage implements IStorage {
     } catch (error) {
       console.error('Error in getActivePersonaRunsWithLastMessage:', error);
       return [];
+    }
+  }
+
+  async findExistingPersonaDirectChat(userId: string, personaId: string): Promise<(PersonaRun & { scenarioRun: ScenarioRun; messages: ChatMessage[] }) | null> {
+    try {
+      // 1. 해당 유저의 persona_direct 대화 중 같은 personaId를 가진 활성 대화 찾기
+      const userScenarioRuns = await db
+        .select()
+        .from(scenarioRuns)
+        .where(and(
+          eq(scenarioRuns.userId, userId),
+          eq(scenarioRuns.conversationType, 'persona_direct'),
+          eq(scenarioRuns.status, 'active')
+        ))
+        .orderBy(desc(scenarioRuns.startedAt));
+
+      if (!userScenarioRuns || userScenarioRuns.length === 0) {
+        return null;
+      }
+
+      // 2. 해당 scenarioRuns에서 personaId가 일치하는 personaRun 찾기
+      for (const sr of userScenarioRuns) {
+        const personaRunsResult = await db
+          .select()
+          .from(personaRuns)
+          .where(and(
+            eq(personaRuns.scenarioRunId, sr.id),
+            eq(personaRuns.personaId, personaId),
+            eq(personaRuns.status, 'active')
+          ))
+          .limit(1);
+
+        if (personaRunsResult && personaRunsResult.length > 0) {
+          const existingPersonaRun = personaRunsResult[0];
+          
+          // 3. 해당 대화의 메시지 가져오기
+          const messages = await db
+            .select()
+            .from(chatMessages)
+            .where(eq(chatMessages.personaRunId, existingPersonaRun.id))
+            .orderBy(asc(chatMessages.turnIndex));
+
+          return {
+            ...existingPersonaRun,
+            scenarioRun: sr,
+            messages: messages || []
+          };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error in findExistingPersonaDirectChat:', error);
+      return null;
     }
   }
 
