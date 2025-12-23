@@ -1495,16 +1495,19 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
           <p className="text-slate-600 mt-1">성격 유형별 AI 페르소나를 관리합니다</p>
         </div>
         
+        <Button 
+          onClick={() => {
+            resetForm();
+            setEditingPersona(null);
+            setIsCreateOpen(true);
+          }}
+          className="bg-corporate-600 hover:bg-corporate-700"
+          data-testid="button-create-persona"
+        >
+          페르소나 생성
+        </Button>
+        
         <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
-          <DialogTrigger asChild>
-            <Button 
-              onClick={() => setIsCreateOpen(true)}
-              className="bg-corporate-600 hover:bg-corporate-700"
-              data-testid="button-create-persona"
-            >
-              페르소나 생성
-            </Button>
-          </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-50">
             <DialogHeader className="bg-indigo-600 -m-6 mb-4 p-6 rounded-t-lg">
               <DialogTitle className="text-white text-xl flex items-center gap-2">
