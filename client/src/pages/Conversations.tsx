@@ -38,8 +38,10 @@ export default function Conversations() {
     mutationFn: async (conversationId: string) => {
       return await apiRequest("POST", `/api/conversations/${conversationId}/close`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/active-conversations"] });
+    onSuccess: async () => {
+      // 캐시 무효화 후 즉시 refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/active-conversations"] });
+      await refetch();
       toast({
         title: "대화방 닫힘",
         description: "대화방이 목록에서 제거되었습니다.",
