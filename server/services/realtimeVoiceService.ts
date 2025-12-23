@@ -1160,16 +1160,22 @@ export class RealtimeVoiceService {
     emotionReason: string | null
   ): Promise<void> {
     try {
-      // conversationId는 sessionId 형식 (예: uuid-uuid-timestamp)이므로 파싱 필요
-      // 실제 personaRunId를 추출 (첫 번째 UUID 부분)
+      // conversationId는 sessionId 형식: userId-personaRunId-timestamp
+      // 예: bb0371f6-9706-439d-8416-498a92c65b56-595ecac0-dada-4cdb-940b-d7ae08cb7fd8-1766477162018
+      // UUID는 8-4-4-4-12 형식 (5개 부분)
       const parts = conversationId.split('-');
       let personaRunId = conversationId;
       
-      // UUID 형식인지 확인 (8-4-4-4-12)
-      if (parts.length >= 5) {
-        // 첫 번째 UUID 추출 시도
-        personaRunId = parts.slice(0, 5).join('-');
+      // 전체 형식: userId(5) + personaRunId(5) + timestamp(1) = 11 parts
+      if (parts.length >= 11) {
+        // 두 번째 UUID (personaRunId) 추출: 인덱스 5-9
+        personaRunId = parts.slice(5, 10).join('-');
+      } else if (parts.length >= 5) {
+        // 짧은 형식의 경우 - 그냥 전달된 대로 시도
+        personaRunId = conversationId;
       }
+      
+      console.log(`🔍 Extracted personaRunId: ${personaRunId} from conversationId: ${conversationId}`);
       
       // 먼저 personaRun 존재 확인
       const personaRun = await storage.getPersonaRun(personaRunId);
@@ -1179,7 +1185,7 @@ export class RealtimeVoiceService {
         if (personaRunByConvId) {
           personaRunId = personaRunByConvId.id;
         } else {
-          console.log(`⚠️ PersonaRun not found for conversationId: ${conversationId}`);
+          console.log(`⚠️ PersonaRun not found for personaRunId: ${personaRunId}, conversationId: ${conversationId}`);
           return;
         }
       }
