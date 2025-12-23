@@ -1008,6 +1008,44 @@ ${personaSnapshot.name}:`;
         aiResponse = responseText;
       }
       
+      // ✨ 메시지를 chat_messages에 자동 저장
+      try {
+        // 현재 대화의 메시지 수 조회하여 turnIndex 결정
+        const existingMessages = await storage.getChatMessagesByPersonaRun(sessionId) || [];
+        const nextTurnIndex = existingMessages.length;
+        
+        // 사용자 메시지 저장
+        await storage.createChatMessage({
+          personaRunId: sessionId,
+          turnIndex: nextTurnIndex,
+          sender: 'user',
+          message: message,
+          emotion: null,
+          emotionReason: null,
+        });
+        
+        // AI 메시지 저장
+        await storage.createChatMessage({
+          personaRunId: sessionId,
+          turnIndex: nextTurnIndex + 1,
+          sender: 'ai',
+          message: aiResponse,
+          emotion: emotion,
+          emotionReason: '',
+        });
+        
+        // persona_run의 turnCount와 lastActivityAt 업데이트
+        const userTurnCount = Math.floor((nextTurnIndex + 2) / 2); // 사용자 턴 수 계산
+        await storage.updatePersonaRun(sessionId, {
+          turnCount: userTurnCount,
+          lastActivityAt: new Date(),
+        });
+        
+        console.log(`✅ 메시지 저장 완료: sessionId=${sessionId}, turnIndex=${nextTurnIndex}, ${nextTurnIndex + 1}`);
+      } catch (saveError) {
+        console.error('메시지 저장 오류 (대화는 계속 진행):', saveError);
+      }
+      
       res.json({
         response: aiResponse,
         emotion,
