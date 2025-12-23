@@ -49,7 +49,6 @@ export default function AdminManagement() {
   const updatePersonaVisibilityMutation = useMutation({
     mutationFn: async ({ id, visibility }: { id: string; visibility: string }) => {
       const res = await apiRequest("PATCH", `/api/personas/${id}/visibility`, { visibility });
-      if (!res.ok) throw new Error("Failed to update visibility");
       return res.json();
     },
     onSuccess: (_, variables) => {

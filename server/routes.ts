@@ -4116,6 +4116,45 @@ ${personaSnapshot.name}:`;
     }
   });
 
+  // PATCH: 페르소나 공개/비공개 토글
+  app.patch("/api/personas/:id/visibility", isAuthenticated, async (req: any, res) => {
+    try {
+      const personaId = req.params.id;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const { visibility } = req.body;
+      
+      if (!visibility || !['public', 'private'].includes(visibility)) {
+        return res.status(400).json({ error: "Invalid visibility value" });
+      }
+      
+      // 기존 페르소나 확인
+      const existingPersona = await fileManager.getMBTIPersonaById(personaId);
+      if (!existingPersona) {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+      
+      // 소유자 또는 관리자만 수정 가능
+      const isOwner = existingPersona.ownerId && existingPersona.ownerId === userId;
+      const isAdmin = userRole === 'admin';
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ error: "수정 권한이 없습니다" });
+      }
+      
+      // visibility만 업데이트
+      const updateData = {
+        ...existingPersona,
+        visibility,
+      };
+      
+      const persona = await fileManager.updateMBTIPersona(personaId, updateData);
+      res.json(persona);
+    } catch (error) {
+      console.error("Error updating persona visibility:", error);
+      res.status(500).json({ error: "Failed to update persona visibility" });
+    }
+  });
+
   app.delete("/api/admin/personas/:id", isAuthenticated, async (req: any, res) => {
     try {
       const personaId = req.params.id;
