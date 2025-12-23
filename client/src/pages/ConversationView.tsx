@@ -55,10 +55,12 @@ export default function ConversationView() {
     enabled: !!personaRun?.scenarioRunId,
   });
 
-  // 채팅 메시지 조회
+  // 채팅 메시지 조회 (항상 최신 데이터 가져오기)
   const { data: messages = [], isLoading: msgLoading } = useQuery<ChatMessageData[]>({
     queryKey: ["/api/persona-runs", personaRunId, "messages"],
     enabled: !!personaRunId,
+    staleTime: 0, // 항상 새로운 데이터 가져오기
+    refetchOnMount: 'always', // 마운트 시 항상 refetch
   });
 
   const isLoading = prLoading || srLoading || msgLoading;

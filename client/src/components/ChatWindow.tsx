@@ -115,10 +115,15 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   const [chatMode, setChatMode] = useState<'messenger' | 'character'>(initialChatMode);
   
   // initialMessages가 변경되면 localMessages 업데이트 (쿼리 로딩 완료 후)
+  // 마운트 시점에 초기 메시지 로드 여부 추적
+  const initialMessagesLoadedRef = useRef(false);
+  
   useEffect(() => {
-    if (initialMessages && initialMessages.length > 0 && localMessages.length === 0) {
+    // 초기 메시지가 있고 아직 로드하지 않았으면 로드
+    if (initialMessages && initialMessages.length > 0 && !initialMessagesLoadedRef.current) {
       console.log('📬 Loading initial messages:', initialMessages.length);
       setLocalMessages(initialMessages);
+      initialMessagesLoadedRef.current = true;
     }
   }, [initialMessages]);
   const [isWideScreen, setIsWideScreen] = useState(false);
