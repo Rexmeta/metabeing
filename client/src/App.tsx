@@ -21,7 +21,6 @@ import FeedbackView from "@/pages/FeedbackView";
 import HelpPage from "@/pages/HelpPage";
 import NotFound from "@/pages/not-found";
 import Explore from "@/pages/Explore";
-import Library from "@/pages/Library";
 import ProfileSettings from "@/pages/ProfileSettings";
 import PersonaChat from "@/pages/PersonaChat";
 import Conversations from "@/pages/Conversations";
@@ -32,11 +31,11 @@ function ContentManagementRedirect() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    let libraryTab = "personas";
-    if (tab === "manage-personas") libraryTab = "personas";
-    else if (tab === "manage-scenarios") libraryTab = "scenarios";
-    else if (tab === "difficulty") libraryTab = "difficulty";
-    setLocation(`/library?tab=${libraryTab}`, { replace: true });
+    let adminTab = "manage-scenarios";
+    if (tab === "manage-personas" || tab === "personas") adminTab = "manage-personas";
+    else if (tab === "manage-scenarios" || tab === "scenarios") adminTab = "manage-scenarios";
+    else if (tab === "difficulty" || tab === "difficulty-settings") adminTab = "difficulty-settings";
+    setLocation(`/admin-management?tab=${adminTab}`, { replace: true });
   }, [setLocation]);
   
   return null;
@@ -167,9 +166,8 @@ function MainRouter() {
         {() => <AdminRoute component={SystemAdminPage} />}
       </Route>
       <Route path="/help" component={HelpPage} />
-      <Route path="/library">
-        {() => <ProtectedRoute component={Library} />}
-      </Route>
+      {/* library redirects to admin-management */}
+      <Route path="/library" component={ContentManagementRedirect} />
       <Route path="/conversations">
         {() => <ProtectedRoute component={Conversations} />}
       </Route>

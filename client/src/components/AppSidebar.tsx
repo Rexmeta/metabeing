@@ -41,7 +41,6 @@ import {
   Cog,
   HelpCircle,
   ChartBar,
-  Library,
   History,
   UserCog,
   ShieldCheck,
@@ -66,7 +65,7 @@ const mainMenuItems = [
   },
   {
     title: "페르소나 만들기",
-    url: "/library?tab=personas",
+    url: "/admin-management?tab=manage-personas",
     icon: Users,
     requiresAuth: true,
   },
@@ -77,12 +76,6 @@ const myContentItems = [
     title: "마이 페이지",
     url: "/mypage",
     icon: User,
-    requiresAuth: true,
-  },
-  {
-    title: "내 라이브러리",
-    url: "/library",
-    icon: Library,
     requiresAuth: true,
   },
   {
