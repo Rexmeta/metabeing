@@ -127,7 +127,7 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
   return (
     <Card 
       className="cursor-pointer hover:shadow-lg transition-shadow overflow-hidden flex-shrink-0 w-[280px]"
-      onClick={() => setLocation(`/scenario/${scenario.id}`)}
+      onClick={() => setLocation(`/home?scenarioId=${scenario.id}`)}
       data-testid={`card-scenario-${scenario.id}`}
     >
       <div className="relative aspect-video bg-muted">
