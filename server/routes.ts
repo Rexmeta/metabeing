@@ -744,7 +744,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scenarioName: virtualScenarioName,
         userId,
         status: 'active',
-        difficulty: difficulty || 2
+        difficulty: difficulty || 2,
+        attemptNumber: 1,
+        mode: mode || 'text'
       });
       
       const personaRun = await storage.createPersonaRun({
