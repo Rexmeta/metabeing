@@ -41,9 +41,13 @@ Preferred communication style: Simple, everyday language.
 - **Schema**: `conversations`, `feedbacks`, `users`, `categories`, `system_settings`, `ai_usage_logs` tables.
 
 ## Features
+- **Conversation Types**: Two conversation modes supported:
+    - **Scenario-based (scenario_based)**: Guided conversations based on specific workplace scenarios.
+    - **Persona-direct (persona_direct)**: Free chat directly with personas without scenarios (scenarioId=null).
 - **4-Level Difficulty System**: Users select difficulty, influencing AI responses across all conversation modes.
 - **Analytics and Reporting**: Comprehensive user conversation history analytics including scores, category breakdowns, growth tracking, and pattern recognition. Uses a ComOn Check research-based 5-point scoring system (converted to 0-100).
 - **Real-time Emotion Analysis**: AI characters display emotions with visual indicators.
+- **16 MBTI Personas**: All 16 MBTI personality types available (ENFP, ENTP, ENTJ, ENFJ added).
 - **Role-Based Access Control**: `시스템관리자 (admin)`, `운영자 (operator)`, `일반유저 (user)` roles with distinct permissions for system admin, operator dashboard, and content management.
 - **Category System**: Scenarios are organized by categories, with operators assigned to manage specific categories.
 - **System Settings Management**: Configurable system parameters stored in `system_settings` table, including per-feature AI model selection (e.g., Gemini, OpenAI for conversation/feedback, Gemini Live for real-time voice).
