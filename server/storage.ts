@@ -939,10 +939,25 @@ export class PostgreSQLStorage implements IStorage {
 
   // Persona Runs
   async createPersonaRun(insertPersonaRun: InsertPersonaRun): Promise<PersonaRun> {
+    // UUID를 미리 생성하여 INSERT 후 SELECT 폴백이 가능하도록 함
+    const personaRunId = crypto.randomUUID();
+    
     const result = await withRetry(async () => {
-      const rows = await db.insert(personaRuns).values(insertPersonaRun).returning();
+      const rows = await db.insert(personaRuns).values({
+        ...insertPersonaRun,
+        id: personaRunId
+      }).returning();
+      
+      // Neon HTTP 드라이버의 간헐적 null 반환 문제 처리
       if (!rows || rows.length === 0) {
-        throw new Error('createPersonaRun returned empty result');
+        console.log('createPersonaRun: INSERT returned empty, trying SELECT fallback');
+        // INSERT는 성공했지만 returning이 실패한 경우를 위한 폴백
+        const [existingRow] = await db.select().from(personaRuns).where(eq(personaRuns.id, personaRunId));
+        if (existingRow) {
+          console.log('createPersonaRun: Found row via SELECT after INSERT');
+          return existingRow;
+        }
+        throw new Error('createPersonaRun returned empty result and SELECT fallback failed');
       }
       return rows[0];
     }, 3);
