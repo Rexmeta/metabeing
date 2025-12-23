@@ -807,7 +807,8 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getAllCategories(): Promise<Category[]> {
-    return await db.select().from(categories).orderBy(asc(categories.order));
+    const result = await db.select().from(categories).orderBy(asc(categories.order));
+    return result || [];
   }
 
   async updateCategory(id: string, updates: Partial<InsertCategory>): Promise<Category> {

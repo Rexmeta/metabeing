@@ -162,7 +162,7 @@ export function AppSidebar() {
 
   const role = user?.role || "user";
   const roleInfo = roleConfig[role] || roleConfig.user;
-  const assignedCategory = categories?.find(c => String(c.id) === String(user?.assignedCategoryId));
+  const assignedCategory = Array.isArray(categories) ? categories.find(c => String(c.id) === String(user?.assignedCategoryId)) : undefined;
 
   const handleLogout = async () => {
     await logout();
