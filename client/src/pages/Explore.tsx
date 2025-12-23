@@ -134,7 +134,7 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-lg line-clamp-2">{scenario.name}</CardTitle>
+          <CardTitle className="text-lg line-clamp-2">{scenario.title || scenario.name}</CardTitle>
           {scenario.difficulty && (
             <Badge className={difficultyColors[scenario.difficulty]}>
               {difficultyLabels[scenario.difficulty]}
@@ -158,7 +158,7 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
         </div>
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1 text-sm text-muted-foreground">
-            <Sparkles className="h-3 w-3" /> {formatSNSNumber(scenario.usageCount)}회 사용
+            <Sparkles className="h-3 w-3" /> {formatSNSNumber(scenario.usageCount || 0)}회 사용
           </span>
           <div className="flex items-center gap-2">
             <button
