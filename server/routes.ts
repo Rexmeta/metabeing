@@ -1059,7 +1059,7 @@ ${personaSnapshot.name}:`;
       const messages = chatMessages.map(msg => ({
         sender: msg.sender,
         message: msg.message,
-        timestamp: msg.createdAt.toISOString(),
+        timestamp: msg.createdAt ? (typeof msg.createdAt === 'string' ? msg.createdAt : msg.createdAt.toISOString()) : new Date().toISOString(),
         emotion: msg.emotion,
         emotionReason: msg.emotionReason
       }));
