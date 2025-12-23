@@ -113,6 +113,14 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   const [conversationStartTime, setConversationStartTime] = useState<Date | null>(null);
   const [localMessages, setLocalMessages] = useState<ConversationMessage[]>(initialMessages);
   const [chatMode, setChatMode] = useState<'messenger' | 'character'>(initialChatMode);
+  
+  // initialMessages가 변경되면 localMessages 업데이트 (쿼리 로딩 완료 후)
+  useEffect(() => {
+    if (initialMessages && initialMessages.length > 0 && localMessages.length === 0) {
+      console.log('📬 Loading initial messages:', initialMessages.length);
+      setLocalMessages(initialMessages);
+    }
+  }, [initialMessages]);
   const [isWideScreen, setIsWideScreen] = useState(false);
   const [showInputMode, setShowInputMode] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
