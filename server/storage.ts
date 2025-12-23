@@ -9,23 +9,39 @@ const sql = sqlBuilder;
 const neonClient = neon(process.env.DATABASE_URL!);
 export const db = drizzle(neonClient);
 
-// Neon HTTP 드라이버 재시도 유틸리티
-async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 100): Promise<T> {
+// Neon HTTP 드라이버 재시도 유틸리티 - null/TypeError 대응 강화
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 150): Promise<T> {
+  let lastError: Error | null = null;
   for (let i = 0; i <= retries; i++) {
     try {
       const result = await fn();
+      // Neon serverless가 가끔 null을 반환하는 문제 대응
       if (result !== null && result !== undefined) {
         return result;
       }
+      // 결과가 null/undefined면 다시 시도
       if (i < retries) {
         await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+        continue;
       }
-    } catch (error) {
-      if (i === retries) throw error;
+    } catch (error: any) {
+      lastError = error;
+      // TypeError (null.map 등)는 Neon의 일시적 오류로 간주하고 재시도
+      const isRetryable = 
+        error?.message?.includes('Cannot read properties of null') ||
+        error?.message?.includes('Cannot read properties of undefined') ||
+        error?.name === 'TypeError';
+      
+      if (!isRetryable && i === retries) throw error;
       await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
     }
   }
-  return await fn();
+  // 마지막 시도
+  try {
+    return await fn();
+  } catch (error) {
+    throw lastError || error;
+  }
 }
 
 export interface IStorage {
@@ -1091,7 +1107,7 @@ export class PostgreSQLStorage implements IStorage {
     const scenarioMap = new Map<string, { scenarioId: string; scenarioName: string; emotions: { emotion: string; count: number }[]; totalCount: number }>();
     
     for (const row of result) {
-      if (!row.emotion) continue;
+      if (!row.emotion || !row.scenarioId) continue;
       
       if (!scenarioMap.has(row.scenarioId)) {
         scenarioMap.set(row.scenarioId, {
@@ -1102,7 +1118,7 @@ export class PostgreSQLStorage implements IStorage {
         });
       }
       
-      const scenario = scenarioMap.get(row.scenarioId)!;
+      const scenario = scenarioMap.get(row.scenarioId)!
       scenario.emotions.push({ emotion: row.emotion, count: row.count });
       scenario.totalCount += row.count;
     }
@@ -1115,7 +1131,7 @@ export class PostgreSQLStorage implements IStorage {
     const whereConditions = [
       eq(chatMessages.sender, 'ai'),
       isNotNull(chatMessages.emotion),
-      isNotNull(personaRuns.mbti)
+      isNotNull(personaRuns.mbtiType)
     ];
     
     if (scenarioIds && scenarioIds.length > 0) {
@@ -1123,7 +1139,7 @@ export class PostgreSQLStorage implements IStorage {
     }
     
     const result = await db.select({
-      mbti: personaRuns.mbti,
+      mbti: personaRuns.mbtiType,
       emotion: chatMessages.emotion,
       count: sql<number>`count(*)::int`
     })
@@ -1131,8 +1147,8 @@ export class PostgreSQLStorage implements IStorage {
     .innerJoin(personaRuns, eq(chatMessages.personaRunId, personaRuns.id))
     .innerJoin(scenarioRuns, eq(personaRuns.scenarioRunId, scenarioRuns.id))
     .where(and(...whereConditions))
-    .groupBy(personaRuns.mbti, chatMessages.emotion)
-    .orderBy(personaRuns.mbti, desc(sql`count(*)`));
+    .groupBy(personaRuns.mbtiType, chatMessages.emotion)
+    .orderBy(personaRuns.mbtiType, desc(sql`count(*)`));
     
     // MBTI별로 그룹화
     const mbtiMap = new Map<string, { mbti: string; emotions: { emotion: string; count: number }[]; totalCount: number }>();
