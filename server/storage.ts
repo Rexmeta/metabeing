@@ -1027,8 +1027,11 @@ export class PostgreSQLStorage implements IStorage {
       const scenarioRunIds = userScenarioRuns.map(sr => sr.id);
       const scenarioRunMap = new Map(userScenarioRuns.map(sr => [sr.id, sr]));
 
-      // 2. active persona runs 가져오기 (각 scenarioRunId별로 개별 쿼리 - Neon 안정성)
+      // 2. active persona runs 가져오기 + 최근 완료된 대화 (각 scenarioRunId별로 개별 쿼리 - Neon 안정성)
       let activePersonaRuns: PersonaRun[] = [];
+      const RECENT_COMPLETED_HOURS = 24; // 최근 24시간
+      const recentCutoffTime = new Date(Date.now() - RECENT_COMPLETED_HOURS * 60 * 60 * 1000);
+      
       for (const scenarioRunId of scenarioRunIds) {
         try {
           const result = await db
@@ -1036,7 +1039,14 @@ export class PostgreSQLStorage implements IStorage {
             .from(personaRuns)
             .where(and(
               eq(personaRuns.scenarioRunId, scenarioRunId),
-              eq(personaRuns.status, 'active')
+              // ✨ 'active' 상태 OR (최근 완료된 대화)
+              or(
+                eq(personaRuns.status, 'active'),
+                and(
+                  eq(personaRuns.status, 'completed'),
+                  gt(personaRuns.completedAt, recentCutoffTime)
+                )
+              )
             ));
           if (result && Array.isArray(result)) {
             activePersonaRuns.push(...result);

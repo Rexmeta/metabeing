@@ -1912,6 +1912,8 @@ ${personaSnapshot.name}:`;
       const userId = req.user?.id;
       
       const activeConversations = await storage.getActivePersonaRunsWithLastMessage(userId);
+      // ✨ Cache-Control 헤더로 실시간 업데이트 보장 (매 요청마다 새로 조회)
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.json(activeConversations);
     } catch (error) {
       console.error("Error fetching active conversations:", error);

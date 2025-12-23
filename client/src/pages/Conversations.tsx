@@ -23,9 +23,9 @@ interface ActiveConversation {
 }
 
 export default function Conversations() {
-  const { data: activeConversations, isLoading } = useQuery<ActiveConversation[]>({
+  const { data: activeConversations, isLoading, refetch } = useQuery<ActiveConversation[]>({
     queryKey: ["/api/active-conversations"],
-    refetchInterval: 30000,
+    refetchInterval: 10000, // 10초마다 자동 리페치
   });
 
   // 페르소나 정보 조회 (이미지용)
