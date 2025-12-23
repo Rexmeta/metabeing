@@ -317,13 +317,6 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
     return () => window.removeEventListener('resize', checkScreenWidth);
   }, [chatMode]);
 
-  // 메신저 모드에서는 텍스트 입력을 기본으로 설정
-  useEffect(() => {
-    if (chatMode === 'messenger') {
-      setInputMode('text');
-    }
-  }, [chatMode]);
-
   // personaImagesAvailable이 업데이트될 때 초기 이미지 설정 및 로딩 오버레이 해제
   useEffect(() => {
     if (initialLoadCompletedRef.current) return;
