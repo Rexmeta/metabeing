@@ -116,14 +116,15 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// 새로운 데이터 구조: 시나리오 실행 (1회 플레이)
+// 새로운 데이터 구조: 시나리오 실행 (1회 플레이) 또는 페르소나 직접 대화
 export const scenarioRuns = pgTable("scenario_runs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
-  scenarioId: text("scenario_id").notNull(),
+  conversationType: text("conversation_type").notNull().default("scenario_based"), // scenario_based | persona_direct
+  scenarioId: text("scenario_id"), // nullable - 페르소나 직접 대화 시 null
   scenarioName: text("scenario_name").notNull(),
-  attemptNumber: integer("attempt_number").notNull(), // 해당 사용자가 이 시나리오를 몇 번째 시도하는지
-  status: text("status").notNull().default("in_progress"), // in_progress, completed
+  attemptNumber: integer("attempt_number").notNull().default(1), // 해당 사용자가 이 시나리오를 몇 번째 시도하는지
+  status: text("status").notNull().default("in_progress"), // in_progress, completed, active
   totalScore: integer("total_score"), // 전체 점수 (0-100)
   difficulty: integer("difficulty").notNull().default(2), // 사용자가 선택한 난이도 (1-4), 기본값: 기본 난이도
   mode: text("mode").notNull().default("text"), // text, tts, realtime_voice
@@ -136,7 +137,7 @@ export const scenarioRuns = pgTable("scenario_runs", {
   completedAt: timestamp("completed_at"),
 }, (table) => [
   index("idx_scenario_runs_user_id").on(table.userId),
-  index("idx_scenario_runs_scenario_id").on(table.scenarioId),
+  index("idx_scenario_runs_conversation_type").on(table.conversationType),
 ]);
 
 // 페르소나별 대화 세션

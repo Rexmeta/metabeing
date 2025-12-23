@@ -739,8 +739,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // ✨ DB에 scenario_run과 persona_run 생성 (대화 중 목록에 표시되도록)
+      // conversationType: 'persona_direct'로 페르소나 직접 대화임을 표시
       const scenarioRun = await storage.createScenarioRun({
-        scenarioId: virtualScenarioId,
+        conversationType: 'persona_direct',
+        scenarioId: null, // 페르소나 직접 대화는 시나리오 ID가 없음
         scenarioName: virtualScenarioName,
         userId,
         status: 'active',
