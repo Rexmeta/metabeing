@@ -67,6 +67,11 @@ export function useRealtimeVoice({
   const serverVoiceDetectedTimeRef = useRef<number | null>(null); // Timestamp when server detected user speaking
   const isAISpeakingRef = useRef<boolean>(false); // Ref for isAISpeaking state (for closures)
   const isAudioPausedRef = useRef<boolean>(false); // Track if AI audio is paused due to user speaking
+  const speechRecognitionRef = useRef<SpeechRecognition | null>(null); // Web Speech API for user transcription
+  const currentUserTranscriptRef = useRef<string>(''); // Buffer for accumulating user speech
+  const recognitionGenRef = useRef<number>(0); // Generation token for SpeechRecognition restarts
+  const pendingMessagesRef = useRef<Map<string, {transcript: string, retries: number, sentAt: number}>>(new Map()); // Retry queue with message ID
+  const messageIdCounterRef = useRef<number>(0); // Counter for generating unique message IDs
   
   // Store callbacks in refs to avoid recreating connect() on every render
   const onMessageRef = useRef(onMessage);
@@ -236,6 +241,21 @@ export function useRealtimeVoice({
       ws.onopen = () => {
         console.log('🎙️ WebSocket connected for realtime voice');
         setStatus('connected');
+        
+        // 🔄 재연결 시 pending 메시지 flush (저장 확인 못 받은 메시지 재전송)
+        if (pendingMessagesRef.current.size > 0) {
+          console.log(`🔄 Flushing ${pendingMessagesRef.current.size} pending messages after reconnect`);
+          pendingMessagesRef.current.forEach((pending, msgId) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'user.message',
+                transcript: pending.transcript,
+                messageId: msgId
+              }));
+              console.log(`📤 Re-sent pending message: ${msgId}`);
+            }
+          });
+        }
         
         // 🔊 AudioContext 준비 완료 신호 전송 - 서버는 이 신호를 받은 후 첫 인사를 시작
         // 이렇게 하면 클라이언트가 오디오 재생 준비가 완료된 상태에서 첫 인사를 받을 수 있음
@@ -408,6 +428,52 @@ export function useRealtimeVoice({
               if (data.turnSeq !== undefined) {
                 expectedTurnSeqRef.current = data.turnSeq - 1; // Accept audio from this turn onwards
               }
+              break;
+
+            case 'user.message.saved':
+              console.log('💾 User message saved:', data.transcript, data.messageId);
+              // 재시도 큐에서 해당 메시지 제거 (messageId 기반)
+              if (data.messageId && pendingMessagesRef.current.has(data.messageId)) {
+                pendingMessagesRef.current.delete(data.messageId);
+                console.log('✅ Message confirmed and removed from pending:', data.messageId);
+              }
+              break;
+
+            case 'user.message.failed':
+              console.error('❌ User message save failed:', data.transcript, data.messageId, data.error);
+              // messageId로 pending 메시지 찾아서 재시도
+              const msgId = data.messageId;
+              if (msgId && pendingMessagesRef.current.has(msgId)) {
+                const pending = pendingMessagesRef.current.get(msgId)!;
+                pending.retries++;
+                if (pending.retries >= 3) {
+                  console.error('❌ Max retries reached for:', msgId, pending.transcript);
+                  pendingMessagesRef.current.delete(msgId);
+                  if (onErrorRef.current) {
+                    onErrorRef.current('메시지 저장에 실패했습니다.');
+                  }
+                } else {
+                  // 1초 후 재시도
+                  setTimeout(() => {
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                      wsRef.current.send(JSON.stringify({ 
+                        type: 'user.message', 
+                        transcript: pending.transcript,
+                        messageId: msgId 
+                      }));
+                      console.log(`🔄 Retrying message (attempt ${pending.retries}):`, msgId);
+                    }
+                  }, 1000 * pending.retries); // 점진적 백오프
+                }
+              }
+              break;
+
+            case 'ai.message.saved':
+              console.log('💾 AI message saved:', data.text?.substring(0, 50));
+              break;
+
+            case 'ai.message.failed':
+              console.error('❌ AI message save failed:', data.text?.substring(0, 50), data.error);
               break;
 
             case 'session.terminated':
@@ -715,6 +781,125 @@ export function useRealtimeVoice({
       setIsRecording(true);
       isRecordingRef.current = true; // Update ref for onaudioprocess callback
       console.log('🎤 Recording started (PCM16 16kHz for Gemini)');
+      
+      // 🎤 Web Speech API로 사용자 음성 전사 시작
+      const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognitionClass) {
+        try {
+          // 🔧 Generation token으로 stale 이벤트 무시
+          recognitionGenRef.current++;
+          const currentGen = recognitionGenRef.current;
+          
+          // 재시작 함수 (generation token 사용)
+          const startRecognitionInstance = (gen: number) => {
+            // 🔒 stale generation이면 무시
+            if (gen !== recognitionGenRef.current) {
+              console.log(`🎤 [STT] Ignoring stale restart (gen ${gen} vs ${recognitionGenRef.current})`);
+              return;
+            }
+            
+            try {
+              // 이전 recognition 정리
+              if (speechRecognitionRef.current) {
+                try {
+                  speechRecognitionRef.current.onend = null;
+                  speechRecognitionRef.current.onerror = null;
+                  speechRecognitionRef.current.onresult = null;
+                  speechRecognitionRef.current.stop();
+                } catch (e) { /* ignore */ }
+                speechRecognitionRef.current = null;
+              }
+              
+              currentUserTranscriptRef.current = '';
+              const recognition = new SpeechRecognitionClass();
+              recognition.lang = 'ko-KR';
+              recognition.continuous = true;
+              recognition.interimResults = true;
+              
+              recognition.onresult = (event: SpeechRecognitionEvent) => {
+                if (gen !== recognitionGenRef.current) return; // stale
+                
+                let finalTranscript = '';
+                let interimTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                  const transcript = event.results[i][0].transcript;
+                  if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                  } else {
+                    interimTranscript += transcript;
+                  }
+                }
+                
+                if (finalTranscript.trim()) {
+                  console.log('🎤 [STT] Final transcript:', finalTranscript);
+                  const msg = finalTranscript.trim();
+                  currentUserTranscriptRef.current = '';
+                  
+                  // 고유 메시지 ID 생성
+                  const msgId = `msg_${Date.now()}_${++messageIdCounterRef.current}`;
+                  
+                  // pending 큐에 먼저 추가 (확인 전까지 보관)
+                  pendingMessagesRef.current.set(msgId, { 
+                    transcript: msg, 
+                    retries: 0, 
+                    sentAt: Date.now() 
+                  });
+                  
+                  if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify({ 
+                      type: 'user.message', 
+                      transcript: msg,
+                      messageId: msgId 
+                    }));
+                    console.log('📤 Sent user message with ID:', msgId);
+                  } else {
+                    console.log('📦 Message queued for later (WS not open):', msgId);
+                  }
+                  
+                  if (onUserTranscriptionRef.current) {
+                    onUserTranscriptionRef.current(msg);
+                  }
+                }
+                
+                if (interimTranscript && Math.random() < 0.3) {
+                  console.log('🎤 [STT] Interim:', interimTranscript);
+                }
+              };
+              
+              recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+                if (gen !== recognitionGenRef.current) return; // stale
+                console.warn('🎤 [STT] Error:', event.error);
+                currentUserTranscriptRef.current = '';
+                if (event.error !== 'no-speech') {
+                  console.error('🎤 [STT] Recognition error:', event.error);
+                }
+              };
+              
+              recognition.onend = () => {
+                if (gen !== recognitionGenRef.current) return; // stale
+                console.log('🎤 [STT] Recognition ended');
+                currentUserTranscriptRef.current = '';
+                if (isRecordingRef.current) {
+                  startRecognitionInstance(gen);
+                }
+              };
+              
+              recognition.start();
+              speechRecognitionRef.current = recognition;
+              console.log(`🎤 [STT] Recognition started (gen ${gen})`);
+            } catch (e) {
+              console.warn('🎤 [STT] Could not start/restart:', e);
+            }
+          };
+          
+          startRecognitionInstance(currentGen);
+        } catch (e) {
+          console.warn('🎤 [STT] Failed to start Web Speech API:', e);
+        }
+      } else {
+        console.warn('🎤 [STT] Web Speech API not supported in this browser');
+      }
     } catch (err) {
       console.error('Error starting recording:', err);
       setError('Microphone access denied');
@@ -726,6 +911,17 @@ export function useRealtimeVoice({
 
   const stopRecording = useCallback(() => {
     console.log('🎤 Stopping recording...');
+    
+    // 🎤 Web Speech API 정리
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+        console.log('🎤 [STT] Stopped Web Speech API');
+      } catch (e) {
+        console.warn('🎤 [STT] Error stopping:', e);
+      }
+      speechRecognitionRef.current = null;
+    }
     
     // Reset voice activity tracking
     voiceActivityStartRef.current = null;

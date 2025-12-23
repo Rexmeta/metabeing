@@ -88,6 +88,9 @@ interface RealtimeSession {
   isInterrupted: boolean; // Barge-in flag to suppress audio until new response
   turnSeq: number; // Monotonic turn counter, incremented on each turnComplete
   cancelledTurnSeq: number; // Turn seq when cancel was issued (ignore audio from this turn)
+  messageIndex: number; // Atomic message counter for turnIndex (prevents race conditions)
+  saveQueue: Promise<void>; // Serialization queue for message saves (prevents concurrent index collisions)
+  savedMessageIds: Set<string>; // Idempotent guard: track saved messageIds to prevent duplicates
 }
 
 export class RealtimeVoiceService {
@@ -349,8 +352,25 @@ export class RealtimeVoiceService {
 
     // Get realtime model for tracking
     const realtimeModel = await this.getRealtimeModel();
+    
+    // 🔢 세션 등록 전에 messageIndex 초기화 (경쟁 조건 방지)
+    let initialMessageIndex = 0;
+    try {
+      const parts = conversationId.split('-');
+      let personaRunId = conversationId;
+      if (parts.length >= 11) {
+        personaRunId = parts.slice(5, 10).join('-');
+      }
+      
+      const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId) || [];
+      initialMessageIndex = existingMessages.length;
+      console.log(`🔢 Pre-initialized messageIndex to ${initialMessageIndex} from existing ${existingMessages.length} messages`);
+    } catch (err) {
+      console.warn('⚠️ Failed to pre-initialize messageIndex from DB, starting at 0:', err);
+      initialMessageIndex = 0;
+    }
 
-    // Create session object
+    // Create session object (messageIndex already initialized)
     const session: RealtimeSession = {
       id: sessionId,
       conversationId,
@@ -375,6 +395,9 @@ export class RealtimeVoiceService {
       isInterrupted: false,
       turnSeq: 0, // First turn is 0
       cancelledTurnSeq: -1, // No cancelled turn initially
+      messageIndex: initialMessageIndex, // Atomic message counter - initialized from DB
+      saveQueue: Promise.resolve(), // Serialization queue starts resolved
+      savedMessageIds: new Set<string>(), // Idempotent guard for duplicate message saves
     };
 
     this.sessions.set(sessionId, session);
@@ -795,11 +818,18 @@ export class RealtimeVoiceService {
             transcript: userMessage,
           });
           
-          // ✨ 사용자 메시지 DB 자동 저장 (완전 비동기, 대화 흐름에 영향 없음)
+          // ✨ 사용자 메시지 DB 자동 저장 (직렬화된 큐로 순서 보장, 실패 시 클라이언트 통지)
           const convId = session.conversationId;
-          setImmediate(() => {
-            this.saveMessageToDb(convId, 'user', userMessage, null, null).catch(() => {});
-          });
+          const sessionRef = session;
+          this.queueMessageSave(convId, 'user', userMessage, null, null)
+            .then(() => {
+              console.log(`💾 User message saved from inputTranscription`);
+              this.sendToClient(sessionRef, { type: 'user.message.saved', transcript: userMessage });
+            })
+            .catch(err => {
+              console.error(`❌ Failed to save user message from inputTranscription:`, err);
+              this.sendToClient(sessionRef, { type: 'user.message.failed', transcript: userMessage, error: String(err) });
+            });
           
           session.userTranscriptBuffer = ''; // 버퍼 초기화
         }
@@ -825,8 +855,16 @@ export class RealtimeVoiceService {
                     emotionReason,
                   });
                   
-                  // ✨ AI 메시지 DB 자동 저장 (감정 정보 포함, 완전 비동기)
-                  this.saveMessageToDb(convId, 'ai', filteredTranscript, emotion, emotionReason).catch(() => {});
+                  // ✨ AI 메시지 DB 자동 저장 (감정 정보 포함, 실패 시 클라이언트 통지)
+                  this.queueMessageSave(convId, 'ai', filteredTranscript, emotion, emotionReason)
+                    .then(() => {
+                      console.log(`💾 AI message saved with emotion: ${emotion}`);
+                      this.sendToClient(session, { type: 'ai.message.saved', text: filteredTranscript });
+                    })
+                    .catch(err => {
+                      console.error(`❌ Failed to save AI message:`, err);
+                      this.sendToClient(session, { type: 'ai.message.failed', text: filteredTranscript, error: String(err) });
+                    });
                 })
                 .catch(error => {
                   console.error('❌ Failed to analyze emotion:', error);
@@ -837,8 +875,16 @@ export class RealtimeVoiceService {
                     emotionReason: '감정 분석 실패',
                   });
                   
-                  // ✨ AI 메시지 DB 자동 저장 (기본 감정, 완전 비동기)
-                  this.saveMessageToDb(convId, 'ai', filteredTranscript, '중립', '감정 분석 실패').catch(() => {});
+                  // ✨ AI 메시지 DB 자동 저장 (기본 감정, 실패 시 클라이언트 통지)
+                  this.queueMessageSave(convId, 'ai', filteredTranscript, '중립', '감정 분석 실패')
+                    .then(() => {
+                      console.log(`💾 AI message saved with default emotion`);
+                      this.sendToClient(session, { type: 'ai.message.saved', text: filteredTranscript });
+                    })
+                    .catch(err => {
+                      console.error(`❌ Failed to save AI message:`, err);
+                      this.sendToClient(session, { type: 'ai.message.failed', text: filteredTranscript, error: String(err) });
+                    });
                 });
             });
           }
@@ -1070,28 +1116,52 @@ export class RealtimeVoiceService {
         // 🎤 클라이언트에서 Web Speech API로 전사된 사용자 메시지 저장
         if (message.transcript && message.transcript.trim()) {
           const userTranscript = message.transcript.trim();
-          console.log(`🎤 User message received from client STT: "${userTranscript}"`);
+          const messageId = message.messageId || null; // 클라이언트에서 전달된 메시지 ID
+          console.log(`🎤 User message received from client STT: "${userTranscript}" (id: ${messageId})`);
+          
+          // 🔒 Idempotent guard: 이미 저장된 메시지 ID면 중복 저장 방지
+          if (messageId && session.savedMessageIds.has(messageId)) {
+            console.log(`⏭️ Duplicate message detected (already saved): ${messageId}`);
+            // 이미 저장되었으므로 성공 ACK만 재전송
+            this.sendToClient(session, {
+              type: 'user.message.saved',
+              transcript: userTranscript,
+              messageId: messageId,
+            });
+            break;
+          }
           
           // 사용자 메시지 누적
           session.totalUserTranscriptLength += userTranscript.length;
           
-          // DB에 사용자 메시지 즉시 저장 (비동기, 에러 무시)
-          setImmediate(() => {
-            this.saveMessageToDb(
-              session.conversationId,
-              'user',
-              userTranscript,
-              null,
-              null
-            ).catch(err => {
-              console.error('❌ Failed to save user message:', err);
+          // DB에 사용자 메시지 즉시 저장 (직렬화된 큐 + 재시도 로직 포함)
+          this.queueMessageSave(
+            session.conversationId,
+            'user',
+            userTranscript,
+            null,
+            null,
+            3 // 최대 3번 재시도
+          ).then(() => {
+            // 저장 성공 시 messageId를 savedMessageIds에 추가 (idempotent guard)
+            if (messageId) {
+              session.savedMessageIds.add(messageId);
+            }
+            // 저장 성공 시 클라이언트에 확인 메시지 전송 (messageId 포함)
+            this.sendToClient(session, {
+              type: 'user.message.saved',
+              transcript: userTranscript,
+              messageId: messageId,
             });
-          });
-          
-          // 클라이언트에 확인 메시지 전송
-          this.sendToClient(session, {
-            type: 'user.message.saved',
-            transcript: userTranscript,
+          }).catch(err => {
+            console.error('❌ Final failure saving user message:', err);
+            // 저장 실패 시 클라이언트에 실패 메시지 전송 (messageId 포함)
+            this.sendToClient(session, {
+              type: 'user.message.failed',
+              transcript: userTranscript,
+              messageId: messageId,
+              error: 'Failed to save message after 3 attempts',
+            });
           });
         }
         break;
@@ -1181,51 +1251,92 @@ export class RealtimeVoiceService {
     }
   }
 
-  // ✨ 실시간 대화 메시지를 DB에 자동 저장
-  private async saveMessageToDb(
+  // 🔒 직렬화된 메시지 저장 (세션별 큐 사용으로 동시성 문제 해결)
+  public queueMessageSave(
+    conversationId: string,
+    sender: 'user' | 'ai',
+    message: string,
+    emotion: string | null,
+    emotionReason: string | null,
+    maxRetries: number = 3
+  ): Promise<void> {
+    const session = Array.from(this.sessions.values()).find(s => s.conversationId === conversationId);
+    
+    if (!session) {
+      // 세션이 없으면 직접 저장 시도
+      return this.saveMessageToDbInternal(conversationId, sender, message, emotion, emotionReason, maxRetries, null);
+    }
+    
+    // 세션의 큐에 체인하여 직렬화된 저장 보장
+    const savePromise = session.saveQueue.then(() => 
+      this.saveMessageToDbInternal(conversationId, sender, message, emotion, emotionReason, maxRetries, session)
+    ).catch(err => {
+      console.error(`❌ Queued save failed for ${sender} message:`, err);
+      throw err;
+    });
+    
+    // 큐 업데이트 (다음 저장이 이 저장 완료 후 실행되도록)
+    // 에러가 발생해도 큐가 막히지 않도록 catch로 에러 무시
+    session.saveQueue = savePromise.catch(() => {});
+    
+    return savePromise;
+  }
+
+  // ✨ 실시간 대화 메시지를 DB에 자동 저장 (세션별 atomic 카운터 사용)
+  private async saveMessageToDbInternal(
     conversationId: string, 
     sender: 'user' | 'ai', 
     message: string, 
     emotion: string | null, 
-    emotionReason: string | null
+    emotionReason: string | null,
+    maxRetries: number = 3,
+    session: RealtimeSession | null = null
   ): Promise<void> {
-    try {
-      // conversationId는 sessionId 형식: userId-personaRunId-timestamp
-      // 예: bb0371f6-9706-439d-8416-498a92c65b56-595ecac0-dada-4cdb-940b-d7ae08cb7fd8-1766477162018
-      // UUID는 8-4-4-4-12 형식 (5개 부분)
-      const parts = conversationId.split('-');
-      let personaRunId = conversationId;
-      
-      // 전체 형식: userId(5) + personaRunId(5) + timestamp(1) = 11 parts
-      if (parts.length >= 11) {
-        // 두 번째 UUID (personaRunId) 추출: 인덱스 5-9
-        personaRunId = parts.slice(5, 10).join('-');
-      } else if (parts.length >= 5) {
-        // 짧은 형식의 경우 - 그냥 전달된 대로 시도
-        personaRunId = conversationId;
-      }
-      
-      console.log(`🔍 Extracted personaRunId: ${personaRunId} from conversationId: ${conversationId}`);
-      
-      // 먼저 personaRun 존재 확인
-      const personaRun = await storage.getPersonaRun(personaRunId);
-      if (!personaRun) {
-        // conversationId 전체로 시도
-        const personaRunByConvId = await storage.getPersonaRunByConversationId(conversationId);
-        if (personaRunByConvId) {
-          personaRunId = personaRunByConvId.id;
-        } else {
-          console.log(`⚠️ PersonaRun not found for personaRunId: ${personaRunId}, conversationId: ${conversationId}`);
-          return;
-        }
-      }
-      
-      // 현재 메시지 수 조회하여 turnIndex 결정
-      const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId) || [];
-      const nextTurnIndex = existingMessages.length;
-      
-      // 메시지 저장 (핵심 - 반드시 성공해야 함)
+    // 세션이 전달되지 않았으면 찾기
+    if (!session) {
+      session = Array.from(this.sessions.values()).find(s => s.conversationId === conversationId) || null;
+    }
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        // conversationId는 sessionId 형식: userId-personaRunId-timestamp
+        const parts = conversationId.split('-');
+        let personaRunId = conversationId;
+        
+        // 전체 형식: userId(5) + personaRunId(5) + timestamp(1) = 11 parts
+        if (parts.length >= 11) {
+          personaRunId = parts.slice(5, 10).join('-');
+        } else if (parts.length >= 5) {
+          personaRunId = conversationId;
+        }
+        
+        console.log(`🔍 [Attempt ${attempt}/${maxRetries}] Saving ${sender} message to personaRunId: ${personaRunId}`);
+        
+        // 먼저 personaRun 존재 확인
+        const personaRun = await storage.getPersonaRun(personaRunId);
+        if (!personaRun) {
+          const personaRunByConvId = await storage.getPersonaRunByConversationId(conversationId);
+          if (personaRunByConvId) {
+            personaRunId = personaRunByConvId.id;
+          } else {
+            console.log(`⚠️ PersonaRun not found for personaRunId: ${personaRunId}, conversationId: ${conversationId}`);
+            return;
+          }
+        }
+        
+        // 세션별 atomic messageIndex 사용 (동시성 문제 해결)
+        let nextTurnIndex: number;
+        if (session) {
+          nextTurnIndex = session.messageIndex++;
+          console.log(`🔢 Using session atomic index: ${nextTurnIndex}`);
+        } else {
+          // 세션 없으면 DB 기반 (fallback)
+          const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId) || [];
+          nextTurnIndex = existingMessages.length;
+          console.log(`🔢 Using DB-based index (no session): ${nextTurnIndex}`);
+        }
+        
+        // 메시지 저장
         await storage.createChatMessage({
           personaRunId,
           turnIndex: nextTurnIndex,
@@ -1235,28 +1346,36 @@ export class RealtimeVoiceService {
           emotionReason,
         });
         console.log(`💾 Chat message saved: personaRunId=${personaRunId}, turnIndex=${nextTurnIndex}, sender=${sender}`);
-      } catch (msgError) {
-        console.error(`❌ Failed to save chat message: personaRunId=${personaRunId}`, msgError);
-        return; // 메시지 저장 실패시 종료
+        
+        // 메시지 미리보기 생성 (최대 50자)
+        const messagePreview = message.length > 50 ? message.substring(0, 50) + '...' : message;
+        
+        // persona_run 메신저 필드 업데이트 (선택적)
+        try {
+          await storage.updatePersonaRun(personaRunId, {
+            lastActivityAt: new Date(),
+            lastMessage: messagePreview,
+            turnCount: Math.floor((nextTurnIndex + 1) / 2) + 1,
+            unreadCount: sender === 'ai' ? 1 : 0,
+          });
+          console.log(`📝 PersonaRun metadata updated: personaRunId=${personaRunId}`);
+        } catch (updateError) {
+          console.warn(`⚠️ Failed to update personaRun metadata (message was saved): personaRunId=${personaRunId}`, updateError);
+        }
+        
+        return; // 성공 시 종료
+      } catch (error) {
+        console.error(`❌ [Attempt ${attempt}/${maxRetries}] Failed to save message:`, error);
+        
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 100; // exponential backoff: 200ms, 400ms, 800ms
+          console.log(`⏳ Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          console.error(`❌ All ${maxRetries} attempts failed for ${sender} message.`);
+          throw new Error(`Failed to save ${sender} message after ${maxRetries} attempts`);
+        }
       }
-      
-      // 메시지 미리보기 생성 (최대 50자)
-      const messagePreview = message.length > 50 ? message.substring(0, 50) + '...' : message;
-      
-      // persona_run 메신저 필드 업데이트 (선택적 - 실패해도 메시지는 저장됨)
-      try {
-        await storage.updatePersonaRun(personaRunId, {
-          lastActivityAt: new Date(),
-          lastMessage: messagePreview,
-          turnCount: Math.floor((nextTurnIndex + 1) / 2) + 1,
-          unreadCount: sender === 'ai' ? 1 : 0,
-        });
-        console.log(`📝 PersonaRun metadata updated: personaRunId=${personaRunId}`);
-      } catch (updateError) {
-        console.warn(`⚠️ Failed to update personaRun metadata (message was saved): personaRunId=${personaRunId}`, updateError);
-      }
-    } catch (error) {
-      console.error('❌ Failed to save message to DB:', error);
     }
   }
 
