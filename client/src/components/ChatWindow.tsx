@@ -3,7 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, User, ThumbsUp, ThumbsDown } from "lucide-react";
+import { MessageSquare, User, ThumbsUp, ThumbsDown, Menu, LogOut, UserCircle, X } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -115,6 +122,8 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
   const [isOverlayFading, setIsOverlayFading] = useState(false);
   const [showMicPrompt, setShowMicPrompt] = useState(false); // AI 첫 응답 후 마이크 안내 애니메이션
   const [isInputExpanded, setIsInputExpanded] = useState(false); // 텍스트 입력창 확대 상태
+  const [isChatMenuOpen, setIsChatMenuOpen] = useState(false); // 채팅방 메뉴 열림 상태
+  const [showPersonaInfo, setShowPersonaInfo] = useState(false); // 대화 상대 정보 보기
   const hasUserSpokenRef = useRef(false); // 사용자가 마이크를 사용했는지 추적
   const initialLoadCompletedRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1364,6 +1373,162 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                   <User className="w-4 h-4" />
                 </button>
               </div>
+              
+              {/* 채팅방 메뉴 버튼 */}
+              <Sheet open={isChatMenuOpen} onOpenChange={setIsChatMenuOpen}>
+                <SheetTrigger asChild>
+                  <button
+                    className="ml-2 p-2 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
+                    data-testid="button-chat-menu"
+                    title="채팅방 메뉴"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-80 sm:w-96 p-0">
+                  <div className="flex flex-col h-full">
+                    {/* 메뉴 헤더 */}
+                    <div className="bg-gradient-to-r from-corporate-600 to-corporate-700 px-6 py-4 text-white">
+                      <SheetHeader>
+                        <SheetTitle className="text-white text-lg font-semibold">채팅방 메뉴</SheetTitle>
+                      </SheetHeader>
+                    </div>
+                    
+                    {/* 대화 상대 정보 섹션 */}
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="p-4 border-b">
+                        <div className="flex items-center space-x-4 mb-4">
+                          <Avatar className="w-16 h-16 border-2 border-slate-200 shadow-md">
+                            <AvatarImage 
+                              src={getCharacterImage(currentEmotion) || persona.image} 
+                              alt={persona.name}
+                              className="object-cover object-[center_15%] scale-110"
+                            />
+                            <AvatarFallback className="bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 text-xl">
+                              {persona.name.slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-lg truncate">{persona.name}</h3>
+                            <p className="text-sm text-muted-foreground">{persona.role}</p>
+                            {persona.department && (
+                              <p className="text-xs text-muted-foreground">{persona.department}</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* 대화 상대 상세 정보 토글 */}
+                        <button
+                          onClick={() => setShowPersonaInfo(!showPersonaInfo)}
+                          className="w-full flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800 hover-elevate transition-all"
+                          data-testid="button-toggle-persona-info"
+                        >
+                          <div className="flex items-center gap-2">
+                            <UserCircle className="w-5 h-5 text-corporate-600" />
+                            <span className="font-medium">대화 상대 정보</span>
+                          </div>
+                          <span className={`transform transition-transform ${showPersonaInfo ? 'rotate-180' : ''}`}>▼</span>
+                        </button>
+                        
+                        {showPersonaInfo && (
+                          <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-3 text-sm">
+                            <div>
+                              <span className="font-medium text-muted-foreground">이름:</span>
+                              <span className="ml-2">{persona.name}</span>
+                            </div>
+                            {persona.role && (
+                              <div>
+                                <span className="font-medium text-muted-foreground">역할:</span>
+                                <span className="ml-2">{persona.role}</span>
+                              </div>
+                            )}
+                            {persona.department && (
+                              <div>
+                                <span className="font-medium text-muted-foreground">부서:</span>
+                                <span className="ml-2">{persona.department}</span>
+                              </div>
+                            )}
+                            {persona.mbti && (
+                              <div>
+                                <span className="font-medium text-muted-foreground">MBTI:</span>
+                                <span className="ml-2">{persona.mbti}</span>
+                              </div>
+                            )}
+                            {persona.personality && (
+                              <div>
+                                <span className="font-medium text-muted-foreground">성격:</span>
+                                <p className="mt-1 text-muted-foreground">{persona.personality}</p>
+                              </div>
+                            )}
+                            {personaStats?.creatorName && (
+                              <div>
+                                <span className="font-medium text-muted-foreground">제작자:</span>
+                                <span className="ml-2">@{personaStats.creatorName}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-4 pt-2 border-t">
+                              <div className="flex items-center gap-1">
+                                <ThumbsUp className="w-4 h-4 text-green-600" />
+                                <span>{formatSNSNumber(personaStats?.likesCount || 0)}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <ThumbsDown className="w-4 h-4 text-red-600" />
+                                <span>{formatSNSNumber(personaStats?.dislikesCount || 0)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* 시나리오 정보 */}
+                      {scenario && (
+                        <div className="p-4 border-b">
+                          <h4 className="font-medium text-sm text-muted-foreground mb-2">시나리오</h4>
+                          <p className="font-medium">{scenario.title}</p>
+                          {scenario.description && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{scenario.description}</p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* 대화 통계 */}
+                      <div className="p-4 border-b">
+                        <h4 className="font-medium text-sm text-muted-foreground mb-3">대화 정보</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg text-center">
+                            <div className="text-2xl font-bold text-corporate-600">{currentTurnCount}</div>
+                            <div className="text-xs text-muted-foreground">현재 턴</div>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg text-center">
+                            <div className="text-2xl font-bold text-corporate-600">{maxTurns}</div>
+                            <div className="text-xs text-muted-foreground">최대 턴</div>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg text-center col-span-2">
+                            <div className="text-2xl font-bold text-corporate-600">{formatElapsedTime(elapsedTime)}</div>
+                            <div className="text-xs text-muted-foreground">경과 시간</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* 하단 액션 버튼들 */}
+                    <div className="p-4 border-t bg-slate-50 dark:bg-slate-900 space-y-2">
+                      <Button
+                        variant="destructive"
+                        className="w-full"
+                        onClick={() => {
+                          setIsChatMenuOpen(false);
+                          setShowEndConversationDialog(true);
+                        }}
+                        data-testid="button-leave-chat"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        채팅방 나가기
+                      </Button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
           
