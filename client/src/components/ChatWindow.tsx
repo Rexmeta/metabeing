@@ -1925,126 +1925,6 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                 )}
               </div>
 
-              {/* Chat Controls & Info */}
-              <div className="mt-8 space-y-5 px-2">
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-slate-700 text-sm flex items-center">
-                        <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center mr-2 group-hover:scale-110 transition-transform duration-300">
-                          <i className="fas fa-stopwatch text-blue-600 text-sm"></i>
-                        </div>
-                        경과 시간
-                      </h4>
-                    </div>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent" data-testid="sidebar-elapsed-time">
-                      {formatElapsedTime(elapsedTime)}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-                      <span className={`w-2 h-2 rounded-full ${
-                        elapsedTime < 300 ? 'bg-green-400' : 
-                        elapsedTime < 600 ? 'bg-blue-400' : 
-                        elapsedTime < 900 ? 'bg-amber-400' : 'bg-red-400'
-                      }`}></span>
-                      {elapsedTime < 300 ? '효율적으로 진행 중' : 
-                       elapsedTime < 600 ? '적절한 속도' : 
-                       elapsedTime < 900 ? '시간 관리 주의' : '신속한 마무리 권장'}
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-slate-700 text-sm flex items-center">
-                        <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center mr-2 group-hover:scale-110 transition-transform duration-300">
-                          <i className="fas fa-sync-alt text-amber-600 text-sm"></i>
-                        </div>
-                        남은 턴
-                      </h4>
-                    </div>
-                    <p className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-amber-500 bg-clip-text text-transparent">{maxTurns - currentTurnCount}</p>
-                    <p className="text-xs text-slate-500 mt-2">턴이 끝나면 자동으로 평가됩니다</p>
-                  </div>
-                  <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300 group">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-slate-700 text-sm flex items-center">
-                        <div className="w-8 h-8 bg-green-100 rounded-xl flex items-center justify-center mr-2 group-hover:scale-110 transition-transform duration-300">
-                          <i className="fas fa-chart-line text-green-600 text-sm"></i>
-                        </div>
-                        현재 점수
-                      </h4>
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        currentScore >= 80 ? 'bg-green-100 text-green-700' :
-                        currentScore >= 60 ? 'bg-blue-100 text-blue-700' :
-                        currentScore >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                      }`}>
-                        {currentScore >= 80 ? '우수' :
-                         currentScore >= 60 ? '보통' :
-                         currentScore >= 40 ? '개선 필요' : '미흡'}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-green-500 bg-clip-text text-transparent">{currentScore}<span className="text-lg text-slate-400">/100</span></p>
-                      <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                        <div 
-                          className={`h-2.5 rounded-full transition-all duration-700 ease-out ${
-                            currentScore >= 80 ? 'bg-gradient-to-r from-green-400 to-green-500' :
-                            currentScore >= 60 ? 'bg-gradient-to-r from-blue-400 to-blue-500' :
-                            currentScore >= 40 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' : 'bg-gradient-to-r from-red-400 to-red-500'
-                          }`}
-                          style={{ width: `${Math.max(3, currentScore)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300">
-                  <h4 className="font-semibold text-slate-700 mb-4 flex items-center text-sm">
-                    <div className="w-8 h-8 bg-corporate-100 rounded-xl flex items-center justify-center mr-2">
-                      <i className="fas fa-user-tie text-corporate-600 text-sm"></i>
-                    </div>
-                    당신의 역할과 목표
-                  </h4>
-                  <div className="text-sm grid md:grid-cols-2 gap-4">
-                    {scenario.context?.playerRole?.responsibility && (
-                      <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-xl p-4">
-                        <div className="text-xs font-semibold text-corporate-600 mb-2 flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <i className="fas fa-id-badge"></i>
-                            당신의 역할
-                          </span>
-                          <span className="text-slate-500 font-normal bg-white px-2 py-0.5 rounded-full">
-                            {scenario.context.playerRole.position}
-                          </span>
-                        </div>
-                        <div className="text-slate-700 leading-relaxed">
-                          {scenario.context.playerRole.responsibility}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {scenario.objectives && scenario.objectives.length > 0 && (
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100/30 rounded-xl p-4">
-                        <div className="text-xs font-semibold text-blue-600 mb-2 flex items-center gap-1.5">
-                          <i className="fas fa-bullseye"></i>
-                          달성 목표
-                        </div>
-                        <div className="space-y-2">
-                          {scenario.objectives.slice(0, 2).map((objective: string, index: number) => (
-                            <div key={index} className="flex items-start gap-2">
-                              <span className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{index + 1}</span>
-                              <span className="flex-1 text-slate-700 leading-relaxed">{objective}</span>
-                            </div>
-                          ))}
-                          {scenario.objectives.length > 2 && (
-                            <div className="text-xs text-slate-500 pl-7">
-                              +{scenario.objectives.length - 2}개 목표 더...
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
@@ -2067,10 +1947,6 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                     <span className="flex items-center" data-testid="text-elapsed-time-sidebar">
                       <i className="fas fa-clock mr-1"></i>
                       {formatElapsedTime(elapsedTime)}
-                    </span>
-                    <span className="flex items-center" data-testid="text-remaining-turns-sidebar">
-                      <i className="fas fa-redo mr-1"></i>
-                      {Math.max(0, maxTurns - (conversation?.turnCount ?? 0))}턴 남음
                     </span>
                   </div>
                 </div>
@@ -2154,16 +2030,11 @@ export default function ChatWindow({ scenario, persona, conversationId, onChatCo
                         </span>
                       )}
                     </div>
-                    {/* Time, Turn Info and Voice Toggle */}
+                    {/* Time and Voice Toggle */}
                     <div className="flex items-center space-x-2 text-xs text-slate-500">
                       <span className="flex items-center" data-testid="text-elapsed-time">
                         <i className="fas fa-clock mr-1 text-xs"></i>
                         {formatElapsedTime(elapsedTime)}
-                      </span>
-                      <span className="text-slate-300">•</span>
-                      <span className="flex items-center" data-testid="text-remaining-turns">
-                        <i className="fas fa-redo mr-1 text-xs"></i>
-                        {Math.max(0, maxTurns - (conversation?.turnCount ?? 0))}턴 남음
                       </span>
                     </div>
                   </div>
