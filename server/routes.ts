@@ -757,8 +757,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         personaName,
         personaSnapshot,
         phase: 1,
-        status: 'active',
-        conversationId: null // 페르소나 직접 대화는 conversations 테이블을 사용하지 않음
+        status: 'active'
+        // conversationId 생략 - 페르소나 직접 대화는 conversations 테이블을 사용하지 않음 (nullable이므로 자동 null)
       });
       
       console.log(`✅ DB에 페르소나 대화 저장: scenarioRunId=${scenarioRun.id}, personaRunId=${personaRun.id}`);
