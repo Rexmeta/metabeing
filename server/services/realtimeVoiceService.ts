@@ -787,12 +787,20 @@ export class RealtimeVoiceService {
         });
 
         // 사용자 발화가 완료되었다면 transcript를 전송 (VAD에 의한 자동 턴 구분)
-        if (session.userTranscriptBuffer.trim()) {
-          console.log(`🎤 User turn complete (VAD): "${session.userTranscriptBuffer.trim()}"`);
+        const userMessage = session.userTranscriptBuffer.trim();
+        if (userMessage) {
+          console.log(`🎤 User turn complete (VAD): "${userMessage}"`);
           this.sendToClient(session, {
             type: 'user.transcription',
-            transcript: session.userTranscriptBuffer.trim(),
+            transcript: userMessage,
           });
+          
+          // ✨ 사용자 메시지 DB 자동 저장 (완전 비동기, 대화 흐름에 영향 없음)
+          const convId = session.conversationId;
+          setImmediate(() => {
+            this.saveMessageToDb(convId, 'user', userMessage, null, null).catch(() => {});
+          });
+          
           session.userTranscriptBuffer = ''; // 버퍼 초기화
         }
 
@@ -805,6 +813,7 @@ export class RealtimeVoiceService {
           if (filteredTranscript) {
             // setImmediate로 감정 분석을 비동기화하여 이벤트 루프 블로킹 방지
             // 대화 품질에 영향 없이 동시 접속 처리량 향상
+            const convId = session.conversationId;
             setImmediate(() => {
               this.analyzeEmotion(filteredTranscript, session.personaName)
                 .then(({ emotion, emotionReason }) => {
@@ -815,6 +824,9 @@ export class RealtimeVoiceService {
                     emotion,
                     emotionReason,
                   });
+                  
+                  // ✨ AI 메시지 DB 자동 저장 (감정 정보 포함, 완전 비동기)
+                  this.saveMessageToDb(convId, 'ai', filteredTranscript, emotion, emotionReason).catch(() => {});
                 })
                 .catch(error => {
                   console.error('❌ Failed to analyze emotion:', error);
@@ -824,6 +836,9 @@ export class RealtimeVoiceService {
                     emotion: '중립',
                     emotionReason: '감정 분석 실패',
                   });
+                  
+                  // ✨ AI 메시지 DB 자동 저장 (기본 감정, 완전 비동기)
+                  this.saveMessageToDb(convId, 'ai', filteredTranscript, '중립', '감정 분석 실패').catch(() => {});
                 });
             });
           }
