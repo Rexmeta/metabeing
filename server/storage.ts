@@ -1004,7 +1004,12 @@ export class PostgreSQLStorage implements IStorage {
       return personaRun;
     }, 3, 100);
     
+    // returning()이 실패해도 업데이트는 성공했을 수 있으므로 다시 조회
     if (!result) {
+      const existing = await this.getPersonaRun(id);
+      if (existing) {
+        return existing;
+      }
       throw new Error("PersonaRun not found");
     }
     return result;
