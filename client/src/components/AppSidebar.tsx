@@ -87,7 +87,7 @@ const myContentItems = [
   },
   {
     title: "콘텐츠 관리",
-    url: "/library?tab=scenarios",
+    url: "/admin-management",
     icon: Cog,
     requiresAuth: true,
   },
