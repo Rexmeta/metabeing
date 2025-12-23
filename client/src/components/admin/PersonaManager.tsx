@@ -327,6 +327,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/personas'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/personas/public'] });
       setIsCreateOpen(false);
       resetForm();
       toast({
@@ -350,6 +351,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/personas'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/personas/public'] });
       
       // 이미지 자동 저장인 경우 다이얼로그 유지, 수동 저장인 경우만 닫기
       if (!autoSavingRef.current) {
@@ -380,6 +382,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/personas'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/personas/public'] });
       setDeletingPersona(null);
       toast({
         title: "성공",

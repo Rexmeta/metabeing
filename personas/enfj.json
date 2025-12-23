@@ -50,5 +50,44 @@
     "emotion": "공감과 열정"
   },
   "ownerId": "bb0371f6-9706-439d-8416-498a92c65b56",
-  "visibility": "public"
+  "visibility": "public",
+  "name": "Zeus",
+  "department": "",
+  "position": "",
+  "experience": "",
+  "stance": "",
+  "goal": "",
+  "tradeoff": "",
+  "images": {
+    "base": "/personas/enfj/female/neutral.webp?t=1766493810709",
+    "style": "",
+    "male": {
+      "expressions": {
+        "중립": "",
+        "기쁨": "",
+        "슬픔": "",
+        "분노": "",
+        "놀람": "",
+        "호기심": "",
+        "불안": "",
+        "단호": "",
+        "실망": "",
+        "당혹": ""
+      }
+    },
+    "female": {
+      "expressions": {
+        "중립": "/personas/enfj/female/neutral.webp?t=1766493810709",
+        "기쁨": "",
+        "슬픔": "",
+        "분노": "",
+        "놀람": "",
+        "호기심": "",
+        "불안": "",
+        "단호": "",
+        "실망": "",
+        "당혹": ""
+      }
+    }
+  }
 }
