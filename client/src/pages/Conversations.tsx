@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { MessageCircle, User } from "lucide-react";
+import { MessageCircle, User, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface ActiveConversation {
   id: string;
@@ -23,9 +25,33 @@ interface ActiveConversation {
 }
 
 export default function Conversations() {
+  const { toast } = useToast();
   const { data: activeConversations, isLoading, refetch } = useQuery<ActiveConversation[]>({
     queryKey: ["/api/active-conversations"],
     refetchInterval: 10000, // 10초마다 자동 리페치
+  });
+
+  // 대화방 닫기 mutation
+  const closeMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      return await apiRequest(`/api/conversations/${conversationId}/close`, {
+        method: "POST",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/active-conversations"] });
+      toast({
+        title: "대화방 닫힘",
+        description: "대화방이 목록에서 제거되었습니다.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "오류",
+        description: "대화방을 닫는데 실패했습니다.",
+        variant: "destructive",
+      });
+    },
   });
 
   // 페르소나 정보 조회 (이미지용)
@@ -126,7 +152,7 @@ export default function Conversations() {
                   </div>
 
                   {/* 액션 버튼 (호버시 표시) */}
-                  <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="outline"
                       size="sm"
@@ -135,8 +161,25 @@ export default function Conversations() {
                         e.preventDefault();
                         window.location.href = `/chat/${conv.id}`;
                       }}
+                      data-testid={`button-view-conversation-${conv.id}`}
                     >
                       보기
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (confirm("대화방을 닫으시겠습니까? 목록에서 제거됩니다.")) {
+                          closeMutation.mutate(conv.id);
+                        }
+                      }}
+                      disabled={closeMutation.isPending}
+                      data-testid={`button-close-conversation-${conv.id}`}
+                    >
+                      <X className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>

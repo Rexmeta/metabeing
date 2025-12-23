@@ -2,7 +2,7 @@ import { type Conversation, type InsertConversation, type Feedback, type InsertF
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, asc, desc, inArray, and, gte, lte, sql as sqlBuilder, count, sum, isNotNull } from "drizzle-orm";
+import { eq, asc, desc, inArray, and, gte, lte, sql as sqlBuilder, count, sum, isNotNull, isNull, or, gt } from "drizzle-orm";
 const sql = sqlBuilder;
 
 // Initialize database connection
@@ -1027,10 +1027,8 @@ export class PostgreSQLStorage implements IStorage {
       const scenarioRunIds = userScenarioRuns.map(sr => sr.id);
       const scenarioRunMap = new Map(userScenarioRuns.map(sr => [sr.id, sr]));
 
-      // 2. active persona runs 가져오기 + 최근 완료된 대화 (각 scenarioRunId별로 개별 쿼리 - Neon 안정성)
+      // 2. 닫히지 않은 persona runs 가져오기 (closedAt IS NULL - 상태 무관)
       let activePersonaRuns: PersonaRun[] = [];
-      const RECENT_COMPLETED_HOURS = 24; // 최근 24시간
-      const recentCutoffTime = new Date(Date.now() - RECENT_COMPLETED_HOURS * 60 * 60 * 1000);
       
       for (const scenarioRunId of scenarioRunIds) {
         try {
@@ -1039,14 +1037,8 @@ export class PostgreSQLStorage implements IStorage {
             .from(personaRuns)
             .where(and(
               eq(personaRuns.scenarioRunId, scenarioRunId),
-              // ✨ 'active' 상태 OR (최근 완료된 대화)
-              or(
-                eq(personaRuns.status, 'active'),
-                and(
-                  eq(personaRuns.status, 'completed'),
-                  gt(personaRuns.completedAt, recentCutoffTime)
-                )
-              )
+              // ✨ 사용자가 명시적으로 닫지 않은 대화만 (closedAt IS NULL)
+              isNull(personaRuns.closedAt)
             ));
           if (result && Array.isArray(result)) {
             activePersonaRuns.push(...result);

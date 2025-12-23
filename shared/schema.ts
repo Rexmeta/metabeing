@@ -158,6 +158,7 @@ export const personaRuns = pgTable("persona_runs", {
   startedAt: timestamp("started_at").notNull().default(sql`CURRENT_TIMESTAMP`), // 첫 생성 시간
   actualStartedAt: timestamp("actual_started_at").notNull().default(sql`CURRENT_TIMESTAMP`), // 실제 대화 시작/재개 시간 (매 재개마다 업데이트)
   completedAt: timestamp("completed_at"),
+  closedAt: timestamp("closed_at"), // 사용자가 명시적으로 대화방 닫은 시간 (null이면 목록에 표시)
 }, (table) => [
   index("idx_persona_runs_scenario_run_id").on(table.scenarioRunId),
   index("idx_persona_runs_persona_id").on(table.personaId),

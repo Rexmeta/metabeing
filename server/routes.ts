@@ -1921,6 +1921,37 @@ ${personaSnapshot.name}:`;
     }
   });
 
+  // Close conversation (대화방 닫기 - 목록에서 제거)
+  app.post("/api/conversations/:id/close", isAuthenticated, async (req, res) => {
+    try {
+      // @ts-ignore - req.user는 auth 미들웨어에서 설정됨
+      const userId = req.user?.id;
+      const personaRunId = req.params.id;
+      
+      const personaRun = await storage.getPersonaRun(personaRunId);
+      if (!personaRun) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      // 권한 확인
+      const scenarioRun = await storage.getScenarioRun(personaRun.scenarioRunId);
+      if (!scenarioRun || scenarioRun.userId !== userId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      // closedAt 설정
+      const updated = await storage.updatePersonaRun(personaRunId, {
+        closedAt: new Date()
+      });
+      
+      console.log(`대화방 닫힘: ${personaRunId}`);
+      res.json({ success: true, closedAt: updated.closedAt });
+    } catch (error) {
+      console.error("Error closing conversation:", error);
+      res.status(500).json({ error: "Failed to close conversation" });
+    }
+  });
+
   // Delete scenario run (cascade deletes persona_runs and chat_messages)
   app.delete("/api/scenario-runs/:id", isAuthenticated, async (req, res) => {
     try {
