@@ -39,6 +39,8 @@ interface Scenario {
   categoryId?: string;
   image?: string;
   status?: string;
+  visibility?: "public" | "private";
+  ownerId?: string;
 }
 
 interface Bookmark {
@@ -92,9 +94,9 @@ export default function Library() {
   };
 
   const { data: myScenarios = [], isLoading: loadingScens } = useQuery<Scenario[]>({
-    queryKey: ["/api/admin/scenarios"],
+    queryKey: ["/api/scenarios/mine"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/scenarios", { 
+      const res = await fetch("/api/scenarios/mine", { 
         credentials: "include",
         headers: getAuthHeaders(),
       });
@@ -137,7 +139,8 @@ export default function Library() {
       if (!res.ok) throw new Error("삭제 실패");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/scenarios"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scenarios/mine"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scenarios/public"] });
       toast({ title: "삭제됨", description: "시나리오가 삭제되었습니다." });
       setDeleteDialog(null);
     },
@@ -186,6 +189,33 @@ export default function Library() {
       toast({ 
         title: variables.visibility === "public" ? "공개됨" : "비공개됨", 
         description: `페르소나가 ${variables.visibility === "public" ? "공개" : "비공개"}로 변경되었습니다.` 
+      });
+    },
+    onError: () => {
+      toast({ title: "오류", description: "변경에 실패했습니다.", variant: "destructive" });
+    },
+  });
+
+  const updateScenarioVisibilityMutation = useMutation({
+    mutationFn: async ({ id, visibility }: { id: string; visibility: "public" | "private" }) => {
+      const res = await fetch(`/api/admin/scenarios/${id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ visibility }),
+      });
+      if (!res.ok) throw new Error("변경 실패");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scenarios/mine"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scenarios/public"] });
+      toast({ 
+        title: variables.visibility === "public" ? "공개됨" : "비공개됨", 
+        description: `시나리오가 ${variables.visibility === "public" ? "공개" : "비공개"}로 변경되었습니다.` 
       });
     },
     onError: () => {
@@ -375,11 +405,11 @@ export default function Library() {
             <div className="flex justify-end gap-2 mb-4">
               <AIScenarioGenerator 
                 onGenerated={(data) => {
-                  queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
-                  queryClient.invalidateQueries({ queryKey: ['/api/scenarios'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/scenarios/mine'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/scenarios/public'] });
                   toast({
                     title: "성공",
-                    description: "AI가 시나리오를 생성했습니다. 콘텐츠 관리에서 확인하세요."
+                    description: "AI가 시나리오를 생성했습니다."
                   });
                 }} 
               />
@@ -391,8 +421,8 @@ export default function Library() {
                   </Button>
                 }
                 onSuccess={() => {
-                  queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
-                  queryClient.invalidateQueries({ queryKey: ['/api/scenarios'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/scenarios/mine'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/scenarios/public'] });
                 }}
               />
             </div>
@@ -407,49 +437,82 @@ export default function Library() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {myScenarios.map((scen) => (
-                  <Card key={scen.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base line-clamp-1">{scen.title}</CardTitle>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {scen.difficulty && (
-                              <Badge variant="outline">Lv.{scen.difficulty}</Badge>
-                            )}
-                            {scen.estimatedTime && (
-                              <Badge variant="secondary">{scen.estimatedTime}</Badge>
-                            )}
+                {myScenarios.map((scen) => {
+                  const isScenPublic = scen.visibility === "public";
+                  return (
+                    <Card key={scen.id}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-base line-clamp-1">{scen.title}</CardTitle>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              {scen.visibility === "private" ? (
+                                <Badge variant="secondary"><EyeOff className="h-3 w-3 mr-1" />비공개</Badge>
+                              ) : (
+                                <Badge variant="outline"><Eye className="h-3 w-3 mr-1" />공개</Badge>
+                              )}
+                              {scen.difficulty && (
+                                <Badge variant="outline">Lv.{scen.difficulty}</Badge>
+                              )}
+                              {scen.estimatedTime && (
+                                <Badge variant="secondary">{scen.estimatedTime}</Badge>
+                              )}
+                            </div>
                           </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem 
+                                onClick={() => setLocation(`/content-management?tab=manage-scenarios&edit=${scen.id}`)}
+                                data-testid={`button-edit-scenario-${scen.id}`}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" /> 수정
+                              </DropdownMenuItem>
+                              {isScenPublic ? (
+                                <DropdownMenuItem 
+                                  onClick={() => updateScenarioVisibilityMutation.mutate({ id: scen.id, visibility: "private" })}
+                                  data-testid={`button-private-scenario-${scen.id}`}
+                                >
+                                  <EyeOff className="h-4 w-4 mr-2" /> 비공개로 전환
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem 
+                                  onClick={() => updateScenarioVisibilityMutation.mutate({ id: scen.id, visibility: "public" })}
+                                  data-testid={`button-public-scenario-${scen.id}`}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" /> 공개로 전환
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem 
+                                onClick={() => setDeleteDialog({ type: "scenario", id: scen.id, name: scen.title })} 
+                                className="text-red-600"
+                                data-testid={`button-delete-scenario-${scen.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> 삭제
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setDeleteDialog({ type: "scenario", id: scen.id, name: scen.title })} className="text-red-600">
-                              <Trash2 className="h-4 w-4 mr-2" /> 삭제
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {scen.description || "설명 없음"}
-                      </p>
-                      {scen.skills && scen.skills.length > 0 && (
-                        <div className="flex items-center gap-1 mt-3 flex-wrap">
-                          {scen.skills.slice(0, 3).map((skill, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {scen.description || "설명 없음"}
+                        </p>
+                        {scen.skills && scen.skills.length > 0 && (
+                          <div className="flex items-center gap-1 mt-3 flex-wrap">
+                            {scen.skills.slice(0, 3).map((skill, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>

@@ -3538,6 +3538,35 @@ ${personaSnapshot.name}:`;
     }
   });
 
+  // 사용자 본인의 시나리오만 반환 (라이브러리용)
+  app.get("/api/scenarios/mine", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const scenarios = await fileManager.getAllScenarios();
+      const myScenarios = scenarios.filter(
+        (s: any) => s.ownerId === userId && s.id
+      );
+      res.json(myScenarios);
+    } catch (error) {
+      console.error("Error getting my scenarios:", error);
+      res.status(500).json({ error: "Failed to get my scenarios" });
+    }
+  });
+
+  // 공개 시나리오만 반환 (탐색 페이지용)
+  app.get("/api/scenarios/public", async (req, res) => {
+    try {
+      const scenarios = await fileManager.getAllScenarios();
+      const publicScenarios = scenarios.filter(
+        (s: any) => s.visibility !== "private" && s.id
+      );
+      res.json(publicScenarios);
+    } catch (error) {
+      console.error("Error getting public scenarios:", error);
+      res.status(500).json({ error: "Failed to get public scenarios" });
+    }
+  });
+
   // Admin API routes for scenario and persona management
   
   // 운영자/관리자 권한 확인 미들웨어
