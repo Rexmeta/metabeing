@@ -786,13 +786,18 @@ export class RealtimeVoiceService {
           type: 'response.done',
         });
 
-        // 사용자 발화가 완료되었다면 transcript를 전송 (VAD에 의한 자동 턴 구분)
-        if (session.userTranscriptBuffer.trim()) {
-          console.log(`🎤 User turn complete (VAD): "${session.userTranscriptBuffer.trim()}"`);
+        // 사용자 발화가 완료되었다면 transcript를 전송하고 DB에 저장
+        const userMessage = session.userTranscriptBuffer.trim();
+        if (userMessage) {
+          console.log(`🎤 User turn complete (VAD): "${userMessage}"`);
           this.sendToClient(session, {
             type: 'user.transcription',
-            transcript: session.userTranscriptBuffer.trim(),
+            transcript: userMessage,
           });
+          
+          // ✨ 사용자 메시지 DB 자동 저장
+          this.saveMessageToDb(session.conversationId, 'user', userMessage, null, null);
+          
           session.userTranscriptBuffer = ''; // 버퍼 초기화
         }
 
@@ -805,6 +810,7 @@ export class RealtimeVoiceService {
           if (filteredTranscript) {
             // setImmediate로 감정 분석을 비동기화하여 이벤트 루프 블로킹 방지
             // 대화 품질에 영향 없이 동시 접속 처리량 향상
+            const conversationId = session.conversationId; // 클로저에서 사용
             setImmediate(() => {
               this.analyzeEmotion(filteredTranscript, session.personaName)
                 .then(({ emotion, emotionReason }) => {
@@ -815,6 +821,9 @@ export class RealtimeVoiceService {
                     emotion,
                     emotionReason,
                   });
+                  
+                  // ✨ AI 메시지 DB 자동 저장 (감정 정보 포함)
+                  this.saveMessageToDb(conversationId, 'ai', filteredTranscript, emotion, emotionReason);
                 })
                 .catch(error => {
                   console.error('❌ Failed to analyze emotion:', error);
@@ -824,6 +833,9 @@ export class RealtimeVoiceService {
                     emotion: '중립',
                     emotionReason: '감정 분석 실패',
                   });
+                  
+                  // ✨ AI 메시지 DB 자동 저장 (기본 감정)
+                  this.saveMessageToDb(conversationId, 'ai', filteredTranscript, '중립', '감정 분석 실패');
                 });
             });
           }
@@ -1133,6 +1145,65 @@ export class RealtimeVoiceService {
   private sendToClient(session: RealtimeSession, message: any): void {
     if (session.clientWs && session.clientWs.readyState === WebSocket.OPEN) {
       session.clientWs.send(JSON.stringify(message));
+    }
+  }
+
+  // ✨ 실시간 대화 메시지를 DB에 자동 저장
+  private async saveMessageToDb(
+    conversationId: string, 
+    sender: 'user' | 'ai', 
+    message: string, 
+    emotion: string | null, 
+    emotionReason: string | null
+  ): Promise<void> {
+    try {
+      // conversationId는 sessionId 형식 (예: uuid-uuid-timestamp)이므로 파싱 필요
+      // 실제 personaRunId를 추출 (첫 번째 UUID 부분)
+      const parts = conversationId.split('-');
+      let personaRunId = conversationId;
+      
+      // UUID 형식인지 확인 (8-4-4-4-12)
+      if (parts.length >= 5) {
+        // 첫 번째 UUID 추출 시도
+        personaRunId = parts.slice(0, 5).join('-');
+      }
+      
+      // 먼저 personaRun 존재 확인
+      const personaRun = await storage.getPersonaRun(personaRunId);
+      if (!personaRun) {
+        // conversationId 전체로 시도
+        const personaRunByConvId = await storage.getPersonaRunByConversationId(conversationId);
+        if (personaRunByConvId) {
+          personaRunId = personaRunByConvId.id;
+        } else {
+          console.log(`⚠️ PersonaRun not found for conversationId: ${conversationId}`);
+          return;
+        }
+      }
+      
+      // 현재 메시지 수 조회하여 turnIndex 결정
+      const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId) || [];
+      const nextTurnIndex = existingMessages.length;
+      
+      // 메시지 저장
+      await storage.createChatMessage({
+        personaRunId,
+        turnIndex: nextTurnIndex,
+        sender,
+        message,
+        emotion,
+        emotionReason,
+      });
+      
+      // persona_run lastActivityAt 업데이트
+      await storage.updatePersonaRun(personaRunId, {
+        lastActivityAt: new Date(),
+        turnCount: Math.floor((nextTurnIndex + 1) / 2) + 1,
+      });
+      
+      console.log(`💾 Auto-saved ${sender} message to DB: personaRunId=${personaRunId}, turnIndex=${nextTurnIndex}`);
+    } catch (error) {
+      console.error('❌ Failed to save message to DB:', error);
     }
   }
 
