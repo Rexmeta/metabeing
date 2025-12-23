@@ -9,6 +9,25 @@ const sql = sqlBuilder;
 const neonClient = neon(process.env.DATABASE_URL!);
 export const db = drizzle(neonClient);
 
+// Neon HTTP 드라이버 재시도 유틸리티
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delay = 100): Promise<T> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const result = await fn();
+      if (result !== null && result !== undefined) {
+        return result;
+      }
+      if (i < retries) {
+        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+      }
+    } catch (error) {
+      if (i === retries) throw error;
+      await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+    }
+  }
+  return await fn();
+}
+
 export interface IStorage {
   // Conversations (레거시)
   createConversation(conversation: InsertConversation): Promise<Conversation>;
@@ -882,8 +901,18 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getPersonaRunByConversationId(conversationId: string): Promise<PersonaRun | undefined> {
-    const [personaRun] = await db.select().from(personaRuns).where(eq(personaRuns.conversationId, conversationId));
-    return personaRun;
+    try {
+      const result = await withRetry(async () => {
+        return await db.select().from(personaRuns).where(eq(personaRuns.conversationId, conversationId));
+      });
+      if (!result || !Array.isArray(result) || result.length === 0) {
+        return undefined;
+      }
+      return result[0];
+    } catch (error) {
+      console.error('Error in getPersonaRunByConversationId:', error);
+      return undefined;
+    }
   }
 
   async updatePersonaRun(id: string, updates: Partial<PersonaRun>): Promise<PersonaRun> {
@@ -904,50 +933,69 @@ export class PostgreSQLStorage implements IStorage {
 
   async getActivePersonaRunsWithLastMessage(userId: string): Promise<(PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[]> {
     try {
-      // 1. 해당 유저의 active persona runs와 마지막 메시지를 함께 가져오기
-      const activeRuns = await db
-        .select({
-          personaRun: personaRuns,
-          scenarioRun: scenarioRuns
-        })
-        .from(personaRuns)
-        .innerJoin(scenarioRuns, eq(personaRuns.scenarioRunId, scenarioRuns.id))
-        .where(and(
-          eq(scenarioRuns.userId, userId),
-          eq(personaRuns.status, 'active')
-        ))
-        .orderBy(desc(personaRuns.actualStartedAt));
+      // 1. 해당 유저의 active persona runs와 마지막 메시지를 함께 가져오기 (재시도 포함)
+      let activeRuns: { personaRun: PersonaRun; scenarioRun: ScenarioRun }[] = [];
+      try {
+        activeRuns = await withRetry(async () => {
+          const result = await db
+            .select({
+              personaRun: personaRuns,
+              scenarioRun: scenarioRuns
+            })
+            .from(personaRuns)
+            .innerJoin(scenarioRuns, eq(personaRuns.scenarioRunId, scenarioRuns.id))
+            .where(and(
+              eq(scenarioRuns.userId, userId),
+              eq(personaRuns.status, 'active')
+            ))
+            .orderBy(desc(personaRuns.actualStartedAt));
+          return result;
+        });
+      } catch (queryError) {
+        console.error('Query error in getActivePersonaRunsWithLastMessage (step 1):', queryError);
+        return [];
+      }
 
-      if (!activeRuns || activeRuns.length === 0) {
+      if (!activeRuns || !Array.isArray(activeRuns) || activeRuns.length === 0) {
         return [];
       }
 
       // 2. 모든 active persona run IDs 수집
-      const personaRunIds = activeRuns.map(r => r.personaRun.id).filter(id => id != null);
+      const personaRunIds = activeRuns.map(r => r.personaRun?.id).filter(id => id != null) as string[];
 
       if (personaRunIds.length === 0) {
         return [];
       }
 
-      // 3. 각 persona run의 마지막 메시지를 한 번의 쿼리로 가져오기
-      const lastMessagesRaw = await db
-        .select()
-        .from(chatMessages)
-        .where(inArray(chatMessages.personaRunId, personaRunIds))
-        .orderBy(desc(chatMessages.turnIndex));
+      // 3. 각 persona run의 마지막 메시지를 한 번의 쿼리로 가져오기 (재시도 포함)
+      let lastMessagesRaw: ChatMessage[] = [];
+      try {
+        lastMessagesRaw = await withRetry(async () => {
+          return await db
+            .select()
+            .from(chatMessages)
+            .where(inArray(chatMessages.personaRunId, personaRunIds))
+            .orderBy(desc(chatMessages.turnIndex));
+        });
+      } catch (queryError) {
+        console.error('Query error in getActivePersonaRunsWithLastMessage (step 3):', queryError);
+        // 메시지 로드 실패해도 대화 목록은 반환
+      }
 
       // 4. personaRunId별로 가장 최신 메시지만 추출
       const lastMessageMap = new Map<string, ChatMessage>();
-      for (const msg of lastMessagesRaw || []) {
-        if (!lastMessageMap.has(msg.personaRunId)) {
-          lastMessageMap.set(msg.personaRunId, msg);
+      if (lastMessagesRaw && Array.isArray(lastMessagesRaw)) {
+        for (const msg of lastMessagesRaw) {
+          if (msg && msg.personaRunId && !lastMessageMap.has(msg.personaRunId)) {
+            lastMessageMap.set(msg.personaRunId, msg);
+          }
         }
       }
 
       // 5. 결과 조합
       return activeRuns.map(row => ({
         ...row.personaRun,
-        lastMessage: lastMessageMap.get(row.personaRun.id) || undefined,
+        lastMessage: lastMessageMap.get(row.personaRun?.id) || undefined,
         scenarioRun: row.scenarioRun
       }));
     } catch (error) {

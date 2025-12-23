@@ -716,7 +716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const virtualScenarioId = `persona-chat-${personaId}`;
       const virtualScenarioName = `${personaName}와의 자유 대화`;
       
-      // 인메모리 세션 생성 (DB 저장 없이)
+      // 세션 ID 생성
       const sessionId = `persona-session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
       // 페르소나 스냅샷 생성
@@ -738,11 +738,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         voice: persona.voice || { tone: "친근한", pace: "보통", emotion: "따뜻한" }
       };
       
+      // ✨ DB에 scenario_run과 persona_run 생성 (대화 중 목록에 표시되도록)
+      const scenarioRun = await storage.createScenarioRun({
+        scenarioId: virtualScenarioId,
+        scenarioName: virtualScenarioName,
+        userId,
+        status: 'active',
+        difficulty: difficulty || 2
+      });
+      
+      const personaRun = await storage.createPersonaRun({
+        scenarioRunId: scenarioRun.id,
+        personaId,
+        personaName,
+        personaSnapshot,
+        phase: 1,
+        status: 'active',
+        conversationId: sessionId
+      });
+      
+      console.log(`✅ DB에 페르소나 대화 저장: scenarioRunId=${scenarioRun.id}, personaRunId=${personaRun.id}`);
+      
       // 실시간 음성 모드는 WebSocket을 통해 처리
       if (mode === 'realtime_voice') {
         console.log('🎙️ 페르소나 직접 대화 - 실시간 음성 모드');
         return res.json({
           id: sessionId,
+          personaRunId: personaRun.id,
+          scenarioRunId: scenarioRun.id,
           scenarioId: virtualScenarioId,
           scenarioName: virtualScenarioName,
           personaId,
@@ -799,6 +822,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const aiResponse = response.text || '안녕하세요! 만나서 반갑습니다.';
         
+        // ✨ AI 첫 메시지를 DB에 저장
+        await storage.createChatMessage({
+          personaRunId: personaRun.id,
+          sender: 'ai',
+          message: aiResponse,
+          turnIndex: 0,
+          emotion: 'neutral'
+        });
+        
         const initialMessage = {
           sender: 'ai' as const,
           message: aiResponse,
@@ -808,6 +840,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         return res.json({
           id: sessionId,
+          personaRunId: personaRun.id,
+          scenarioRunId: scenarioRun.id,
           scenarioId: virtualScenarioId,
           scenarioName: virtualScenarioName,
           personaId,
@@ -827,6 +861,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // AI 실패해도 대화 세션은 반환
         return res.json({
           id: sessionId,
+          personaRunId: personaRun.id,
+          scenarioRunId: scenarioRun.id,
           scenarioId: virtualScenarioId,
           scenarioName: virtualScenarioName,
           personaId,

@@ -242,7 +242,7 @@ export function AppSidebar() {
                       {activeConversations.slice(0, 5).map((conv) => (
                         <Link 
                           key={conv.id} 
-                          href={`/chat/${conv.conversationId || conv.id}`}
+                          href={`/chat/${conv.id}`}
                         >
                           <div 
                             className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
