@@ -1091,11 +1091,23 @@ export class PostgreSQLStorage implements IStorage {
       }
 
       // 6. 결과 조합
-      return activePersonaRuns.map(pr => ({
+      const allResults = activePersonaRuns.map(pr => ({
         ...pr,
         lastMessage: lastMessageMap.get(pr.id) || undefined,
         scenarioRun: scenarioRunMap.get(pr.scenarioRunId)
       }));
+      
+      // 7. 동일 페르소나의 대화방 중복 제거 - 가장 최신 것만 유지
+      const seenPersonaIds = new Set<string>();
+      const uniqueResults = allResults.filter(pr => {
+        if (seenPersonaIds.has(pr.personaId)) {
+          return false; // 이미 같은 페르소나 대화가 있으면 스킵
+        }
+        seenPersonaIds.add(pr.personaId);
+        return true;
+      });
+      
+      return uniqueResults;
     } catch (error) {
       console.error('Error in getActivePersonaRunsWithLastMessage:', error);
       return [];
