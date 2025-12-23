@@ -60,6 +60,9 @@ export interface IStorage {
   // Chat Messages
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessagesByPersonaRun(personaRunId: string): Promise<ChatMessage[]>;
+  
+  // Active Conversations (진행 중인 대화)
+  getActivePersonaRunsWithLastMessage(userId: string): Promise<(PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[]>;
   getAllEmotionStats(scenarioIds?: string[]): Promise<{ emotion: string; count: number }[]>; // Admin analytics - 감정 빈도
   getEmotionStatsByScenario(scenarioIds?: string[]): Promise<{ scenarioId: string; scenarioName: string; emotions: { emotion: string; count: number }[]; totalCount: number }[]>;
   getEmotionStatsByMbti(scenarioIds?: string[]): Promise<{ mbti: string; emotions: { emotion: string; count: number }[]; totalCount: number }[]>;
@@ -341,6 +344,10 @@ export class MemStorage implements IStorage {
 
   async getAllPersonaRuns(): Promise<PersonaRun[]> {
     throw new Error("MemStorage does not support Persona Runs");
+  }
+
+  async getActivePersonaRunsWithLastMessage(userId: string): Promise<(PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[]> {
+    throw new Error("MemStorage does not support Active Persona Runs");
   }
 
   async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
@@ -893,6 +900,39 @@ export class PostgreSQLStorage implements IStorage {
 
   async getAllPersonaRuns(): Promise<PersonaRun[]> {
     return await db.select().from(personaRuns).orderBy(desc(personaRuns.startedAt));
+  }
+
+  async getActivePersonaRunsWithLastMessage(userId: string): Promise<(PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[]> {
+    // 1. 해당 유저의 active persona runs 가져오기
+    const activeRuns = await db
+      .select()
+      .from(personaRuns)
+      .innerJoin(scenarioRuns, eq(personaRuns.scenarioRunId, scenarioRuns.id))
+      .where(and(
+        eq(scenarioRuns.userId, userId),
+        eq(personaRuns.status, 'active')
+      ))
+      .orderBy(desc(personaRuns.actualStartedAt));
+
+    // 2. 각 persona run의 마지막 메시지 가져오기
+    const result: (PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[] = [];
+    
+    for (const row of activeRuns) {
+      const lastMessages = await db
+        .select()
+        .from(chatMessages)
+        .where(eq(chatMessages.personaRunId, row.persona_runs.id))
+        .orderBy(desc(chatMessages.turnIndex))
+        .limit(1);
+      
+      result.push({
+        ...row.persona_runs,
+        lastMessage: lastMessages[0] || undefined,
+        scenarioRun: row.scenario_runs
+      });
+    }
+    
+    return result;
   }
 
   // Chat Messages

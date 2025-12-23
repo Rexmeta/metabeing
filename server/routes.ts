@@ -1798,6 +1798,20 @@ ${personaSnapshot.name}:`;
     }
   });
 
+  // Get active persona runs with last message (진행 중인 대화 목록)
+  app.get("/api/active-conversations", isAuthenticated, async (req, res) => {
+    try {
+      // @ts-ignore - req.user는 auth 미들웨어에서 설정됨
+      const userId = req.user?.id;
+      
+      const activeConversations = await storage.getActivePersonaRunsWithLastMessage(userId);
+      res.json(activeConversations);
+    } catch (error) {
+      console.error("Error fetching active conversations:", error);
+      res.status(500).json({ error: "Failed to fetch active conversations" });
+    }
+  });
+
   // Delete scenario run (cascade deletes persona_runs and chat_messages)
   app.delete("/api/scenario-runs/:id", isAuthenticated, async (req, res) => {
     try {
