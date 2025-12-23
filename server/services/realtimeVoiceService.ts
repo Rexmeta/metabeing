@@ -84,6 +84,7 @@ interface RealtimeSession {
   realtimeModel: string; // 사용된 모델
   hasReceivedFirstAIResponse: boolean; // 첫 AI 응답 수신 여부
   firstGreetingRetryCount: number; // 첫 인사 재시도 횟수
+  greetingTimeoutId: ReturnType<typeof setTimeout> | null; // 첫 인사 타임아웃 ID
   isInterrupted: boolean; // Barge-in flag to suppress audio until new response
   turnSeq: number; // Monotonic turn counter, incremented on each turnComplete
   cancelledTurnSeq: number; // Turn seq when cancel was issued (ignore audio from this turn)
@@ -365,6 +366,7 @@ export class RealtimeVoiceService {
       realtimeModel,
       hasReceivedFirstAIResponse: false,
       firstGreetingRetryCount: 0,
+      greetingTimeoutId: null,
       isInterrupted: false,
       turnSeq: 0, // First turn is 0
       cancelledTurnSeq: -1, // No cancelled turn initially
@@ -662,7 +664,7 @@ export class RealtimeVoiceService {
       
       // 타임아웃: 3초 후에도 client.ready를 받지 못하면 자동으로 첫 인사 트리거
       // 클라이언트 연결 문제 시에도 대화가 시작되도록 보장
-      setTimeout(() => {
+      session.greetingTimeoutId = setTimeout(() => {
         // 세션이 아직 존재하고, 첫 AI 응답이 없는 경우에만 자동 트리거
         const currentSession = this.sessions.get(session.id);
         if (currentSession && !currentSession.hasReceivedFirstAIResponse && currentSession.geminiSession) {
@@ -1006,6 +1008,13 @@ export class RealtimeVoiceService {
         // 클라이언트의 AudioContext가 준비됨 - 이제 첫 인사를 트리거
         console.log('🎬 Client ready signal received - triggering first greeting...');
         
+        // 🔧 타임아웃 취소 - client.ready 수신 시 타임아웃 중복 인사 방지
+        if (session.greetingTimeoutId) {
+          clearTimeout(session.greetingTimeoutId);
+          session.greetingTimeoutId = null;
+          console.log('🛑 Greeting timeout cancelled (client.ready received)');
+        }
+        
         // 이미 첫 응답을 받았으면 중복 트리거 방지
         if (session.hasReceivedFirstAIResponse) {
           console.log('⏭️ First greeting already received, skipping duplicate trigger');
@@ -1018,6 +1027,9 @@ export class RealtimeVoiceService {
           session.hasReceivedFirstAIResponse = true;
           break;
         }
+        
+        // 첫 인사 트리거 시 플래그 설정 - 중복 방지
+        session.hasReceivedFirstAIResponse = true;
         
         // 첫 인사를 유도하는 트리거 - 상대방이 도착했음을 알려 AI가 먼저 인사하도록 함
         const firstMessage = `(상대방이 방금 도착했습니다. 당신이 먼저 인사를 건네세요.)`;
