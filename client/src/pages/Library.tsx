@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { PersonaCreateDialog } from "@/components/PersonaCreateDialog";
+import { PersonaManager } from "@/components/admin/PersonaManager";
 import { ScenarioCreateDialog } from "@/components/ScenarioCreateDialog";
 import { AIScenarioGenerator } from "@/components/admin/AIScenarioGenerator";
 import { Sparkles } from "lucide-react";
@@ -72,6 +72,7 @@ export default function Library() {
   const queryClient = useQueryClient();
   const [deleteDialog, setDeleteDialog] = useState<{ type: "scenario" | "persona"; id: string; name?: string } | null>(null);
   const [editingPersona, setEditingPersona] = useState<Persona | null>(null);
+  const [personaDialogOpen, setPersonaDialogOpen] = useState(false);
   
   const searchParams = new URLSearchParams(searchString);
   const tabFromUrl = searchParams.get("tab") || "personas";
@@ -241,15 +242,17 @@ export default function Library() {
             <h1 className="text-3xl font-bold text-slate-900">내 라이브러리</h1>
             <p className="text-slate-600 mt-1">페르소나, 시나리오, 북마크를 관리하세요</p>
           </div>
-          <PersonaCreateDialog
-            trigger={
-              <Button className="gap-2" data-testid="button-create-persona-header">
-                <Plus className="h-4 w-4" />
-                페르소나 만들기
-              </Button>
-            }
-            onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] })}
-          />
+          <Button 
+            className="gap-2" 
+            data-testid="button-create-persona-header"
+            onClick={() => {
+              setEditingPersona(null);
+              setPersonaDialogOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            페르소나 만들기
+          </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -272,14 +275,16 @@ export default function Library() {
               <div className="text-center py-12">
                 <Users className="h-12 w-12 mx-auto text-slate-300 mb-4" />
                 <h3 className="text-lg font-medium text-slate-600">아직 페르소나가 없습니다</h3>
-                <PersonaCreateDialog
-                  trigger={
-                    <Button className="mt-4" data-testid="button-create-persona-empty">
-                      페르소나 만들기
-                    </Button>
-                  }
-                  onSuccess={() => queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] })}
-                />
+                <Button 
+                  className="mt-4" 
+                  data-testid="button-create-persona-empty"
+                  onClick={() => {
+                    setEditingPersona(null);
+                    setPersonaDialogOpen(true);
+                  }}
+                >
+                  페르소나 만들기
+                </Button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -560,15 +565,13 @@ export default function Library() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 페르소나 수정 다이얼로그 */}
-      <PersonaCreateDialog
-        open={!!editingPersona}
-        onOpenChange={(open) => {
-          if (!open) setEditingPersona(null);
-        }}
-        mode="edit"
-        initialData={editingPersona}
-        onSuccess={() => {
+      {/* 페르소나 생성/수정 다이얼로그 - PersonaManager dialogOnly 모드 */}
+      <PersonaManager
+        dialogOnly={true}
+        externalOpen={personaDialogOpen || !!editingPersona}
+        externalPersona={editingPersona as any}
+        onExternalClose={() => {
+          setPersonaDialogOpen(false);
           setEditingPersona(null);
           queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] });
         }}

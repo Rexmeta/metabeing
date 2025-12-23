@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -192,7 +192,14 @@ interface MBTIPersonaFormData {
   };
 }
 
-export function PersonaManager() {
+interface PersonaManagerProps {
+  externalOpen?: boolean;
+  externalPersona?: any;
+  onExternalClose?: () => void;
+  dialogOnly?: boolean;
+}
+
+export function PersonaManager({ externalOpen, externalPersona, onExternalClose, dialogOnly = false }: PersonaManagerProps = {}) {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingPersona, setEditingPersona] = useState<MBTIPersona | null>(null);
@@ -661,6 +668,27 @@ export function PersonaManager() {
     });
   };
 
+  // 외부에서 다이얼로그 제어
+  useEffect(() => {
+    if (externalOpen && externalPersona) {
+      // 수정 모드
+      handleEdit(externalPersona);
+    } else if (externalOpen && !externalPersona) {
+      // 생성 모드
+      resetForm();
+      setIsCreateOpen(true);
+    }
+  }, [externalOpen, externalPersona]);
+
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      setIsCreateOpen(false);
+      setEditingPersona(null);
+      resetForm();
+      onExternalClose?.();
+    }
+  };
+
   const handleEdit = (persona: MBTIPersona) => {
     setFormData({
       id: persona.id,
@@ -746,38 +774,21 @@ export function PersonaManager() {
     }
   };
 
-  if (isLoading) {
+  // dialogOnly 모드이면 다이얼로그만 렌더링
+  const isDialogOpen = externalOpen || isCreateOpen || !!editingPersona;
+
+  if (isLoading && !dialogOnly) {
     return <div className="text-center py-8">로딩 중...</div>;
   }
 
-  if (error) {
+  if (error && !dialogOnly) {
     return <div className="text-center py-8 text-red-600">페르소나 데이터를 불러올 수 없습니다.</div>;
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">페르소나 관리</h2>
-          <p className="text-slate-600 mt-1">성격 유형별 AI 페르소나를 관리합니다</p>
-        </div>
-        
-        <Dialog open={isCreateOpen || !!editingPersona} onOpenChange={(open) => {
-          if (!open) {
-            setIsCreateOpen(false);
-            setEditingPersona(null);
-            resetForm();
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button 
-              onClick={() => setIsCreateOpen(true)}
-              className="bg-corporate-600 hover:bg-corporate-700"
-              data-testid="button-create-persona"
-            >
-              페르소나 생성
-            </Button>
-          </DialogTrigger>
+  // dialogOnly 모드: 다이얼로그만 렌더링
+  if (dialogOnly) {
+    return (
+      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-50">
             <DialogHeader className="bg-indigo-600 -m-6 mb-4 p-6 rounded-t-lg">
               <DialogTitle className="text-white text-xl flex items-center gap-2">
@@ -1385,6 +1396,90 @@ export function PersonaManager() {
                   disabled={createMutation.isPending || updateMutation.isPending}
                   className="bg-corporate-600 hover:bg-corporate-700"
                   data-testid="button-save-persona"
+                >
+                  {createMutation.isPending || updateMutation.isPending ? '저장 중...' : '저장'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+    );
+  }
+
+  // 기본 레이아웃 렌더링
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">페르소나 관리</h2>
+          <p className="text-slate-600 mt-1">성격 유형별 AI 페르소나를 관리합니다</p>
+        </div>
+        
+        <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
+          <DialogTrigger asChild>
+            <Button 
+              onClick={() => setIsCreateOpen(true)}
+              className="bg-corporate-600 hover:bg-corporate-700"
+              data-testid="button-create-persona"
+            >
+              페르소나 생성
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-50">
+            <DialogHeader className="bg-indigo-600 -m-6 mb-4 p-6 rounded-t-lg">
+              <DialogTitle className="text-white text-xl flex items-center gap-2">
+                <i className="fas fa-user-edit"></i>
+                {editingPersona ? '페르소나 수정' : '페르소나 생성'}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <i className="fas fa-id-card text-indigo-600"></i>
+                  기본 정보
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="id2" className="text-sm font-semibold text-slate-700 mb-1.5 block">MBTI ID (소문자)</Label>
+                    <Input
+                      id="id2"
+                      value={formData.id}
+                      onChange={(e) => setFormData(prev => ({ ...prev, id: e.target.value }))}
+                      placeholder="istj, enfp, intp 등"
+                      required
+                      className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="input-persona-id-2"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="mbti2" className="text-sm font-semibold text-slate-700 mb-1.5 block">MBTI 유형 (대문자)</Label>
+                    <Input
+                      id="mbti2"
+                      value={formData.mbti}
+                      onChange={(e) => setFormData(prev => ({ ...prev, mbti: e.target.value }))}
+                      placeholder="ISTJ, ENFP, INTP 등"
+                      required
+                      className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="input-mbti-2"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => handleDialogClose(false)}
+                >
+                  취소
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  className="bg-corporate-600 hover:bg-corporate-700"
+                  data-testid="button-save-persona-2"
                 >
                   {createMutation.isPending || updateMutation.isPending ? '저장 중...' : '저장'}
                 </Button>

@@ -60,6 +60,7 @@ Preferred communication style: Simple, everyday language.
     - Images stored at `/attached_assets/characters/{characterId}/{gender}/{emotion}.webp`.
     - Expression images displayed in chat based on AI emotion analysis response.
     - Supports gender (male/female) and MBTI-based visual traits.
+- **Unified Persona Management**: Library page uses `PersonaManager` component (dialogOnly mode) for consistent persona creation/editing experience across admin and user interfaces. Supports external control via props (`externalOpen`, `externalPersona`, `onExternalClose`, `dialogOnly`).
 
 # External Dependencies
 

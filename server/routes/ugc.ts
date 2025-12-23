@@ -800,11 +800,22 @@ router.get("/bookmarks", isAuthenticated, async (req: Request, res: Response) =>
       conditions.push(eq(bookmarks.targetType, targetType));
     }
 
-    const result = await db
+    // Neon HTTP driver intermittent null return workaround
+    let result = await db
       .select()
       .from(bookmarks)
       .where(and(...conditions))
       .orderBy(desc(bookmarks.createdAt));
+
+    // Retry once if null is returned (Neon HTTP driver issue)
+    if (result === null || result === undefined) {
+      console.log("Bookmarks: Neon returned null, retrying...");
+      result = await db
+        .select()
+        .from(bookmarks)
+        .where(and(...conditions))
+        .orderBy(desc(bookmarks.createdAt));
+    }
 
     res.json(result ?? []);
   } catch (error: any) {
