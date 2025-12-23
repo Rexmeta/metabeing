@@ -314,7 +314,10 @@ export default function MyPage() {
                               <div className="flex items-center gap-3 flex-wrap">
                                 <CalendarDays className="w-4 h-4 text-slate-500" />
                                 <span className="text-sm text-slate-600">
-                                  {format(new Date(scenarioRun.startedAt), 'yyyy년 MM월 dd일 HH:mm')}
+                                  {scenarioRun.startedAt ? (() => {
+                                    const date = new Date(scenarioRun.startedAt);
+                                    return !isNaN(date.getTime()) ? format(date, 'yyyy년 MM월 dd일 HH:mm') : '시간 정보 없음';
+                                  })() : '시간 정보 없음'}
                                 </span>
                                 <h3 className="font-semibold text-slate-900 text-left">{scenarioInfo.title}</h3>
                                 <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
