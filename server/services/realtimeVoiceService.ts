@@ -786,18 +786,13 @@ export class RealtimeVoiceService {
           type: 'response.done',
         });
 
-        // 사용자 발화가 완료되었다면 transcript를 전송하고 DB에 저장
-        const userMessage = session.userTranscriptBuffer.trim();
-        if (userMessage) {
-          console.log(`🎤 User turn complete (VAD): "${userMessage}"`);
+        // 사용자 발화가 완료되었다면 transcript를 전송 (VAD에 의한 자동 턴 구분)
+        if (session.userTranscriptBuffer.trim()) {
+          console.log(`🎤 User turn complete (VAD): "${session.userTranscriptBuffer.trim()}"`);
           this.sendToClient(session, {
             type: 'user.transcription',
-            transcript: userMessage,
+            transcript: session.userTranscriptBuffer.trim(),
           });
-          
-          // ✨ 사용자 메시지 DB 자동 저장
-          this.saveMessageToDb(session.conversationId, 'user', userMessage, null, null);
-          
           session.userTranscriptBuffer = ''; // 버퍼 초기화
         }
 
@@ -810,7 +805,6 @@ export class RealtimeVoiceService {
           if (filteredTranscript) {
             // setImmediate로 감정 분석을 비동기화하여 이벤트 루프 블로킹 방지
             // 대화 품질에 영향 없이 동시 접속 처리량 향상
-            const conversationId = session.conversationId; // 클로저에서 사용
             setImmediate(() => {
               this.analyzeEmotion(filteredTranscript, session.personaName)
                 .then(({ emotion, emotionReason }) => {
@@ -821,9 +815,6 @@ export class RealtimeVoiceService {
                     emotion,
                     emotionReason,
                   });
-                  
-                  // ✨ AI 메시지 DB 자동 저장 (감정 정보 포함)
-                  this.saveMessageToDb(conversationId, 'ai', filteredTranscript, emotion, emotionReason);
                 })
                 .catch(error => {
                   console.error('❌ Failed to analyze emotion:', error);
@@ -833,9 +824,6 @@ export class RealtimeVoiceService {
                     emotion: '중립',
                     emotionReason: '감정 분석 실패',
                   });
-                  
-                  // ✨ AI 메시지 DB 자동 저장 (기본 감정)
-                  this.saveMessageToDb(conversationId, 'ai', filteredTranscript, '중립', '감정 분석 실패');
                 });
             });
           }
