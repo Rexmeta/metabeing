@@ -14,7 +14,6 @@ import MyPage from "@/pages/MyPage";
 import Analytics from "@/pages/Analytics";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminManagement from "@/pages/admin-management";
-import AIGeneratorPage from "@/pages/ai-generator";
 import SystemAdminPage from "@/pages/system-admin";
 import ConversationView from "@/pages/ConversationView";
 import FeedbackView from "@/pages/FeedbackView";
@@ -159,9 +158,6 @@ function MainRouter() {
       </Route>
       {/* content-management redirects to library */}
       <Route path="/content-management" component={ContentManagementRedirect} />
-      <Route path="/ai-generator">
-        {() => <AdminRoute component={AIGeneratorPage} />}
-      </Route>
       <Route path="/system-admin">
         {() => <AdminRoute component={SystemAdminPage} />}
       </Route>

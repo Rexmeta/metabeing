@@ -116,11 +116,6 @@ const adminItems = [
     url: "/system-admin",
     icon: Shield,
   },
-  {
-    title: "AI 생성기",
-    url: "/ai-generator",
-    icon: Sparkles,
-  },
 ];
 
 export function AppSidebar() {
