@@ -257,7 +257,7 @@ function PersonaCard({ persona, size = "default" }: { persona: Persona; size?: "
   return (
     <div 
       className={`relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer group flex-shrink-0 ${cardSize}`}
-      onClick={() => setLocation(`/persona/${persona.id}`)}
+      onClick={() => setLocation(`/persona/${persona.id}/chat`)}
       data-testid={`card-persona-${persona.id}`}
     >
       {profileImage ? (
