@@ -98,7 +98,7 @@ export default function ScenarioSelector({ onScenarioSelect, playerProfile }: Sc
 
   // 카테고리 이름 조회 헬퍼 함수
   const getCategoryName = (categoryId: string | undefined): string => {
-    if (!categoryId) return '';
+    if (!categoryId || !Array.isArray(categories)) return '';
     const category = categories.find(c => c.id === categoryId);
     return category?.name || '';
   };
@@ -307,7 +307,7 @@ export default function ScenarioSelector({ onScenarioSelect, playerProfile }: Sc
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체 카테고리</SelectItem>
-                  {categories.map((category) => (
+                  {Array.isArray(categories) && categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
                     </SelectItem>
