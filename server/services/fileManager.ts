@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ComplexScenario, ScenarioPersona } from '@/lib/scenario-system';
-import { enrichPersonaWithMBTI, enrichPersonaWithBasicMBTI, invalidateMBTICache } from '../utils/mbtiLoader';
+import { enrichPersonaWithData, enrichPersonaWithBasicData, invalidatePersonaCache } from '../utils/personaLoader';
 
 const SCENARIOS_DIR = 'scenarios';
 const PERSONAS_DIR = 'personas';
@@ -128,7 +128,7 @@ export class FileManagerService {
             const enrichedPersonas = await Promise.all(
               scenario.personas.map(async (persona: any) => {
                 if (typeof persona === 'object' && persona.personaRef) {
-                  return await enrichPersonaWithBasicMBTI(persona, persona.personaRef);
+                  return await enrichPersonaWithBasicData(persona, persona.personaRef);
                 }
                 return persona;
               })
@@ -370,11 +370,11 @@ export class FileManagerService {
       // ID가 변경된 경우 기존 파일 삭제
       if (id !== personaData.id) {
         await fs.unlink(filePath);
-        invalidateMBTICache(id); // 기존 ID 캐시 무효화
+        invalidatePersonaCache(id); // 기존 ID 캐시 무효화
       }
       
       // 캐시 무효화 (다음 조회 시 파일에서 다시 로드)
-      invalidateMBTICache(personaData.id);
+      invalidatePersonaCache(personaData.id);
       
       return personaData;
     } catch (error) {

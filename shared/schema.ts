@@ -148,7 +148,7 @@ export const personaRuns = pgTable("persona_runs", {
   personaId: text("persona_id").notNull(),
   personaName: text("persona_name"), // 페르소나 이름 (MBTI 분석 및 표시용)
   personaSnapshot: jsonb("persona_snapshot"), // 대화 생성 시점의 페르소나 정보 스냅샷
-  mbtiType: text("mbti_type"), // MBTI 유형 (예: "ISTJ", "ENFP") - MBTI 분석용
+  personaType: text("persona_type"), // 페르소나 유형 (예: "ISTJ", "ENFP") - 페르소나 분석용
   phase: integer("phase"), // 몇 번째 대화인지 (1, 2, ...) - nullable for simple conversations
   status: text("status").notNull().default("active"), // active, completed
   turnCount: integer("turn_count").notNull().default(0),
@@ -492,7 +492,7 @@ export const characters = pgTable("characters", {
   coverImage: varchar("cover_image"),
   // 이미지 생성용 필드
   gender: varchar("gender"), // male, female
-  mbti: varchar("mbti"), // MBTI 16가지 중 하나 (선택)
+  personaKey: varchar("persona_key"), // 고유 페르소나 식별자 (자동 생성 또는 수동 입력)
   personalityTraits: jsonb("personality_traits").$type<string[]>().default([]), // 성격 특성
   imageStyle: varchar("image_style"), // 이미지 스타일 (예: professional, casual)
   expressionImagesGenerated: boolean("expression_images_generated").notNull().default(false), // 표정 이미지 생성 여부

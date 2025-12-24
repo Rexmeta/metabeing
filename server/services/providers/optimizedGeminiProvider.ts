@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import type { ConversationMessage, DetailedFeedback } from "@shared/schema";
 import type { AIServiceInterface, ScenarioPersona } from "../aiService";
-import { enrichPersonaWithMBTI } from "../../utils/mbtiLoader";
-import { GlobalMBTICache } from "../../utils/globalMBTICache";
+import { enrichPersonaWithData } from "../../utils/personaLoader";
+import { GlobalPersonaCache } from "../../utils/globalPersonaCache";
 import { getTextModeGuidelines, validateDifficultyLevel } from "../conversationDifficultyPolicy";
 import { trackUsage, extractGeminiTokens, getModelPricingKey } from "../aiUsageTracker";
 
@@ -16,13 +16,13 @@ import { trackUsage, extractGeminiTokens, getModelPricingKey } from "../aiUsageT
 export class OptimizedGeminiProvider implements AIServiceInterface {
   private genAI: GoogleGenAI;
   private model: string;
-  private globalCache: GlobalMBTICache;
+  private globalCache: GlobalPersonaCache;
   private enrichedPersonaCache: Map<string, ScenarioPersona> = new Map();
 
   constructor(apiKey: string, model: string = 'gemini-2.5-flash') {
     this.genAI = new GoogleGenAI({ apiKey });
     this.model = model;
-    this.globalCache = GlobalMBTICache.getInstance();
+    this.globalCache = GlobalPersonaCache.getInstance();
   }
 
   /**
@@ -145,16 +145,16 @@ export class OptimizedGeminiProvider implements AIServiceInterface {
       }
 
       // 글로벌 MBTI 캐시에서 즉시 가져오기
-      const mbtiData = this.globalCache.getMBTIPersona(personaRef);
-      if (!mbtiData) {
-        console.log(`⚠️ MBTI data not found in cache: ${personaRef}`);
+      const personaData = this.globalCache.getPersonaData(personaRef);
+      if (!personaData) {
+        console.log(`⚠️ Persona data not found in cache: ${personaRef}`);
         return persona;
       }
 
-      console.log(`⚡ Using global cached MBTI: ${mbtiData.mbti}`);
+      console.log(`⚡ Using global cached persona: ${personaData.personaKey}`);
       
       // enrichment 수행
-      const enrichedPersona = await enrichPersonaWithMBTI(currentPersona, personaRef);
+      const enrichedPersona = await enrichPersonaWithData(currentPersona, personaRef);
       
       // 시나리오별로 캐시에 저장
       this.enrichedPersonaCache.set(cacheKey, enrichedPersona);
@@ -188,19 +188,21 @@ export class OptimizedGeminiProvider implements AIServiceInterface {
   private buildCompactPrompt(scenario: any, persona: ScenarioPersona, conversationHistory: string): string {
     const situation = scenario.context?.situation || '업무 상황';
     const objectives = scenario.objectives?.join(', ') || '문제 해결';
-    const mbtiData = (persona as any).mbti ? this.globalCache.getMBTIPersona((persona as any).mbti.toLowerCase()) : null;
+    const personaData = (persona as any).personaKey || (persona as any).mbti 
+      ? this.globalCache.getPersonaData(((persona as any).personaKey || (persona as any).mbti).toLowerCase()) 
+      : null;
     
     // 페르소나의 입장과 목표
     const stance = (persona as any).stance || '신중한 접근';
     const goal = (persona as any).goal || '최적의 결과 도출';
     
     // 성격 특성 준비
-    const personalityTraits = mbtiData?.personality_traits 
-      ? mbtiData.personality_traits.join(', ')
+    const personalityTraits = personaData?.personality_traits 
+      ? personaData.personality_traits.join(', ')
       : '균형 잡힌 성격';
     
     // 구어체 스타일 준비
-    const speechStyle = mbtiData?.speech_style;
+    const speechStyle = personaData?.speech_style;
     const speechStyleGuide = speechStyle ? `
 말투 스타일:
 - 격식: ${speechStyle.formality}
@@ -209,7 +211,7 @@ export class OptimizedGeminiProvider implements AIServiceInterface {
 - 특징적 표현: ${speechStyle.characteristic_expressions?.join(', ') || ''}` : '';
     
     // 리액션 어휘 준비
-    const reactionPhrases = mbtiData?.reaction_phrases;
+    const reactionPhrases = personaData?.reaction_phrases;
     const reactionGuide = reactionPhrases ? `
 리액션 표현:
 - 동의할 때: ${reactionPhrases.agreement?.slice(0, 2).join(', ') || '네, 맞아요'}
@@ -231,7 +233,7 @@ export class OptimizedGeminiProvider implements AIServiceInterface {
 당신의 목표: ${goal}
 
 성격 특성: ${personalityTraits}
-의사소통 스타일: ${mbtiData?.communication_style || '균형 잡힌 의사소통'}
+의사소통 스타일: ${personaData?.communication_style || '균형 잡힌 의사소통'}
 ${speechStyleGuide}
 ${reactionGuide}
 

@@ -23,7 +23,7 @@ import { fileManager } from "./services/fileManager";
 import { generateScenarioWithAI, enhanceScenarioWithAI } from "./services/aiScenarioGenerator";
 import { realtimeVoiceService } from "./services/realtimeVoiceService";
 import { generateIntroVideo, deleteIntroVideo, getVideoGenerationStatus } from "./services/gemini-video-generator";
-import { GlobalMBTICache } from "./utils/globalMBTICache";
+import { GlobalPersonaCache } from "./utils/globalPersonaCache";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 이메일 기반 인증 시스템 설정
@@ -568,7 +568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         personaId,
         personaName: (scenarioPersona as any).name,
         personaSnapshot: validatedData.personaSnapshot || {},
-        mbtiType: mbtiType || null,
+        personaType: mbtiType || null,
         phase,
         mode: validatedData.mode,
         difficulty: validatedData.difficulty || 2,
@@ -2721,8 +2721,8 @@ ${personaSnapshot.name}:`;
       
       // 8. MBTI 사용 분석
       const mbtiUsage = personaRuns.reduce((acc, pr) => {
-        if (pr.mbtiType) {
-          const mbtiKey = pr.mbtiType.toUpperCase();
+        if (pr.personaType) {
+          const mbtiKey = pr.personaType.toUpperCase();
           acc[mbtiKey] = (acc[mbtiKey] || 0) + 1;
         }
         return acc;
@@ -2837,7 +2837,7 @@ ${personaSnapshot.name}:`;
         const personaRun = completedPersonaRuns.find(pr => pr.id === f.personaRunId);
         if (personaRun) {
           // mbtiType이 없으면 personaSnapshot 또는 scenario에서 MBTI 추출
-          let mbtiType = personaRun.mbtiType;
+          let mbtiType = personaRun.personaType;
           
           if (!mbtiType && personaRun.personaSnapshot) {
             // personaSnapshot에서 mbti 필드 추출
@@ -3076,8 +3076,8 @@ ${personaSnapshot.name}:`;
       
       for (const pr of personaRuns.filter(pr => pr.status === "completed")) {
         const feedback = feedbacks.find(f => f.personaRunId === pr.id);
-        if (feedback && pr.mbtiType) {
-          const mbtiKey = pr.mbtiType.toUpperCase();
+        if (feedback && pr.personaType) {
+          const mbtiKey = pr.personaType.toUpperCase();
           if (!mbtiPerformance[mbtiKey]) {
             mbtiPerformance[mbtiKey] = { scores: [], count: 0 };
           }
@@ -3152,7 +3152,7 @@ ${personaSnapshot.name}:`;
             id: f.id,
             score: f.overallScore,
             scenarioName: scenario?.title || '알 수 없음',
-            mbti: personaRun?.mbtiType?.toUpperCase() || 'N/A',
+            personaType: personaRun?.personaType?.toUpperCase() || 'N/A',
             userId: scenarioRun?.userId?.slice(0, 8) || 'N/A',
             completedAt: f.createdAt,
             difficulty: scenarioRun?.difficulty || 2
@@ -4037,20 +4037,20 @@ ${personaSnapshot.name}:`;
     }
   });
 
-  // 일반 사용자용 MBTI 템플릿 API (캐릭터 생성 시 페르소나 자동 채우기용)
-  // GlobalMBTICache를 사용하여 성능 최적화 + camelCase로 정규화
+  // 일반 사용자용 페르소나 템플릿 API (캐릭터 생성 시 페르소나 자동 채우기용)
+  // GlobalPersonaCache를 사용하여 성능 최적화 + camelCase로 정규화
   app.get("/api/personas/templates", async (req, res) => {
     try {
-      const cache = GlobalMBTICache.getInstance();
+      const cache = GlobalPersonaCache.getInstance();
       const availableTypes = cache.getAvailableTypes();
       
       const templates = availableTypes.map(type => {
-        const persona = cache.getMBTIPersona(type);
+        const persona = cache.getPersonaData(type);
         if (!persona) return null;
         
         return {
           id: persona.id || type,
-          mbti: persona.mbti || type.toUpperCase(),
+          personaKey: persona.personaKey || type.toUpperCase(),
           personalityTraits: persona.personality_traits || [],
           communicationStyle: persona.communication_style || "",
           motivation: persona.motivation || "",
@@ -4092,8 +4092,8 @@ ${personaSnapshot.name}:`;
         return res.status(400).json({ error: "Invalid MBTI type" });
       }
       
-      const cache = GlobalMBTICache.getInstance();
-      const persona = cache.getMBTIPersona(mbtiType);
+      const cache = GlobalPersonaCache.getInstance();
+      const persona = cache.getPersonaData(mbtiType);
       
       if (!persona) {
         return res.status(404).json({ error: "MBTI template not found" });
@@ -4102,7 +4102,7 @@ ${personaSnapshot.name}:`;
       // camelCase로 정규화하여 반환 (프론트엔드 스키마와 호환)
       res.json({
         id: persona.id || mbtiType,
-        mbti: persona.mbti || mbtiType.toUpperCase(),
+        personaKey: persona.personaKey || mbtiType.toUpperCase(),
         personalityTraits: persona.personality_traits || [],
         communicationStyle: persona.communication_style || "",
         motivation: persona.motivation || "",
