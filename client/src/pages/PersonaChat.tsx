@@ -1,12 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, MessageCircle, User } from "lucide-react";
 import ChatWindow from "@/components/ChatWindow";
 import type { ComplexScenario, ScenarioPersona } from "@/lib/scenario-system";
+
+interface PersonaImages {
+  base?: string;
+  style?: string;
+  male?: {
+    expressions?: Record<string, string>;
+  };
+  female?: {
+    expressions?: Record<string, string>;
+  };
+}
 
 interface Persona {
   id: string;
@@ -25,11 +36,12 @@ interface Persona {
   background?: any;
   communication_patterns?: any;
   voice?: any;
+  images?: PersonaImages;
 }
 
 interface PersonaChatSession {
   id: string;
-  personaRunId: string; // 실제 DB의 persona_runs.id - chatMessages 저장용
+  personaRunId: string;
   scenarioId: string;
   scenarioName: string;
   personaId: string;
@@ -48,6 +60,7 @@ export default function PersonaChat() {
   const { toast } = useToast();
   const [chatSession, setChatSession] = useState<PersonaChatSession | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
   const { data: persona, isLoading: loadingPersona, error: personaError } = useQuery<Persona>({
     queryKey: ["/api/admin/personas", params.personaId],
@@ -57,7 +70,25 @@ export default function PersonaChat() {
       return res.json();
     },
     enabled: !!params.personaId,
+    staleTime: 60000,
   });
+
+  const getProfileImage = useCallback((p: Persona | undefined) => {
+    if (!p) return null;
+    const gender = p.gender || 'female';
+    const genderKey = gender.toLowerCase() === 'male' ? 'male' : 'female';
+    
+    if (p.images?.[genderKey]?.expressions?.base) {
+      return p.images[genderKey].expressions.base;
+    }
+    if (p.images?.base) {
+      return p.images.base;
+    }
+    if (p.profileImage) {
+      return p.profileImage;
+    }
+    return null;
+  }, []);
 
   const createDummyScenario = (session: PersonaChatSession): ComplexScenario => ({
     id: session.scenarioId,
@@ -142,6 +173,8 @@ export default function PersonaChat() {
         
         const session = await response.json();
         setChatSession(session);
+        
+        setTimeout(() => setShowChat(true), 100);
       } catch (error) {
         console.error("페르소나 대화 생성 실패:", error);
         toast({
@@ -149,7 +182,7 @@ export default function PersonaChat() {
           description: "대화를 시작할 수 없습니다.",
           variant: "destructive",
         });
-        setLocation("/");
+        setLocation("/explore");
       } finally {
         setIsCreating(false);
       }
@@ -164,21 +197,57 @@ export default function PersonaChat() {
       title: "대화 완료",
       description: "대화가 성공적으로 완료되었습니다.",
     });
-    setLocation("/");
+    setLocation("/conversations");
   };
 
   const handleExit = () => {
-    setLocation("/");
+    setLocation("/explore");
   };
+
+  const profileImage = getProfileImage(persona);
+  const mbti = persona?.mbtiType || persona?.mbti || params.personaId?.toUpperCase();
 
   if (loadingPersona || isCreating || !chatSession) {
     return (
-      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">
-            {loadingPersona ? "페르소나 정보 로딩 중..." : "대화 준비 중..."}
-          </p>
+      <div className="h-full flex flex-col items-center justify-center bg-gradient-to-b from-background to-muted/30 transition-all duration-300">
+        <div className="flex flex-col items-center gap-6 animate-in fade-in-0 duration-500">
+          <div className="relative">
+            {profileImage ? (
+              <div className="relative">
+                <img 
+                  src={profileImage} 
+                  alt={persona?.name || "페르소나"}
+                  className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover border-4 border-primary/20 shadow-lg"
+                />
+                <div className="absolute inset-0 rounded-full border-4 border-primary/40 animate-pulse" />
+              </div>
+            ) : (
+              <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center border-4 border-primary/20 shadow-lg">
+                <User className="w-10 h-10 sm:w-14 sm:h-14 text-primary/60" />
+              </div>
+            )}
+            <div className="absolute -bottom-2 -right-2 bg-primary text-primary-foreground rounded-full p-2 shadow-md">
+              <MessageCircle className="w-4 h-4" />
+            </div>
+          </div>
+          
+          <div className="text-center space-y-2">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground">
+              {persona?.name || "페르소나"}
+            </h2>
+            {mbti && (
+              <span className="inline-block px-3 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full">
+                {mbti}
+              </span>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <p className="text-sm">
+              {loadingPersona ? "정보 불러오는 중..." : "대화 준비 중..."}
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -186,12 +255,15 @@ export default function PersonaChat() {
 
   if (personaError || !persona) {
     return (
-      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-destructive mb-4">페르소나를 찾을 수 없습니다.</p>
-          <Button onClick={() => setLocation("/")} data-testid="button-back-home">
+      <div className="h-full flex items-center justify-center bg-gradient-to-b from-background to-muted/30">
+        <div className="text-center space-y-4 p-6">
+          <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+            <User className="w-8 h-8 text-destructive" />
+          </div>
+          <p className="text-destructive font-medium">페르소나를 찾을 수 없습니다</p>
+          <Button onClick={() => setLocation("/explore")} variant="outline" data-testid="button-back-explore">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            홈으로 돌아가기
+            탐색으로 돌아가기
           </Button>
         </div>
       </div>
@@ -201,7 +273,6 @@ export default function PersonaChat() {
   const dummyScenario = createDummyScenario(chatSession);
   const personaSnapshot = createPersonaSnapshotForChat(chatSession);
 
-  // 초기 메시지 변환
   const initialMessages = (chatSession.messages || []).map((msg: any) => ({
     sender: msg.sender as 'user' | 'ai',
     message: msg.message,
@@ -211,12 +282,12 @@ export default function PersonaChat() {
   }));
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] w-full relative">
+    <div className={`h-full w-full relative transition-opacity duration-300 ${showChat ? 'opacity-100' : 'opacity-0'}`}>
       <ChatWindow
         scenario={dummyScenario}
         persona={personaSnapshot}
         conversationId={chatSession.id}
-        personaRunId={chatSession.personaRunId} // 실제 DB의 persona_runs.id - chatMessages 저장용
+        personaRunId={chatSession.personaRunId}
         onChatComplete={handleChatComplete}
         onExit={handleExit}
         initialChatMode="character"
