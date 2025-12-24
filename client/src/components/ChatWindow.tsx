@@ -266,11 +266,11 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   const getCharacterImage = (emotion: string): string | null => {
     const emotionEn = emotionToEnglish[emotion] || 'neutral';
     const genderFolder = persona.gender || 'male';
-    const mbtiId = persona.mbti?.toLowerCase() || persona.id;
+    const personaKeyId = persona.personaKey?.toLowerCase() || persona.mbti?.toLowerCase() || persona.id;
     
     // 페르소나별 이미지가 사용 가능한지 확인 (WebP 최적화 이미지 사용)
     if (personaImagesAvailable[emotion]) {
-      return `/personas/${mbtiId}/${genderFolder}/${emotionEn}.webp`;
+      return `/personas/${personaKeyId}/${genderFolder}/${emotionEn}.webp`;
     }
     
     // 페르소나별 이미지가 없으면 null 반환
@@ -285,14 +285,14 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   useEffect(() => {
     const checkPersonaImages = async () => {
       const genderFolder = persona.gender || 'male';
-      const mbtiId = persona.mbti?.toLowerCase() || persona.id;
+      const personaKeyId = persona.personaKey?.toLowerCase() || persona.mbti?.toLowerCase() || persona.id;
       // 페르소나별 이미지 체크
       const checkPromises = Object.entries(emotionToEnglish).map(([emotionKr, emotionEn]) => {
         return new Promise<void>((resolve) => {
           const img = new Image();
           img.onload = () => {
             setPersonaImagesAvailable(prev => ({ ...prev, [emotionKr]: true }));
-            console.log(`✅ 페르소나별 이미지 로딩 성공: ${emotionKr} (${mbtiId}/${genderFolder})`);
+            console.log(`✅ 페르소나별 이미지 로딩 성공: ${emotionKr} (${personaKeyId}/${genderFolder})`);
             resolve();
           };
           img.onerror = () => {
@@ -300,7 +300,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
             console.log(`⚠️ 페르소나별 이미지 없음: ${emotionKr}`);
             resolve();
           };
-          img.src = `/personas/${mbtiId}/${genderFolder}/${emotionEn}.webp`;
+          img.src = `/personas/${personaKeyId}/${genderFolder}/${emotionEn}.webp`;
         });
       });
       
@@ -309,7 +309,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
     };
     
     checkPersonaImages();
-  }, [persona.id, persona.mbti, persona.gender, conversationId]);
+  }, [persona.id, persona.personaKey, persona.mbti, persona.gender, conversationId]);
   
   // 페르소나가 변경되면 로딩 상태 및 이미지 상태 리셋
   useEffect(() => {
@@ -378,7 +378,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
       setLoadedImageUrl(fallbackUrl);
       completeInitialLoad();
     }
-  }, [personaImagesAvailable, persona.id, persona.gender, persona.mbti, persona.name]);
+  }, [personaImagesAvailable, persona.id, persona.gender, persona.personaKey, persona.mbti, persona.name]);
   
   // 감정 변화 시 이미지 업데이트 - preloadImage 함수가 로드 완료 후 setLoadedImageUrl 호출
   // 중립 표정으로 돌아올 때도 이미지가 업데이트되도록 조건 제거
@@ -1478,7 +1478,11 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                             {persona.personality && (
                               <div>
                                 <span className="font-medium text-muted-foreground">성격:</span>
-                                <p className="mt-1 text-muted-foreground">{persona.personality}</p>
+                                <p className="mt-1 text-muted-foreground">
+                                  {typeof persona.personality === 'string' 
+                                    ? persona.personality 
+                                    : persona.personality.communicationStyle || ''}
+                                </p>
                               </div>
                             )}
                             {personaStats?.creatorName && (

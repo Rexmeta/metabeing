@@ -66,6 +66,7 @@ interface PersonaImages {
 interface Persona {
   id: string;
   name: string;
+  personaKey?: string;
   mbtiType?: string;
   mbti?: string;
   gender: string;

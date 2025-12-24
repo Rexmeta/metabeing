@@ -22,6 +22,7 @@ interface PersonaImages {
 interface Persona {
   id: string;
   name?: string;
+  personaKey?: string;
   mbtiType?: string;
   mbti?: string;
   gender: string;
@@ -122,7 +123,7 @@ export default function PersonaChat() {
   const createPersonaSnapshotForChat = (session: PersonaChatSession): ScenarioPersona => ({
     id: session.personaSnapshot.id,
     name: session.personaSnapshot.name,
-    mbti: session.personaSnapshot.mbti || "",
+    personaKey: session.personaSnapshot.personaKey || session.personaSnapshot.mbti || "",
     role: session.personaSnapshot.role || "AI 대화 상대",
     department: session.personaSnapshot.department || "일반",
     experience: "N/A",
@@ -205,7 +206,7 @@ export default function PersonaChat() {
   };
 
   const profileImage = getProfileImage(persona);
-  const mbti = persona?.mbtiType || persona?.mbti || params.personaId?.toUpperCase();
+  const personaKeyDisplay = persona?.personaKey || persona?.mbtiType || persona?.mbti || params.personaId?.toUpperCase();
 
   if (loadingPersona || isCreating || !chatSession) {
     return (
@@ -235,9 +236,9 @@ export default function PersonaChat() {
             <h2 className="text-lg sm:text-xl font-bold text-foreground">
               {persona?.name || "페르소나"}
             </h2>
-            {mbti && (
+            {personaKeyDisplay && (
               <span className="inline-block px-3 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full">
-                {mbti}
+                {personaKeyDisplay}
               </span>
             )}
           </div>

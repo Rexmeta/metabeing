@@ -40,7 +40,8 @@ export interface ScenarioPersona {
   stance?: string;
   goal?: string;
   tradeoff?: string;
-  mbti?: string;
+  personaKey?: string; // 고유 페르소나 키 (새 필드)
+  mbti?: string; // 하위 호환성용
 }
 
 export interface ComplexScenario {

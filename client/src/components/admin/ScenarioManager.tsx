@@ -20,7 +20,8 @@ interface ScenarioPersona {
   id: string;
   name: string;
   gender: 'male' | 'female'; // 성별 필드 추가
-  mbti: string; // MBTI 필드 추가
+  personaKey?: string; // 고유 페르소나 키 (새 필드)
+  mbti?: string; // MBTI 필드 (하위 호환성)
   department: string;
   position: string;
   experience: string;
