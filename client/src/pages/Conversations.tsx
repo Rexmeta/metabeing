@@ -1,10 +1,10 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { format } from "date-fns";
-import { MessageCircle, User, X } from "lucide-react";
+import { format, isToday, isYesterday } from "date-fns";
+import { ko } from "date-fns/locale";
+import { MessageCircle, X, ChevronRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,7 +20,7 @@ interface ActiveConversation {
     message: string;
     sender: string;
     createdAt: string;
-  } | string; // 새로운 필드는 string 직접 저장
+  } | string;
   lastActivityAt?: string;
   unreadCount?: number;
   createdAt: string;
@@ -30,16 +30,14 @@ export default function Conversations() {
   const { toast } = useToast();
   const { data: activeConversations, isLoading, refetch } = useQuery<ActiveConversation[]>({
     queryKey: ["/api/active-conversations"],
-    refetchInterval: 10000, // 10초마다 자동 리페치
+    refetchInterval: 10000,
   });
 
-  // 대화방 닫기 mutation
   const closeMutation = useMutation({
     mutationFn: async (conversationId: string) => {
       return await apiRequest("POST", `/api/conversations/${conversationId}/close`);
     },
     onSuccess: async () => {
-      // 캐시 무효화 후 즉시 refetch
       await queryClient.invalidateQueries({ queryKey: ["/api/active-conversations"] });
       await refetch();
       toast({
@@ -56,7 +54,6 @@ export default function Conversations() {
     },
   });
 
-  // 페르소나 정보 조회 (이미지용)
   const { data: personas = {} } = useQuery<Record<string, any>>({
     queryKey: ["/api/personas/public"],
     select: (data) => {
@@ -77,150 +74,150 @@ export default function Conversations() {
     return genderImages?.expressions?.['중립'] || persona.images.base || null;
   };
 
+  const formatMessageTime = (dateStr?: string) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+    
+    if (isToday(date)) {
+      return format(date, 'a h:mm', { locale: ko });
+    } else if (isYesterday(date)) {
+      return '어제';
+    } else {
+      return format(date, 'M월 d일', { locale: ko });
+    }
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="flex items-center gap-3 mb-6">
-        <MessageCircle className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-bold">대화 중</h1>
-        {activeConversations && activeConversations.length > 0 && (
-          <Badge variant="secondary">{activeConversations.length}개</Badge>
-        )}
+    <div className="flex flex-col h-full bg-background">
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-primary" />
+            <h1 className="text-lg font-bold">대화</h1>
+          </div>
+          {activeConversations && activeConversations.length > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {activeConversations.length}
+            </Badge>
+          )}
+        </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      ) : activeConversations && activeConversations.length > 0 ? (
-        <div className="space-y-1">
-          {activeConversations.map((conv) => {
-            const personaInfo = personas[conv.personaId];
-            const personaImage = getPersonaImage(personaInfo);
-            
-            // 유효한 날짜 확인 및 포맷팅
-            const getValidDate = (dateStr?: string) => {
-              if (!dateStr) return new Date();
-              const parsed = new Date(dateStr);
-              return isNaN(parsed.getTime()) ? new Date() : parsed;
-            };
-            
-            // lastActivityAt 우선 사용 (메신저 스타일)
-            const lastMessageTime = conv.lastActivityAt 
-              ? format(getValidDate(conv.lastActivityAt), 'MM/dd HH:mm')
-              : format(getValidDate(conv.createdAt), 'MM/dd HH:mm');
-            
-            // lastMessage 파싱 (객체 또는 문자열 형태)
-            const getLastMessageText = () => {
-              if (!conv.lastMessage) return "대화를 시작해보세요";
-              if (typeof conv.lastMessage === 'string') {
-                return conv.lastMessage;
-              }
-              if (typeof conv.lastMessage === 'object' && conv.lastMessage.message) {
-                return (conv.lastMessage.sender === "user" ? "나: " : "") + conv.lastMessage.message;
-              }
-              return "대화를 시작해보세요";
-            };
-            
-            const hasUnread = (conv.unreadCount ?? 0) > 0;
-            
-            return (
-              <Link key={conv.id} href={`/chat/${conv.id}`}>
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+          </div>
+        ) : activeConversations && activeConversations.length > 0 ? (
+          <div className="divide-y divide-border/50">
+            {activeConversations.map((conv) => {
+              const personaInfo = personas[conv.personaId];
+              const personaImage = getPersonaImage(personaInfo);
+              const lastMessageTime = formatMessageTime(conv.lastActivityAt || conv.createdAt);
+              
+              const getLastMessageText = () => {
+                if (!conv.lastMessage) return "대화를 시작해보세요";
+                if (typeof conv.lastMessage === 'string') {
+                  return conv.lastMessage;
+                }
+                if (typeof conv.lastMessage === 'object' && conv.lastMessage.message) {
+                  return (conv.lastMessage.sender === "user" ? "나: " : "") + conv.lastMessage.message;
+                }
+                return "대화를 시작해보세요";
+              };
+              
+              const hasUnread = (conv.unreadCount ?? 0) > 0;
+              
+              return (
                 <div 
-                  className="flex items-center gap-3 p-3 rounded-lg border bg-card transition-all cursor-pointer group hover-elevate"
-                  data-testid={`conversation-card-${conv.id}`}
+                  key={conv.id}
+                  className="relative"
+                  data-testid={`conversation-item-${conv.id}`}
                 >
-                  {/* 페르소나 이미지 + 읽지 않음 배지 */}
-                  <div className="relative flex-shrink-0">
-                    {personaImage ? (
-                      <img 
-                        src={personaImage} 
-                        alt={conv.personaName || conv.personaId}
-                        className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-sm"
-                      />
-                    ) : (
-                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-muted to-muted-foreground/50 flex items-center justify-center text-primary-foreground font-bold shadow-sm">
-                        {(conv.personaName || conv.personaId).charAt(0).toUpperCase()}
+                  <Link href={`/chat/${conv.id}`}>
+                    <div className="flex items-center gap-3 px-4 py-3 active:bg-muted/50 transition-colors">
+                      <div className="relative flex-shrink-0">
+                        {personaImage ? (
+                          <img 
+                            src={personaImage} 
+                            alt={conv.personaName || conv.personaId}
+                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover ring-2 ring-background shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-primary font-bold text-lg shadow-sm">
+                            {(conv.personaName || conv.personaId).charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        {hasUnread && (
+                          <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-[10px] font-bold px-1 shadow-sm">
+                            {conv.unreadCount! > 99 ? '99+' : conv.unreadCount}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {/* 읽지 않은 메시지 배지 */}
-                    {hasUnread && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                        {conv.unreadCount}
+
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <span className={`font-medium truncate text-sm sm:text-base ${hasUnread ? 'text-foreground' : 'text-foreground/90'}`}>
+                            {conv.personaName || conv.personaId}
+                          </span>
+                          <span className="text-[11px] sm:text-xs text-muted-foreground flex-shrink-0">
+                            {lastMessageTime}
+                          </span>
+                        </div>
+                        
+                        {conv.scenarioRun?.scenarioName && (
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <Sparkles className="w-3 h-3 text-amber-500" />
+                            <span className="text-[11px] text-muted-foreground truncate">
+                              {conv.scenarioRun.scenarioName}
+                            </span>
+                          </div>
+                        )}
+                        
+                        <p className={`text-xs sm:text-sm truncate ${hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                          {getLastMessageText()}
+                        </p>
                       </div>
-                    )}
-                  </div>
 
-                  {/* 대화 정보 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2 mb-1">
-                      <span className="font-semibold truncate text-sm">
-                        {conv.personaName || conv.personaId}
-                      </span>
-                      <span className="text-xs text-muted-foreground flex-shrink-0">
-                        {lastMessageTime}
-                      </span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/50 flex-shrink-0 hidden sm:block" />
                     </div>
-                    <div className="flex items-center gap-2 mb-1">
-                      {conv.scenarioRun?.scenarioName && (
-                        <Badge variant="outline" className="text-xs">
-                          {conv.scenarioRun.scenarioName}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className={`text-xs truncate ${hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-                      {getLastMessageText()}
-                    </p>
-                  </div>
+                  </Link>
 
-                  {/* 액션 버튼 (호버시 표시) */}
-                  <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        window.location.href = `/chat/${conv.id}`;
-                      }}
-                      data-testid={`button-view-conversation-${conv.id}`}
-                    >
-                      보기
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (confirm("대화방을 닫으시겠습니까? 목록에서 제거됩니다.")) {
-                          closeMutation.mutate(conv.id);
-                        }
-                      }}
-                      disabled={closeMutation.isPending}
-                      data-testid={`button-close-conversation-${conv.id}`}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 text-muted-foreground/60 sm:hidden"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (confirm("대화방을 닫으시겠습니까?")) {
+                        closeMutation.mutate(conv.id);
+                      }
+                    }}
+                    disabled={closeMutation.isPending}
+                    data-testid={`button-close-${conv.id}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
-              </Link>
-            );
-          })}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <MessageCircle className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mb-4">진행 중인 대화가 없습니다</p>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <MessageCircle className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground mb-2 text-sm">진행 중인 대화가 없습니다</p>
             <Link href="/">
-              <span className="text-primary hover:underline cursor-pointer">
-                라이브러리에서 페르소나를 선택하여 대화를 시작해보세요
-              </span>
+              <Button variant="link" className="text-primary p-0 h-auto text-sm">
+                라이브러리에서 대화 시작하기
+              </Button>
             </Link>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
