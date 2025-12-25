@@ -751,20 +751,52 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async updateUser(id: string, updates: { name?: string; password?: string; profileImage?: string; tier?: string }): Promise<User> {
-    const updateData: any = { updatedAt: new Date() };
-    if (updates.name) updateData.name = updates.name;
-    if (updates.password) updateData.password = updates.password;
-    if (updates.profileImage !== undefined) updateData.profileImage = updates.profileImage;
-    if (updates.tier) updateData.tier = updates.tier;
+    const setClauses: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    setClauses.push(`"updated_at" = NOW()`);
+
+    if (updates.name) {
+      setClauses.push(`"name" = $${paramIndex++}`);
+      values.push(updates.name);
+    }
+    if (updates.password) {
+      setClauses.push(`"password" = $${paramIndex++}`);
+      values.push(updates.password);
+    }
+    if (updates.profileImage !== undefined) {
+      setClauses.push(`"profile_image" = $${paramIndex++}`);
+      values.push(updates.profileImage);
+    }
+    if (updates.tier) {
+      setClauses.push(`"tier" = $${paramIndex++}`);
+      values.push(updates.tier);
+    }
+
+    values.push(id);
+    const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
     
-    console.log("[updateUser] id:", id, "updateData:", JSON.stringify(updateData));
-    const result = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
-    console.log("[updateUser] result:", JSON.stringify(result));
-    const [user] = result;
-    if (!user) {
+    const result = await neonClient(query, values);
+    if (!result.rows || result.rows.length === 0) {
       throw new Error("User not found");
     }
-    return user;
+    
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      email: row.email,
+      password: row.password,
+      name: row.name,
+      role: row.role,
+      tier: row.tier,
+      profileImage: row.profile_image,
+      isActive: row.is_active,
+      lastLoginAt: row.last_login_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      assignedCategoryId: row.assigned_category_id,
+    };
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
