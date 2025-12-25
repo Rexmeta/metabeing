@@ -1300,7 +1300,7 @@ export function ScenarioManager({
                         
                         <div className="grid grid-cols-3 gap-3">
                           <div>
-                            <Label htmlFor={`persona-mbti-${index}`} className="text-sm font-medium text-slate-700">MBTI *</Label>
+                            <Label htmlFor={`persona-mbti-${index}`} className="text-sm font-medium text-slate-700">성격 유형 *</Label>
                             <Input
                               id={`persona-mbti-${index}`}
                               value={persona.mbti}

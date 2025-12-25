@@ -887,7 +887,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="id" className="text-sm font-semibold text-slate-700 mb-1.5 block">MBTI ID (소문자)</Label>
+                    <Label htmlFor="id" className="text-sm font-semibold text-slate-700 mb-1.5 block">페르소나 ID (소문자)</Label>
                     <Input
                       id="id"
                       value={formData.id}
@@ -899,7 +899,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                     />
                   </div>
                   <div>
-                    <Label htmlFor="mbti" className="text-sm font-semibold text-slate-700 mb-1.5 block">MBTI 유형 (대문자)</Label>
+                    <Label htmlFor="mbti" className="text-sm font-semibold text-slate-700 mb-1.5 block">성격 유형 (대문자)</Label>
                     <Input
                       id="mbti"
                       value={formData.mbti}
@@ -1571,7 +1571,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="id2" className="text-sm font-semibold text-slate-700 mb-1.5 block">MBTI ID (소문자)</Label>
+                    <Label htmlFor="id2" className="text-sm font-semibold text-slate-700 mb-1.5 block">페르소나 ID (소문자)</Label>
                     <Input
                       id="id2"
                       value={formData.id}
@@ -1583,7 +1583,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                     />
                   </div>
                   <div>
-                    <Label htmlFor="mbti2" className="text-sm font-semibold text-slate-700 mb-1.5 block">MBTI 유형 (대문자)</Label>
+                    <Label htmlFor="mbti2" className="text-sm font-semibold text-slate-700 mb-1.5 block">성격 유형 (대문자)</Label>
                     <Input
                       id="mbti2"
                       value={formData.mbti}
@@ -1861,8 +1861,8 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
       {personas?.length === 0 && (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">🧠</div>
-          <h3 className="text-xl font-medium text-slate-600 mb-2">MBTI 페르소나가 없습니다</h3>
-          <p className="text-slate-500 mb-4">새로운 MBTI 성격 유형을 추가해보세요</p>
+          <h3 className="text-xl font-medium text-slate-600 mb-2">페르소나가 없습니다</h3>
+          <p className="text-slate-500 mb-4">새로운 성격 유형을 추가해보세요</p>
           <Button
             onClick={() => {
               resetForm();
@@ -1871,7 +1871,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
             }}
             className="bg-corporate-600 hover:bg-corporate-700"
           >
-            첫 번째 MBTI 페르소나 생성
+            첫 번째 페르소나 생성
           </Button>
         </div>
       )}
