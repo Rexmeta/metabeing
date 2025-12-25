@@ -1317,7 +1317,7 @@ export function ScenarioManager({
                           </Button>
                         </div>
                         
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-4 gap-3">
                           <div>
                             <Label className="text-sm font-medium text-slate-700">페르소나 선택 *</Label>
                             <Popover 
@@ -1421,42 +1421,6 @@ export function ScenarioManager({
                                 </Command>
                               </PopoverContent>
                             </Popover>
-                          </div>
-                          
-                          <div>
-                            <Label htmlFor={`persona-name-${index}`} className="text-sm font-medium text-slate-700">이름 *</Label>
-                            <Input
-                              id={`persona-name-${index}`}
-                              value={persona.name}
-                              onChange={(e) => {
-                                const newPersonas = [...formData.personas];
-                                newPersonas[index] = { ...persona, name: e.target.value };
-                                setFormData(prev => ({ ...prev, personas: newPersonas }));
-                              }}
-                              placeholder="김민수, 이지영 등"
-                              data-testid={`input-persona-name-${index}`}
-                              className="bg-white"
-                            />
-                          </div>
-
-                          <div>
-                            <Label htmlFor={`persona-gender-${index}`} className="text-sm font-medium text-slate-700">성별 *</Label>
-                            <Select
-                              value={persona.gender}
-                              onValueChange={(value: 'male' | 'female') => {
-                                const newPersonas = [...formData.personas];
-                                newPersonas[index] = { ...persona, gender: value };
-                                setFormData(prev => ({ ...prev, personas: newPersonas }));
-                              }}
-                            >
-                              <SelectTrigger data-testid={`select-persona-gender-${index}`} className="bg-white">
-                                <SelectValue placeholder="성별 선택" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="male">남성</SelectItem>
-                                <SelectItem value="female">여성</SelectItem>
-                              </SelectContent>
-                            </Select>
                           </div>
                           
                           <div>

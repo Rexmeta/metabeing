@@ -126,6 +126,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return { personaRun, scenarioRun };
   }
 
+  // Helper function to enrich scenario personas with data from persona cache
+  function enrichScenarioPersonas(scenario: any): any {
+    if (!scenario || !scenario.personas || !Array.isArray(scenario.personas)) {
+      return scenario;
+    }
+
+    const personaCache = GlobalPersonaCache.getInstance();
+    const enrichedPersonas = scenario.personas.map((p: any) => {
+      // personaRef로 페르소나 데이터 조회
+      const personaRef = p.personaRef || p.id;
+      if (!personaRef) return p;
+
+      const personaData = personaCache.getPersonaData(personaRef);
+      if (!personaData) return p;
+
+      // 페르소나 데이터에서 name과 gender를 가져와서 병합
+      // 기존 값이 있으면 유지 (하위 호환성)
+      return {
+        ...p,
+        name: p.name || personaData.name || personaData.mbti?.toUpperCase() || p.id,
+        gender: p.gender || personaData.gender || 'male'
+      };
+    });
+
+    return {
+      ...scenario,
+      personas: enrichedPersonas
+    };
+  }
+
+  // Helper function to enrich multiple scenarios
+  function enrichScenariosPersonas(scenarios: any[]): any[] {
+    return scenarios.map(enrichScenarioPersonas);
+  }
+
   // Helper function to check if scenario should be auto-completed
   async function checkAndCompleteScenario(scenarioRunId: string) {
     try {
@@ -3772,7 +3807,7 @@ ${personaSnapshot.name}:`;
       const myScenarios = scenarios.filter(
         (s: any) => s.ownerId === userId && s.id
       );
-      res.json(myScenarios);
+      res.json(enrichScenariosPersonas(myScenarios));
     } catch (error) {
       console.error("Error getting my scenarios:", error);
       res.status(500).json({ error: "Failed to get my scenarios" });
@@ -3786,7 +3821,7 @@ ${personaSnapshot.name}:`;
       const publicScenarios = scenarios.filter(
         (s: any) => s.visibility !== "private" && s.id
       );
-      res.json(publicScenarios);
+      res.json(enrichScenariosPersonas(publicScenarios));
     } catch (error) {
       console.error("Error getting public scenarios:", error);
       res.status(500).json({ error: "Failed to get public scenarios" });
@@ -3815,13 +3850,13 @@ ${personaSnapshot.name}:`;
       
       // 관리자는 모든 시나리오 접근 가능
       if (user.role === 'admin') {
-        return res.json(scenarios);
+        return res.json(enrichScenariosPersonas(scenarios));
       }
       
       // 운영자는 할당된 카테고리의 시나리오만 접근 가능
       if (user.role === 'operator' && user.assignedCategoryId) {
         const filteredScenarios = scenarios.filter((s: any) => s.categoryId === user.assignedCategoryId);
-        return res.json(filteredScenarios);
+        return res.json(enrichScenariosPersonas(filteredScenarios));
       }
       
       // 카테고리 미할당 운영자는 빈 배열
@@ -3851,7 +3886,7 @@ ${personaSnapshot.name}:`;
       }
       
       const scenario = await fileManager.createScenario(scenarioData);
-      res.json(scenario);
+      res.json(enrichScenarioPersonas(scenario));
     } catch (error) {
       console.error("Error creating scenario:", error);
       res.status(500).json({ error: "Failed to create scenario" });
@@ -3878,7 +3913,7 @@ ${personaSnapshot.name}:`;
       }
       
       const scenario = await fileManager.updateScenario(scenarioId, req.body);
-      res.json(scenario);
+      res.json(enrichScenarioPersonas(scenario));
     } catch (error) {
       console.error("Error updating scenario:", error);
       res.status(500).json({ error: "Failed to update scenario" });
@@ -4309,7 +4344,7 @@ ${personaSnapshot.name}:`;
       };
       
       const scenario = await fileManager.updateScenario(scenarioId, updateData);
-      res.json(scenario);
+      res.json(enrichScenarioPersonas(scenario));
     } catch (error) {
       console.error("Error updating scenario visibility:", error);
       res.status(500).json({ error: "Failed to update scenario visibility" });
