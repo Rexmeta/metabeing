@@ -757,7 +757,10 @@ export class PostgreSQLStorage implements IStorage {
     if (updates.profileImage !== undefined) updateData.profileImage = updates.profileImage;
     if (updates.tier) updateData.tier = updates.tier;
     
-    const [user] = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
+    console.log("[updateUser] id:", id, "updateData:", JSON.stringify(updateData));
+    const result = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
+    console.log("[updateUser] result:", JSON.stringify(result));
+    const [user] = result;
     if (!user) {
       throw new Error("User not found");
     }
