@@ -10,10 +10,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { ComplexScenario } from '@/lib/scenario-system';
-import { Loader2, MoreVertical, ChevronDown, ChevronUp, Clock, Users, Target } from 'lucide-react';
+import { Loader2, MoreVertical, ChevronDown, ChevronUp, Clock, Users, Target, Check, ChevronsUpDown, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { AIScenarioGenerator } from './AIScenarioGenerator';
 
 interface ScenarioPersona {
@@ -129,6 +132,22 @@ export function ScenarioManager({
   const { data: categories } = useQuery<{ id: string; name: string; description?: string }[]>({
     queryKey: ['/api/categories'],
   });
+
+  // 공개 페르소나 목록 조회 (검색용)
+  interface PublicPersona {
+    id: string;
+    mbti: string;
+    gender: string;
+    name?: string;
+    personality_traits?: string[];
+    background?: string;
+  }
+  const { data: publicPersonas } = useQuery<PublicPersona[]>({
+    queryKey: ['/api/personas/public'],
+  });
+
+  // 페르소나 검색 팝오버 상태 관리 (각 페르소나별)
+  const [personaSearchOpen, setPersonaSearchOpen] = useState<{ [key: number]: boolean }>({});
 
   // 시나리오 로드 시 모두 펼쳐진 상태로 초기화
   React.useEffect(() => {
@@ -1300,26 +1319,108 @@ export function ScenarioManager({
                         
                         <div className="grid grid-cols-3 gap-3">
                           <div>
-                            <Label htmlFor={`persona-mbti-${index}`} className="text-sm font-medium text-slate-700">성격 유형 *</Label>
-                            <Input
-                              id={`persona-mbti-${index}`}
-                              value={persona.mbti}
-                              onChange={(e) => {
-                                const mbtiValue = e.target.value.toUpperCase();
-                                const idValue = e.target.value.toLowerCase();
-                                const newPersonas = [...formData.personas];
-                                newPersonas[index] = { 
-                                  ...persona, 
-                                  mbti: mbtiValue,
-                                  id: idValue, 
-                                  personaRef: idValue + '.json' 
-                                };
-                                setFormData(prev => ({ ...prev, personas: newPersonas }));
-                              }}
-                              placeholder="ISTJ, ENFJ, INTP 등"
-                              data-testid={`input-persona-mbti-${index}`}
-                              className="bg-white"
-                            />
+                            <Label className="text-sm font-medium text-slate-700">페르소나 선택 *</Label>
+                            <Popover 
+                              open={personaSearchOpen[index] || false} 
+                              onOpenChange={(open) => setPersonaSearchOpen(prev => ({ ...prev, [index]: open }))}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={personaSearchOpen[index] || false}
+                                  className="w-full justify-between bg-white font-normal"
+                                  data-testid={`select-persona-${index}`}
+                                >
+                                  {persona.id ? (
+                                    <span className="flex items-center gap-2">
+                                      <Badge variant="secondary" className="text-xs">
+                                        {persona.mbti || persona.id.toUpperCase()}
+                                      </Badge>
+                                      {publicPersonas?.find(p => p.id === persona.id)?.name || persona.name || persona.id}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">페르소나 검색...</span>
+                                  )}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80 p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder="이름, 성격 유형, 특성으로 검색..." />
+                                  <CommandList>
+                                    <CommandEmpty>페르소나를 찾을 수 없습니다</CommandEmpty>
+                                    {persona.id && !publicPersonas?.find(p => p.id === persona.id) && (
+                                      <CommandGroup heading="현재 설정">
+                                        <CommandItem
+                                          value={`current ${persona.id} ${persona.mbti || ''} ${persona.name || ''}`}
+                                          onSelect={() => {
+                                            setPersonaSearchOpen(prev => ({ ...prev, [index]: false }));
+                                          }}
+                                          className="cursor-pointer"
+                                        >
+                                          <Check className="mr-2 h-4 w-4 opacity-100" />
+                                          <div className="flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-2">
+                                              <Badge variant="outline" className="text-xs">
+                                                {persona.mbti || persona.id.toUpperCase()}
+                                              </Badge>
+                                              <span className="font-medium">{persona.name || persona.id}</span>
+                                              <Badge variant="secondary" className="text-xs">현재 값</Badge>
+                                            </div>
+                                          </div>
+                                        </CommandItem>
+                                      </CommandGroup>
+                                    )}
+                                    <CommandGroup heading="페르소나 목록">
+                                      {publicPersonas && publicPersonas.map((p) => (
+                                        <CommandItem
+                                          key={p.id}
+                                          value={`${p.id} ${p.mbti} ${p.name || ''} ${p.personality_traits?.join(' ') || ''} ${p.background || ''}`}
+                                          onSelect={() => {
+                                            const newPersonas = [...formData.personas];
+                                            newPersonas[index] = {
+                                              ...persona,
+                                              id: p.id,
+                                              mbti: p.mbti,
+                                              personaRef: p.id + '.json',
+                                              gender: (p.gender as 'male' | 'female') || persona.gender
+                                            };
+                                            setFormData(prev => ({ ...prev, personas: newPersonas }));
+                                            setPersonaSearchOpen(prev => ({ ...prev, [index]: false }));
+                                          }}
+                                          className="cursor-pointer"
+                                          data-testid={`persona-option-${p.id}`}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              persona.id === p.id ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          <div className="flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-2">
+                                              <Badge variant="outline" className="text-xs">
+                                                {p.mbti}
+                                              </Badge>
+                                              <span className="font-medium">{p.name || p.id}</span>
+                                              <span className="text-xs text-muted-foreground">
+                                                ({p.gender === 'female' ? '여성' : '남성'})
+                                              </span>
+                                            </div>
+                                            {p.personality_traits && p.personality_traits.length > 0 && (
+                                              <span className="text-xs text-muted-foreground truncate max-w-[250px]">
+                                                {p.personality_traits.slice(0, 3).join(', ')}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                           </div>
                           
                           <div>
