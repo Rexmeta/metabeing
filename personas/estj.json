@@ -111,7 +111,7 @@
         "놀람": "/personas/estj/male/surprise.webp?t=1765149748327",
         "호기심": "/personas/estj/male/curious.webp?t=1765149748327",
         "불안": "/personas/estj/male/anxious.webp?t=1765149748327",
-        "피로": "/personas/estj/male/tired.webp?t=1765149748327",
+        "단호": "",
         "실망": "/personas/estj/male/disappointed.webp?t=1765149748327",
         "당혹": "/personas/estj/male/confused.webp?t=1765149748327"
       }
@@ -125,12 +125,19 @@
         "놀람": "",
         "호기심": "",
         "불안": "",
-        "피로": "",
+        "단호": "",
         "실망": "",
         "당혹": ""
       }
     }
   },
   "ownerId": "bb0371f6-9706-439d-8416-498a92c65b56",
-  "visibility": "public"
+  "visibility": "public",
+  "name": "김기현",
+  "department": "",
+  "position": "",
+  "experience": "",
+  "stance": "",
+  "goal": "",
+  "tradeoff": ""
 }

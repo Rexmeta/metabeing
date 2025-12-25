@@ -856,6 +856,9 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
   // dialogOnly 모드이면 다이얼로그만 렌더링
   // dialogOnly 모드에서는 externalOpen만으로 다이얼로그 열림 제어
   const isDialogOpen = dialogOnly ? externalOpen : (isCreateOpen || !!editingPersona);
+  
+  // dialogOnly 모드에서 수정/생성 모드 판단 (externalPersona 우선 사용으로 상태 동기화 문제 방지)
+  const isEditMode = dialogOnly ? !!externalPersona : !!editingPersona;
 
   if (isLoading && !dialogOnly) {
     return <div className="text-center py-8">로딩 중...</div>;
@@ -874,7 +877,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
             <DialogHeader className="bg-indigo-600 -m-6 mb-4 p-6 rounded-t-lg">
               <DialogTitle className="text-white text-xl flex items-center gap-2">
                 <i className="fas fa-user-edit"></i>
-                {editingPersona ? '페르소나 수정' : '페르소나 생성'}
+                {isEditMode ? '페르소나 수정' : '페르소나 생성'}
               </DialogTitle>
             </DialogHeader>
             
@@ -1559,7 +1562,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
             <DialogHeader className="bg-indigo-600 -m-6 mb-4 p-6 rounded-t-lg">
               <DialogTitle className="text-white text-xl flex items-center gap-2">
                 <i className="fas fa-user-edit"></i>
-                {editingPersona ? '페르소나 수정' : '페르소나 생성'}
+                {isEditMode ? '페르소나 수정' : '페르소나 생성'}
               </DialogTitle>
             </DialogHeader>
             
