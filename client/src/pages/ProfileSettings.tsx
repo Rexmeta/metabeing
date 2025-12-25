@@ -71,8 +71,9 @@ export default function ProfileSettings() {
   const onProfileSubmit = async (data: ProfileFormData) => {
     setIsUpdatingProfile(true);
     try {
-      await apiRequest("PATCH", "/api/auth/profile", data);
+      await apiRequest("PATCH", "/api/user/profile", { name: data.name });
       await refreshUser();
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
         title: "프로필 업데이트 완료",
         description: "프로필 정보가 성공적으로 업데이트되었습니다.",
@@ -91,7 +92,7 @@ export default function ProfileSettings() {
   const onPasswordSubmit = async (data: PasswordFormData) => {
     setIsUpdatingPassword(true);
     try {
-      await apiRequest("PATCH", "/api/auth/password", {
+      await apiRequest("PATCH", "/api/user/profile", {
         currentPassword: data.currentPassword,
         newPassword: data.newPassword,
       });
