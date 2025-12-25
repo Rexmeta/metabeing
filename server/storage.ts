@@ -751,57 +751,21 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async updateUser(id: string, updates: { name?: string; password?: string; profileImage?: string; tier?: string }): Promise<User> {
-    const setClauses: string[] = [];
-    const values: any[] = [];
-    let paramIndex = 1;
-
-    setClauses.push(`"updated_at" = NOW()`);
-
-    if (updates.name) {
-      setClauses.push(`"name" = $${paramIndex++}`);
-      values.push(updates.name);
-    }
-    if (updates.password) {
-      setClauses.push(`"password" = $${paramIndex++}`);
-      values.push(updates.password);
-    }
-    if (updates.profileImage !== undefined) {
-      setClauses.push(`"profile_image" = $${paramIndex++}`);
-      values.push(updates.profileImage);
-    }
-    if (updates.tier) {
-      setClauses.push(`"tier" = $${paramIndex++}`);
-      values.push(updates.tier);
-    }
-
-    values.push(id);
-    const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
+    const updateData: any = { updatedAt: new Date() };
+    if (updates.name) updateData.name = updates.name;
+    if (updates.password) updateData.password = updates.password;
+    if (updates.profileImage !== undefined) updateData.profileImage = updates.profileImage;
+    if (updates.tier) updateData.tier = updates.tier;
     
-    console.log("[updateUser] query:", query, "values:", values);
-    const result = await neonClient(query, values);
-    console.log("[updateUser] raw result:", JSON.stringify(result));
+    // 2-step approach: UPDATE then SELECT (workaround for Neon HTTP driver RETURNING issue)
+    await db.update(users).set(updateData).where(eq(users.id, id));
     
-    // neon client returns rows directly as array
-    const rows = Array.isArray(result) ? result : (result?.rows || []);
-    if (!rows || rows.length === 0) {
+    // Fetch the updated user
+    const user = await this.getUser(id);
+    if (!user) {
       throw new Error("User not found");
     }
-    
-    const row = rows[0];
-    return {
-      id: row.id,
-      email: row.email,
-      password: row.password,
-      name: row.name,
-      role: row.role,
-      tier: row.tier,
-      profileImage: row.profile_image,
-      isActive: row.is_active,
-      lastLoginAt: row.last_login_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      assignedCategoryId: row.assigned_category_id,
-    };
+    return user;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
