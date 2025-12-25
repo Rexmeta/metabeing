@@ -777,12 +777,17 @@ export class PostgreSQLStorage implements IStorage {
     values.push(id);
     const query = `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
     
+    console.log("[updateUser] query:", query, "values:", values);
     const result = await neonClient(query, values);
-    if (!result.rows || result.rows.length === 0) {
+    console.log("[updateUser] raw result:", JSON.stringify(result));
+    
+    // neon client returns rows directly as array
+    const rows = Array.isArray(result) ? result : (result?.rows || []);
+    if (!rows || rows.length === 0) {
       throw new Error("User not found");
     }
     
-    const row = result.rows[0];
+    const row = rows[0];
     return {
       id: row.id,
       email: row.email,
