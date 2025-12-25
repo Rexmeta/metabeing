@@ -24,7 +24,6 @@ import { User, Mail, Lock, Camera, Save, Shield } from "lucide-react";
 
 const profileSchema = z.object({
   name: z.string().min(2, "이름은 2자 이상이어야 합니다"),
-  email: z.string().email("유효한 이메일 주소를 입력하세요"),
 });
 
 const passwordSchema = z.object({
@@ -55,7 +54,6 @@ export default function ProfileSettings() {
     resolver: zodResolver(profileSchema),
     defaultValues: {
       name: user?.name || "",
-      email: user?.email || "",
     },
   });
 
@@ -170,19 +168,17 @@ export default function ProfileSettings() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={profileForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>이메일</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="email" data-testid="input-email" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-2">
+                  <Label>이메일</Label>
+                  <Input 
+                    value={user?.email || ""} 
+                    type="email" 
+                    disabled 
+                    className="bg-muted cursor-not-allowed"
+                    data-testid="input-email" 
+                  />
+                  <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다</p>
+                </div>
                 <Button type="submit" disabled={isUpdatingProfile} data-testid="button-save-profile">
                   <Save className="w-4 h-4 mr-2" />
                   {isUpdatingProfile ? "저장 중..." : "프로필 저장"}
