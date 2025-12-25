@@ -795,10 +795,20 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
-    const existing = await db.select().from(users).where(eq(users.username, username));
-    if (existing.length === 0) return true;
-    if (excludeUserId && existing[0].id === excludeUserId) return true;
-    return false;
+    try {
+      const existing = await db.select({ id: users.id }).from(users).where(
+        and(
+          eq(users.username, username),
+          isNotNull(users.username)
+        )
+      );
+      if (!existing || existing.length === 0) return true;
+      if (excludeUserId && existing[0].id === excludeUserId) return true;
+      return false;
+    } catch (error) {
+      console.error("isUsernameAvailable error:", error);
+      return true;
+    }
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
