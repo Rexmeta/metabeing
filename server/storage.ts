@@ -750,12 +750,33 @@ export class PostgreSQLStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: string, updates: { name?: string; password?: string; profileImage?: string; tier?: string }): Promise<User> {
+  async updateUser(id: string, updates: { 
+    name?: string; 
+    password?: string; 
+    profileImage?: string; 
+    tier?: string;
+    username?: string;
+    displayName?: string;
+    bio?: string;
+    subscriptionPlan?: string;
+    subscriptionBillingCycle?: string;
+    subscriptionExpiresAt?: Date | null;
+    mutedWords?: string[];
+    preferences?: any;
+  }): Promise<User> {
     const updateData: any = { updatedAt: new Date() };
-    if (updates.name) updateData.name = updates.name;
-    if (updates.password) updateData.password = updates.password;
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.password !== undefined) updateData.password = updates.password;
     if (updates.profileImage !== undefined) updateData.profileImage = updates.profileImage;
-    if (updates.tier) updateData.tier = updates.tier;
+    if (updates.tier !== undefined) updateData.tier = updates.tier;
+    if (updates.username !== undefined) updateData.username = updates.username;
+    if (updates.displayName !== undefined) updateData.displayName = updates.displayName;
+    if (updates.bio !== undefined) updateData.bio = updates.bio;
+    if (updates.subscriptionPlan !== undefined) updateData.subscriptionPlan = updates.subscriptionPlan;
+    if (updates.subscriptionBillingCycle !== undefined) updateData.subscriptionBillingCycle = updates.subscriptionBillingCycle;
+    if (updates.subscriptionExpiresAt !== undefined) updateData.subscriptionExpiresAt = updates.subscriptionExpiresAt;
+    if (updates.mutedWords !== undefined) updateData.mutedWords = updates.mutedWords;
+    if (updates.preferences !== undefined) updateData.preferences = updates.preferences;
     
     // 2-step approach: UPDATE then SELECT (workaround for Neon HTTP driver RETURNING issue)
     await db.update(users).set(updateData).where(eq(users.id, id));
@@ -766,6 +787,18 @@ export class PostgreSQLStorage implements IStorage {
       throw new Error("User not found");
     }
     return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
+    const existing = await db.select().from(users).where(eq(users.username, username));
+    if (existing.length === 0) return true;
+    if (excludeUserId && existing[0].id === excludeUserId) return true;
+    return false;
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {

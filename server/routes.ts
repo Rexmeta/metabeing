@@ -385,7 +385,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const { name, currentPassword, newPassword, profileImage } = req.body;
+      const { 
+        name, 
+        currentPassword, 
+        newPassword, 
+        profileImage,
+        username,
+        displayName,
+        bio,
+        mutedWords,
+        preferences
+      } = req.body;
       
       // 현재 사용자 정보 조회
       const user = await storage.getUser(userId);
@@ -394,7 +404,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
-      const updates: { name?: string; password?: string; profileImage?: string } = {};
+      const updates: { 
+        name?: string; 
+        password?: string; 
+        profileImage?: string;
+        username?: string;
+        displayName?: string;
+        bio?: string;
+        mutedWords?: string[];
+        preferences?: any;
+      } = {};
 
       // 이름 업데이트
       if (name && name.trim()) {
@@ -404,6 +423,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 프로필 이미지 업데이트
       if (profileImage !== undefined) {
         updates.profileImage = profileImage;
+      }
+
+      // 사용자명 업데이트
+      if (username !== undefined) {
+        if (username && username.trim()) {
+          const trimmedUsername = username.trim().toLowerCase();
+          // 사용자명 유효성 검사 (영문, 숫자, 밑줄만 허용)
+          if (!/^[a-z0-9_]{3,20}$/.test(trimmedUsername)) {
+            return res.status(400).json({ error: "사용자명은 3-20자의 영문 소문자, 숫자, 밑줄만 허용됩니다" });
+          }
+          // 중복 확인
+          const isAvailable = await storage.isUsernameAvailable(trimmedUsername, userId);
+          if (!isAvailable) {
+            return res.status(400).json({ error: "이미 사용 중인 사용자명입니다" });
+          }
+          updates.username = trimmedUsername;
+        } else {
+          updates.username = username; // null 허용
+        }
+      }
+
+      // 표시 이름 업데이트
+      if (displayName !== undefined) {
+        updates.displayName = displayName?.trim() || null;
+      }
+
+      // 자기소개 업데이트
+      if (bio !== undefined) {
+        updates.bio = bio?.trim() || null;
+      }
+
+      // 음소거 단어 업데이트
+      if (mutedWords !== undefined) {
+        updates.mutedWords = Array.isArray(mutedWords) ? mutedWords : [];
+      }
+
+      // 설정 업데이트
+      if (preferences !== undefined) {
+        updates.preferences = preferences;
       }
 
       // 비밀번호 변경
@@ -435,9 +493,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: updatedUser.id,
         email: updatedUser.email,
         name: updatedUser.name,
+        username: updatedUser.username,
+        displayName: updatedUser.displayName,
+        bio: updatedUser.bio,
         role: updatedUser.role,
         profileImage: updatedUser.profileImage,
         tier: updatedUser.tier,
+        subscriptionPlan: updatedUser.subscriptionPlan,
+        subscriptionBillingCycle: updatedUser.subscriptionBillingCycle,
+        subscriptionExpiresAt: updatedUser.subscriptionExpiresAt,
+        mutedWords: updatedUser.mutedWords,
+        preferences: updatedUser.preferences,
         updatedAt: updatedUser.updatedAt,
       });
     } catch (error: any) {

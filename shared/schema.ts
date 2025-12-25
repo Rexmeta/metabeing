@@ -106,15 +106,33 @@ export const users = pgTable("users", {
   email: varchar("email").unique().notNull(),
   password: varchar("password").notNull(), // 해시된 비밀번호
   name: varchar("name").notNull(), // 사용자 이름
+  username: varchar("username").unique(), // 고유 사용자명 (@username)
+  displayName: varchar("display_name"), // 표시 이름
+  bio: text("bio"), // 자기소개
   role: varchar("role").notNull().default("user"), // admin, operator, user
   profileImage: varchar("profile_image"), // 프로필 이미지 URL
   tier: varchar("tier").notNull().default("bronze"), // 회원 등급: bronze, silver, gold, platinum, diamond
+  subscriptionPlan: varchar("subscription_plan").notNull().default("free"), // 구독 플랜: free, plus, pro
+  subscriptionBillingCycle: varchar("subscription_billing_cycle"), // monthly, yearly
+  subscriptionExpiresAt: timestamp("subscription_expires_at"), // 구독 만료일
+  mutedWords: text("muted_words").array(), // 음소거 단어 목록
+  preferences: jsonb("preferences").$type<UserPreferences>(), // 사용자 설정
   isActive: boolean("is_active").notNull().default(true), // 계정 활성화 상태
   lastLoginAt: timestamp("last_login_at"), // 마지막 로그인 시간
   assignedCategoryId: varchar("assigned_category_id").references(() => categories.id), // 운영자가 담당하는 카테고리 (운영자만 해당)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// 사용자 기본 설정 타입
+export interface UserPreferences {
+  language: string; // ko, en, ja, zh 등
+  theme: string; // light, dark, system
+  chatStyle: string; // casual, formal, balanced
+  previewReleases: boolean; // 미리보기 릴리스 참여 여부
+  soundEffects: boolean; // 사운드 효과 활성화
+  notifications: boolean; // 알림 활성화
+}
 
 // 새로운 데이터 구조: 시나리오 실행 (1회 플레이) 또는 페르소나 직접 대화
 export const scenarioRuns = pgTable("scenario_runs", {
