@@ -380,6 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // @ts-ignore - req.user는 auth 미들웨어에서 설정됨
       const userId = req.user?.id;
+      console.log("[Profile Update] userId:", userId, "req.body:", JSON.stringify(req.body));
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -388,6 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 현재 사용자 정보 조회
       const user = await storage.getUser(userId);
+      console.log("[Profile Update] getUser result:", user ? `found (id: ${user.id})` : "not found");
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -425,6 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No updates provided" });
       }
 
+      console.log("[Profile Update] updates to apply:", JSON.stringify(updates));
       // 사용자 정보 업데이트
       const updatedUser = await storage.updateUser(userId, updates);
 
