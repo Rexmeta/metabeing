@@ -204,6 +204,7 @@ export function ScenarioManager({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scenarios/mine'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scenarios/public'] });
       setIsCreateOpen(false);
       resetForm();
       toast({
@@ -231,6 +232,7 @@ export function ScenarioManager({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scenarios/mine'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scenarios/public'] });
       setEditingScenario(null);
       resetForm();
       setIsCreateOpen(false);
@@ -258,6 +260,7 @@ export function ScenarioManager({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/scenarios'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scenarios/public'] });
       toast({
         title: "시나리오 삭제 완료",
         description: "시나리오가 성공적으로 삭제되었습니다.",
