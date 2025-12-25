@@ -1628,11 +1628,14 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <CardTitle className="text-lg mb-2 flex items-center gap-2">
+                    <CardTitle className="text-lg mb-2 flex items-center gap-2 flex-wrap">
                       <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-bold">
                         {persona.mbti}
                       </span>
-                      <span className="text-slate-700">{persona.id}</span>
+                      <span className="font-semibold text-slate-800">{persona.name || persona.id}</span>
+                      {persona.name && (
+                        <span className="text-xs text-slate-500">({persona.id})</span>
+                      )}
                     </CardTitle>
                     <p className="text-sm text-slate-600 mb-2">{persona.communication_style}</p>
                     <div className="flex items-center gap-2">
