@@ -974,8 +974,14 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getScenarioRun(id: string): Promise<ScenarioRun | undefined> {
-    const [scenarioRun] = await db.select().from(scenarioRuns).where(eq(scenarioRuns.id, id));
-    return scenarioRun;
+    try {
+      const result = await db.select().from(scenarioRuns).where(eq(scenarioRuns.id, id));
+      if (!result || !Array.isArray(result) || result.length === 0) return undefined;
+      return result[0];
+    } catch (error) {
+      console.error('getScenarioRun error:', error);
+      return undefined;
+    }
   }
 
   async updateScenarioRun(id: string, updates: Partial<ScenarioRun>): Promise<ScenarioRun> {
@@ -987,25 +993,45 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getUserScenarioRuns(userId: string): Promise<ScenarioRun[]> {
-    return await db.select().from(scenarioRuns).where(eq(scenarioRuns.userId, userId)).orderBy(desc(scenarioRuns.startedAt));
+    try {
+      const result = await db.select().from(scenarioRuns).where(eq(scenarioRuns.userId, userId)).orderBy(desc(scenarioRuns.startedAt));
+      if (!result || !Array.isArray(result)) return [];
+      return result;
+    } catch (error) {
+      console.error('getUserScenarioRuns error:', error);
+      return [];
+    }
   }
 
   async getAllScenarioRuns(): Promise<ScenarioRun[]> {
-    return await db.select().from(scenarioRuns).orderBy(desc(scenarioRuns.startedAt));
+    try {
+      const result = await db.select().from(scenarioRuns).orderBy(desc(scenarioRuns.startedAt));
+      if (!result || !Array.isArray(result)) return [];
+      return result;
+    } catch (error) {
+      console.error('getAllScenarioRuns error:', error);
+      return [];
+    }
   }
 
   async findActiveScenarioRun(userId: string, scenarioId: string): Promise<ScenarioRun | undefined> {
-    const [activeRun] = await db
-      .select()
-      .from(scenarioRuns)
-      .where(and(
-        eq(scenarioRuns.userId, userId),
-        eq(scenarioRuns.scenarioId, scenarioId),
-        eq(scenarioRuns.status, 'active')
-      ))
-      .orderBy(desc(scenarioRuns.startedAt))
-      .limit(1);
-    return activeRun;
+    try {
+      const result = await db
+        .select()
+        .from(scenarioRuns)
+        .where(and(
+          eq(scenarioRuns.userId, userId),
+          eq(scenarioRuns.scenarioId, scenarioId),
+          eq(scenarioRuns.status, 'active')
+        ))
+        .orderBy(desc(scenarioRuns.startedAt))
+        .limit(1);
+      if (!result || !Array.isArray(result) || result.length === 0) return undefined;
+      return result[0];
+    } catch (error) {
+      console.error('findActiveScenarioRun error:', error);
+      return undefined;
+    }
   }
 
   async getUserScenarioRunsWithPersonaRuns(userId: string): Promise<(ScenarioRun & { personaRuns: PersonaRun[] })[]> {
@@ -1128,7 +1154,17 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getPersonaRunsByScenarioRun(scenarioRunId: string): Promise<PersonaRun[]> {
-    return await db.select().from(personaRuns).where(eq(personaRuns.scenarioRunId, scenarioRunId)).orderBy(asc(personaRuns.phase));
+    try {
+      const result = await db.select().from(personaRuns).where(eq(personaRuns.scenarioRunId, scenarioRunId)).orderBy(asc(personaRuns.phase));
+      // Handle Neon HTTP driver returning null
+      if (!result || !Array.isArray(result)) {
+        return [];
+      }
+      return result;
+    } catch (error) {
+      console.error('getPersonaRunsByScenarioRun error:', error);
+      return [];
+    }
   }
 
   async getAllPersonaRuns(): Promise<PersonaRun[]> {
