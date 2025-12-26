@@ -638,46 +638,58 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getUserFeedbacks(userId: string): Promise<Feedback[]> {
-    // ✨ 새 구조: personaRunId를 통해 userId 필터링
-    // 1) 유저의 모든 scenarioRun ID 가져오기
-    const userScenarioRuns = await db.select().from(scenarioRuns).where(eq(scenarioRuns.userId, userId));
-    
-    if (userScenarioRuns.length === 0) {
+    try {
+      // ✨ 새 구조: personaRunId를 통해 userId 필터링
+      // 1) 유저의 모든 scenarioRun ID 가져오기
+      const userScenarioRuns = await db.select().from(scenarioRuns).where(eq(scenarioRuns.userId, userId));
+      
+      if (!userScenarioRuns || userScenarioRuns.length === 0) {
+        return [];
+      }
+      
+      const scenarioRunIds = userScenarioRuns.map(sr => sr.id);
+      
+      // 2) 해당 scenarioRun들에 속한 모든 personaRun ID 가져오기
+      const userPersonaRuns = await db
+        .select()
+        .from(personaRuns)
+        .where(inArray(personaRuns.scenarioRunId, scenarioRunIds));
+      
+      const personaRunIds = (userPersonaRuns || []).map(pr => pr.id);
+      
+      // 3) personaRunId로 피드백 조회 (새 구조)
+      let newStructureFeedbacks: Feedback[] = [];
+      if (personaRunIds.length > 0) {
+        const result = await db.select().from(feedbacks).where(inArray(feedbacks.personaRunId, personaRunIds));
+        newStructureFeedbacks = result || [];
+      }
+      
+      // 4) conversationId로 피드백 조회 (레거시 지원)
+      let legacyFeedbacks: Feedback[] = [];
+      try {
+        const legacyResults = await db
+          .select()
+          .from(feedbacks)
+          .innerJoin(conversations, eq(feedbacks.conversationId, conversations.id))
+          .where(eq(conversations.userId, userId));
+        
+        legacyFeedbacks = (legacyResults || []).map(r => r.feedbacks);
+      } catch (legacyError) {
+        console.error('Legacy feedback query error:', legacyError);
+      }
+      
+      // 5) 두 결과 병합하고 중복 제거 (ID 기준)
+      const allFeedbacks = [...newStructureFeedbacks, ...legacyFeedbacks];
+      const uniqueFeedbacks = Array.from(
+        new Map(allFeedbacks.map(f => [f.id, f])).values()
+      ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      console.log(`✅ UserFeedbacks for ${userId}: ${uniqueFeedbacks.length} feedbacks from ${newStructureFeedbacks.length} new + ${legacyFeedbacks.length} legacy`);
+      return uniqueFeedbacks;
+    } catch (error) {
+      console.error('getUserFeedbacks error:', error);
       return [];
     }
-    
-    const scenarioRunIds = userScenarioRuns.map(sr => sr.id);
-    
-    // 2) 해당 scenarioRun들에 속한 모든 personaRun ID 가져오기
-    const userPersonaRuns = await db
-      .select()
-      .from(personaRuns)
-      .where(inArray(personaRuns.scenarioRunId, scenarioRunIds));
-    
-    const personaRunIds = userPersonaRuns.map(pr => pr.id);
-    
-    // 3) personaRunId로 피드백 조회 (새 구조)
-    const newStructureFeedbacks = personaRunIds.length > 0 
-      ? await db.select().from(feedbacks).where(inArray(feedbacks.personaRunId, personaRunIds))
-      : [];
-    
-    // 4) conversationId로 피드백 조회 (레거시 지원)
-    const legacyResults = await db
-      .select()
-      .from(feedbacks)
-      .innerJoin(conversations, eq(feedbacks.conversationId, conversations.id))
-      .where(eq(conversations.userId, userId));
-    
-    const legacyFeedbacks = legacyResults.map(r => r.feedbacks);
-    
-    // 5) 두 결과 병합하고 중복 제거 (ID 기준)
-    const allFeedbacks = [...newStructureFeedbacks, ...legacyFeedbacks];
-    const uniqueFeedbacks = Array.from(
-      new Map(allFeedbacks.map(f => [f.id, f])).values()
-    ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    
-    console.log(`✅ UserFeedbacks for ${userId}: ${uniqueFeedbacks.length} feedbacks from ${newStructureFeedbacks.length} new + ${legacyFeedbacks.length} legacy`);
-    return uniqueFeedbacks;
   }
 
   // Strategic Selection - Persona Selections
@@ -736,18 +748,47 @@ export class PostgreSQLStorage implements IStorage {
 
   // User operations - 이메일 기반 인증 시스템
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id));
+      if (!result || result.length === 0) return undefined;
+      return result[0];
+    } catch (error) {
+      console.error("getUser error:", error);
+      return undefined;
+    }
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+    try {
+      const result = await db.select().from(users).where(eq(users.email, email));
+      if (!result || result.length === 0) return undefined;
+      return result[0];
+    } catch (error) {
+      console.error("getUserByEmail error:", error);
+      return undefined;
+    }
   }
 
   async createUser(userData: { email: string; password: string; name: string; assignedCategoryId?: string | null }): Promise<User> {
-    const [user] = await db.insert(users).values(userData).returning();
-    return user;
+    try {
+      const result = await db.insert(users).values(userData).returning();
+      if (result && result.length > 0) {
+        return result[0];
+      }
+      // Fallback: query by email if RETURNING fails (Neon HTTP driver issue)
+      const user = await this.getUserByEmail(userData.email);
+      if (!user) {
+        throw new Error("User creation failed");
+      }
+      return user;
+    } catch (error: any) {
+      // Check if user was created despite error
+      const existingUser = await this.getUserByEmail(userData.email);
+      if (existingUser) {
+        return existingUser;
+      }
+      throw error;
+    }
   }
 
   async updateUser(id: string, updates: { 
@@ -790,8 +831,14 @@ export class PostgreSQLStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    try {
+      const result = await db.select().from(users).where(eq(users.username, username));
+      if (!result || result.length === 0) return undefined;
+      return result[0];
+    } catch (error) {
+      console.error("getUserByUsername error:", error);
+      return undefined;
+    }
   }
 
   async isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
