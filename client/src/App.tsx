@@ -23,6 +23,7 @@ import Explore from "@/pages/Explore";
 import ProfileSettings from "@/pages/ProfileSettings";
 import PersonaChat from "@/pages/PersonaChat";
 import Conversations from "@/pages/Conversations";
+import { AuthPage } from "@/pages/AuthPage";
 
 function ContentManagementRedirect() {
   const [, setLocation] = useLocation();
@@ -41,15 +42,16 @@ function ContentManagementRedirect() {
 }
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, isLoading, setShowAuthModal } = useAuth();
-  const [hasShownModal, setHasShownModal] = useState(false);
+  const { isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  const [location] = useLocation();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !hasShownModal) {
-      setShowAuthModal(true);
-      setHasShownModal(true);
+    if (!isLoading && !isAuthenticated) {
+      sessionStorage.setItem("redirectAfterAuth", location);
+      setLocation("/auth");
     }
-  }, [isLoading, isAuthenticated, hasShownModal, setShowAuthModal]);
+  }, [isLoading, isAuthenticated, location, setLocation]);
 
   if (isLoading) {
     return (
@@ -63,28 +65,23 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">로그인이 필요합니다.</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return <Component />;
 }
 
 function AdminRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, isAuthenticated, isLoading, setShowAuthModal } = useAuth();
-  const [hasShownModal, setHasShownModal] = useState(false);
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  const [location] = useLocation();
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !hasShownModal) {
-      setShowAuthModal(true);
-      setHasShownModal(true);
+    if (!isLoading && !isAuthenticated) {
+      sessionStorage.setItem("redirectAfterAuth", location);
+      setLocation("/auth");
     }
-  }, [isLoading, isAuthenticated, hasShownModal, setShowAuthModal]);
+  }, [isLoading, isAuthenticated, location, setLocation]);
 
   if (isLoading) {
     return (
@@ -98,13 +95,7 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">로그인이 필요합니다.</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (user?.role !== "admin" && user?.role !== "operator") {
@@ -125,6 +116,7 @@ function MainRouter() {
     <Switch>
       <Route path="/" component={Explore} />
       <Route path="/explore" component={Explore} />
+      <Route path="/auth" component={AuthPage} />
       <Route path="/persona/:personaId/chat">
         {() => <ProtectedRoute component={PersonaChat} />}
       </Route>
@@ -139,6 +131,9 @@ function MainRouter() {
         {() => <ProtectedRoute component={Analytics} />}
       </Route>
       <Route path="/profile-settings">
+        {() => <ProtectedRoute component={ProfileSettings} />}
+      </Route>
+      <Route path="/settings/profile">
         {() => <ProtectedRoute component={ProfileSettings} />}
       </Route>
       <Route path="/chat/:conversationId">
