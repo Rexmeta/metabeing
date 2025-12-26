@@ -22,9 +22,8 @@ app.use('/personas', express.static(pathModule.join(process.cwd(), 'attached_ass
 // attached_assets/characters 폴더의 캐릭터별 표정 이미지를 정적으로 제공
 app.use('/characters', express.static(pathModule.join(process.cwd(), 'attached_assets', 'characters')));
 
-// 사용자 프로필 이미지 업로드 폴더 - 인증 필요
-// 참고: 실제 인증된 접근은 server/routes.ts에서 처리
-// 기본 정적 파일 제공은 비활성화 (보안상 이유)
+// attached_assets/profiles 폴더의 사용자 프로필 이미지를 정적으로 제공
+app.use('/attached_assets/profiles', express.static(pathModule.join(process.cwd(), 'attached_assets', 'profiles')));
 
 // 민감 정보 제거 함수
 function sanitizeLogData(data: Record<string, any> | undefined): string {
