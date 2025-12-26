@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,7 @@ interface RegisterFormProps {
 export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   const { register: registerUser } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
@@ -72,8 +74,9 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       await registerUser(data.email, data.password, data.name, categoryToSubmit);
       toast({
         title: "회원가입 성공",
-        description: "계정이 생성되었습니다. 환영합니다!",
+        description: "계정이 생성되었습니다. 프로필을 설정해주세요!",
       });
+      setLocation("/settings/profile");
     } catch (error: any) {
       console.error("Register error:", error);
       toast({
