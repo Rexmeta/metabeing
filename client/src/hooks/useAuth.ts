@@ -1,4 +1,4 @@
-import { useContext, createContext, useState, useCallback } from "react";
+import { useContext, createContext, useCallback } from "react";
 
 export interface User {
   id: string;
@@ -18,9 +18,6 @@ export interface AuthContextType {
   register: (email: string, password: string, name: string, categoryId?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  showAuthModal: boolean;
-  setShowAuthModal: (show: boolean) => void;
-  authModalMessage: string;
   requireAuth: (message?: string) => boolean;
 }
 
@@ -35,15 +32,7 @@ export function useAuth() {
 }
 
 export function useRequireAuth() {
-  const { isAuthenticated, setShowAuthModal } = useAuth();
-  
-  const requireAuth = useCallback((message?: string) => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return false;
-    }
-    return true;
-  }, [isAuthenticated, setShowAuthModal]);
+  const { isAuthenticated, requireAuth } = useAuth();
   
   return { requireAuth, isAuthenticated };
 }

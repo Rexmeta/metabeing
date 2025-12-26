@@ -6,8 +6,6 @@ import type { User, AuthContextType } from "@/hooks/useAuth";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authModalMessage, setAuthModalMessage] = useState("");
 
   // 페이지 로드 시 사용자 정보 확인 (localStorage 토큰 또는 httpOnly 쿠키 모두 지원)
   const { data: currentUser, isLoading: isUserLoading } = useQuery({
@@ -69,7 +67,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.token) {
         localStorage.setItem("authToken", data.token);
       }
-      setShowAuthModal(false);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
   });
@@ -102,7 +99,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.token) {
         localStorage.setItem("authToken", data.token);
       }
-      setShowAuthModal(false);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
   });
@@ -176,9 +172,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     refreshUser,
-    showAuthModal,
-    setShowAuthModal,
-    authModalMessage,
     requireAuth,
   };
 
