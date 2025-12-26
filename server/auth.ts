@@ -172,12 +172,13 @@ export function setupAuth(app: Express) {
       // 비밀번호 해시
       const hashedPassword = await hashPassword(password);
 
-      // 사용자 생성 (categoryId는 선택사항으로 저장)
+      // 사용자 생성 (categoryId는 선택사항으로 저장, 빈 문자열은 null로 처리)
+      const validCategoryId = categoryId && categoryId.trim().length > 0 ? categoryId : null;
       const user = await storage.createUser({
         email,
         password: hashedPassword,
         name,
-        assignedCategoryId: categoryId || null,
+        assignedCategoryId: validCategoryId,
       });
 
       // JWT 토큰 생성
