@@ -66,7 +66,10 @@ const registerSchema = z.object({
   email: z.string().email("유효한 이메일을 입력해주세요"),
   password: passwordSchema,
   name: z.string().min(1, "이름을 입력해주세요").max(50, "이름은 50자 이하여야 합니다"),
-  categoryId: z.string().uuid().optional(),
+  categoryId: z.preprocess(
+    (val) => (val === "" || val === null) ? undefined : val,
+    z.string().uuid().optional()
+  ),
 });
 
 // 로그인 스키마
