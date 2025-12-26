@@ -1338,7 +1338,145 @@ router.post('/generate-character-expressions', async (req, res) => {
   }
 });
 
+// 프로필 이미지 생성 엔드포인트
+router.post('/generate-profile-image', async (req, res) => {
+  try {
+    const { prompt, style } = req.body;
+
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ 
+        error: '프롬프트가 필요합니다.' 
+      });
+    }
+
+    // 프로필 이미지용 프롬프트 생성
+    let imagePrompt = '';
+    const stylePreset = style || 'realistic';
+    
+    if (stylePreset === 'realistic') {
+      imagePrompt = `Professional high-quality portrait photo: ${prompt}. `;
+      imagePrompt += `Studio lighting, sharp focus, professional headshot style, clean background, modern portrait photography. `;
+    } else if (stylePreset === 'anime') {
+      imagePrompt = `Anime style character portrait: ${prompt}. `;
+      imagePrompt += `High quality anime illustration, vibrant colors, detailed character design, expressive eyes. `;
+    } else if (stylePreset === 'cartoon') {
+      imagePrompt = `Stylized cartoon portrait: ${prompt}. `;
+      imagePrompt += `Modern cartoon illustration style, clean lines, bright colors, friendly appearance. `;
+    } else if (stylePreset === 'artistic') {
+      imagePrompt = `Artistic digital portrait painting: ${prompt}. `;
+      imagePrompt += `Digital art style, expressive brushstrokes, artistic interpretation, vibrant colors. `;
+    } else {
+      imagePrompt = `Portrait image: ${prompt}. High quality, detailed, professional style.`;
+    }
+    
+    imagePrompt += ` Square aspect ratio, centered face, suitable for profile picture. NO text, NO watermarks.`;
+
+    console.log(`🎨 프로필 이미지 생성 요청`);
+    console.log(`프롬프트: ${imagePrompt}`);
+
+    // Gemini 이미지 생성
+    const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY });
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image-preview",
+      contents: [{ role: 'user', parts: [{ text: imagePrompt }] }]
+    });
+    
+    // 응답에서 이미지 데이터 추출
+    let imageUrl = null;
+    if (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts) {
+      for (const part of result.candidates[0].content.parts) {
+        if (part.inlineData) {
+          const imageData = part.inlineData;
+          imageUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
+          break;
+        }
+      }
+    }
+    
+    if (!imageUrl) {
+      console.error('❌ 프로필 이미지 데이터를 찾을 수 없음');
+      throw new Error('이미지가 생성되지 않았습니다.');
+    }
+
+    // 이미지를 프로필 폴더에 저장
+    const savedPath = await saveProfileImageToLocal(imageUrl);
+    
+    console.log(`✅ 프로필 이미지 생성 성공: ${savedPath}`);
+
+    trackImageUsage({
+      model: 'gemini-2.5-flash-image-preview',
+      provider: 'gemini',
+      metadata: { type: 'profile', style: stylePreset }
+    });
+
+    res.json({
+      success: true,
+      imageUrl: savedPath,
+      originalImageUrl: imageUrl,
+      prompt: imagePrompt
+    });
+
+  } catch (error: any) {
+    console.error('프로필 이미지 생성 오류:', error);
+    
+    if (error.message?.includes('quota') || error.status === 429) {
+      return res.status(429).json({
+        error: '요청 한도 초과',
+        details: 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.'
+      });
+    }
+
+    if (error.message?.includes('safety') || error.message?.includes('policy')) {
+      return res.status(400).json({
+        error: '콘텐츠 정책 위반',
+        details: '생성하려는 이미지가 콘텐츠 정책에 위반됩니다. 다른 내용으로 시도해주세요.'
+      });
+    }
+
+    res.status(500).json({
+      error: '이미지 생성 실패',
+      details: error.message || '알 수 없는 오류가 발생했습니다.'
+    });
+  }
+});
+
+// 프로필 이미지 저장 함수
+async function saveProfileImageToLocal(base64ImageUrl: string): Promise<string> {
+  try {
+    const matches = base64ImageUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches) {
+      throw new Error('유효하지 않은 base64 이미지 형식입니다.');
+    }
+
+    const imageData = matches[2];
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(2, 8);
+    const filename = `profile-${timestamp}-${randomId}.webp`;
+    
+    const imageDir = path.join(process.cwd(), 'attached_assets', 'profiles');
+    
+    if (!fs.existsSync(imageDir)) {
+      fs.mkdirSync(imageDir, { recursive: true });
+    }
+
+    const outputPath = path.join(imageDir, filename);
+    
+    // WebP로 최적화하여 저장 (정사각형 400x400)
+    await sharp(Buffer.from(imageData, 'base64'))
+      .resize(400, 400, { fit: 'cover', position: 'center' })
+      .webp({ quality: 90 })
+      .toFile(outputPath);
+
+    console.log(`✅ 프로필 이미지 저장 완료: ${outputPath}`);
+    
+    return `/attached_assets/profiles/${filename}`;
+  } catch (error: any) {
+    console.error('프로필 이미지 저장 실패:', error);
+    throw error;
+  }
+}
+
 // saveImageToLocal 함수도 export
-export { saveImageToLocal, savePersonaImageToLocal, saveCharacterImageToLocal, getThumbnailPath };
+export { saveImageToLocal, savePersonaImageToLocal, saveCharacterImageToLocal, getThumbnailPath, saveProfileImageToLocal };
 
 export default router;

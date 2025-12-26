@@ -24,7 +24,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { User, Lock, Save, Shield, Crown, Settings, VolumeX, Plus, X, Check, Sparkles, Zap, Star } from "lucide-react";
+import { User, Lock, Save, Shield, Crown, Settings, VolumeX, Plus, X, Check, Sparkles, Zap, Star, Upload, Camera, Wand2, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const profileSchema = z.object({
   username: z.string().min(3, "사용자명은 3자 이상이어야 합니다").max(20, "사용자명은 20자 이하여야 합니다").regex(/^[a-z0-9_]+$/, "영문 소문자, 숫자, 밑줄만 허용됩니다").optional().or(z.literal("")),
@@ -128,6 +130,16 @@ export default function ProfileSettings() {
   const [mutedWords, setMutedWords] = useState<string[]>([]);
   const [newMutedWord, setNewMutedWord] = useState("");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+  const [imageTab, setImageTab] = useState<"upload" | "generate">("upload");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiStyle, setAiStyle] = useState("realistic");
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
 
   const profileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -262,6 +274,95 @@ export default function ProfileSettings() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "파일이 너무 큽니다", description: "5MB 이하의 파일만 업로드 가능합니다", variant: "destructive" });
+        return;
+      }
+      setSelectedFile(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+  };
+
+  const handleUploadImage = async () => {
+    if (!selectedFile) return;
+    setIsUploadingImage(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const response = await apiRequest("POST", "/api/user/profile-image", { imageData: base64 });
+        const data = await response.json();
+        await refreshUser();
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        toast({ title: "프로필 사진이 업데이트되었습니다" });
+        setIsImageDialogOpen(false);
+        setSelectedFile(null);
+        setPreviewUrl(null);
+      };
+      reader.readAsDataURL(selectedFile);
+    } catch (error: any) {
+      toast({ title: "업로드 실패", description: error.message, variant: "destructive" });
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleGenerateImage = async () => {
+    if (!aiPrompt.trim()) {
+      toast({ title: "프롬프트를 입력하세요", variant: "destructive" });
+      return;
+    }
+    setIsGeneratingImage(true);
+    setGeneratedImageUrl(null);
+    try {
+      const response = await apiRequest("POST", "/api/image/generate-profile-image", { 
+        prompt: aiPrompt,
+        style: aiStyle
+      });
+      const data = await response.json();
+      if (data.success && data.imageUrl) {
+        setGeneratedImageUrl(data.imageUrl);
+        toast({ title: "이미지가 생성되었습니다" });
+      } else {
+        throw new Error(data.error || "이미지 생성 실패");
+      }
+    } catch (error: any) {
+      toast({ title: "생성 실패", description: error.message, variant: "destructive" });
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const handleApplyGeneratedImage = async () => {
+    if (!generatedImageUrl) return;
+    setIsUploadingImage(true);
+    try {
+      await apiRequest("PATCH", "/api/user/profile", { profileImage: generatedImageUrl });
+      await refreshUser();
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({ title: "프로필 사진이 업데이트되었습니다" });
+      setIsImageDialogOpen(false);
+      setGeneratedImageUrl(null);
+      setAiPrompt("");
+    } catch (error: any) {
+      toast({ title: "적용 실패", description: error.message, variant: "destructive" });
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const resetImageDialog = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setGeneratedImageUrl(null);
+    setAiPrompt("");
+    setImageTab("upload");
+  };
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -293,14 +394,32 @@ export default function ProfileSettings() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-6 mb-6">
-              <Avatar className="w-20 h-20">
-                <AvatarImage src={user.profileImage || undefined} />
-                <AvatarFallback className="text-2xl">{user.name?.charAt(0) || "U"}</AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="w-20 h-20">
+                  <AvatarImage src={user.profileImage || undefined} />
+                  <AvatarFallback className="text-2xl">{user.name?.charAt(0) || "U"}</AvatarFallback>
+                </Avatar>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="absolute -bottom-1 -right-1 rounded-full w-8 h-8"
+                  onClick={() => { resetImageDialog(); setIsImageDialogOpen(true); }}
+                  data-testid="button-change-avatar"
+                >
+                  <Camera className="w-4 h-4" />
+                </Button>
+              </div>
               <div>
                 <p className="font-medium">{(user as any).displayName || user.name}</p>
                 <p className="text-sm text-muted-foreground">@{(user as any).username || "username"}</p>
                 <p className="text-xs text-muted-foreground mt-1">{user.email}</p>
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto text-xs" 
+                  onClick={() => { resetImageDialog(); setIsImageDialogOpen(true); }}
+                >
+                  프로필 사진 변경
+                </Button>
               </div>
             </div>
 
@@ -687,6 +806,171 @@ export default function ProfileSettings() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 프로필 이미지 변경 다이얼로그 */}
+      <Dialog open={isImageDialogOpen} onOpenChange={(open) => { if (!open) resetImageDialog(); setIsImageDialogOpen(open); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>프로필 사진 변경</DialogTitle>
+            <DialogDescription>
+              사진을 업로드하거나 AI로 생성하세요
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs value={imageTab} onValueChange={(v) => setImageTab(v as "upload" | "generate")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="upload" data-testid="tab-upload">
+                <Upload className="w-4 h-4 mr-2" />
+                업로드
+              </TabsTrigger>
+              <TabsTrigger value="generate" data-testid="tab-generate">
+                <Wand2 className="w-4 h-4 mr-2" />
+                AI 생성
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="upload" className="space-y-4">
+              <div className="flex flex-col items-center gap-4 py-4">
+                {previewUrl ? (
+                  <div className="relative">
+                    <Avatar className="w-32 h-32">
+                      <AvatarImage src={previewUrl} />
+                      <AvatarFallback>미리보기</AvatarFallback>
+                    </Avatar>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="absolute -top-2 -right-2 rounded-full w-6 h-6"
+                      onClick={() => { setSelectedFile(null); setPreviewUrl(null); }}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="w-32 h-32 border-2 border-dashed rounded-full flex items-center justify-center bg-muted">
+                    <Camera className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id="profile-image-input"
+                  onChange={handleFileSelect}
+                  data-testid="input-file-upload"
+                />
+                <Label htmlFor="profile-image-input" className="cursor-pointer">
+                  <Button variant="outline" asChild>
+                    <span>
+                      <Upload className="w-4 h-4 mr-2" />
+                      이미지 선택
+                    </span>
+                  </Button>
+                </Label>
+                <p className="text-xs text-muted-foreground">PNG, JPG, GIF (최대 5MB)</p>
+              </div>
+              <DialogFooter>
+                <Button 
+                  onClick={handleUploadImage} 
+                  disabled={!selectedFile || isUploadingImage}
+                  data-testid="button-upload-image"
+                >
+                  {isUploadingImage ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      업로드 중...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      적용하기
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+            
+            <TabsContent value="generate" className="space-y-4">
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>스타일</Label>
+                  <Select value={aiStyle} onValueChange={setAiStyle}>
+                    <SelectTrigger data-testid="select-ai-style">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="realistic">사실적</SelectItem>
+                      <SelectItem value="anime">애니메이션</SelectItem>
+                      <SelectItem value="cartoon">카툰</SelectItem>
+                      <SelectItem value="artistic">아티스틱</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>설명</Label>
+                  <Textarea 
+                    placeholder="원하는 프로필 이미지를 설명하세요 (예: 웃고 있는 젊은 전문가, 비즈니스 캐주얼 스타일)"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    rows={3}
+                    className="resize-none"
+                    data-testid="input-ai-prompt"
+                  />
+                </div>
+                
+                {generatedImageUrl && (
+                  <div className="flex flex-col items-center gap-2">
+                    <Avatar className="w-32 h-32">
+                      <AvatarImage src={generatedImageUrl} />
+                      <AvatarFallback>생성됨</AvatarFallback>
+                    </Avatar>
+                    <p className="text-sm text-muted-foreground">생성된 이미지</p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button 
+                  variant="outline"
+                  onClick={handleGenerateImage} 
+                  disabled={!aiPrompt.trim() || isGeneratingImage}
+                  data-testid="button-generate-image"
+                >
+                  {isGeneratingImage ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      생성 중...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      이미지 생성
+                    </>
+                  )}
+                </Button>
+                {generatedImageUrl && (
+                  <Button 
+                    onClick={handleApplyGeneratedImage} 
+                    disabled={isUploadingImage}
+                    data-testid="button-apply-generated"
+                  >
+                    {isUploadingImage ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        적용 중...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        프로필에 적용
+                      </>
+                    )}
+                  </Button>
+                )}
+              </DialogFooter>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
