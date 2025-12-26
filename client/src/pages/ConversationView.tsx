@@ -187,11 +187,18 @@ export default function ConversationView() {
   const handleChatComplete = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/active-conversations"] });
     queryClient.invalidateQueries({ queryKey: ["/api/persona-runs", personaRunId] });
+    queryClient.invalidateQueries({ queryKey: ["/api/scenario-runs"] });
     toast({
       title: "대화 완료",
       description: "대화가 성공적으로 완료되었습니다.",
     });
-    setLocation("/conversations");
+    
+    // 시나리오 기반 대화인 경우 피드백 페이지로, 개별 페르소나 대화인 경우 대화 목록으로
+    if (personaRun?.scenarioRunId) {
+      setLocation(`/feedback/${personaRunId}`);
+    } else {
+      setLocation("/conversations");
+    }
   };
 
   const handleExit = () => {

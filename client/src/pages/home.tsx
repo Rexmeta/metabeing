@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import ScenarioSelector from "@/components/ScenarioSelector";
-import ChatWindow from "@/components/ChatWindow";
 import PersonalDevelopmentReport from "@/components/PersonalDevelopmentReport";
 import { SimplePersonaSelector } from "@/components/SimplePersonaSelector";
 import { StrategyReflection } from "@/components/StrategyReflection";
@@ -24,11 +23,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type ViewState = "scenarios" | "persona-selection" | "video-intro" | "chat" | "strategy-reflection" | "strategy-result" | "feedback";
+type ViewState = "scenarios" | "persona-selection" | "video-intro" | "strategy-reflection" | "strategy-result" | "feedback";
 
 export default function Home() {
   const { user } = useAuth();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [currentView, setCurrentView] = useState<ViewState>("scenarios");
   const [selectedScenario, setSelectedScenario] = useState<ComplexScenario | null>(null);
   const [selectedPersona, setSelectedPersona] = useState<ScenarioPersona | null>(null);
@@ -87,6 +86,7 @@ export default function Home() {
     const scenarioId = params.get('scenarioId');
     const scenarioRunIdParam = params.get('scenarioRunId');
     const personaIdParam = params.get('personaId');
+    const showStrategyReflection = params.get('showStrategyReflection') === 'true';
 
     if (resumePersonaRunId && scenarios.length > 0 && !isResuming) {
       // 대화 재개 로직
@@ -113,16 +113,8 @@ export default function Home() {
             return;
           }
 
-          // 상태 설정
-          setSelectedScenario(scenario);
-          setSelectedPersona(persona);
-          setConversationId(conversation.id);
-          setScenarioRunId(conversation.scenarioRunId);
-          setSelectedDifficulty(conversation.difficulty || 4);
-          setCurrentView("chat");
-          
-          // URL에서 파라미터 제거
-          window.history.replaceState({}, '', '/home');
+          // 대화 화면으로 이동
+          setLocation(`/chat/${conversation.id}`);
           setIsResuming(false);
         })
         .catch(error => {
@@ -167,11 +159,8 @@ export default function Home() {
             apiRequest("POST", "/api/conversations", conversationData)
               .then(res => res.json())
               .then(conversation => {
-                setSelectedPersona(targetPersona);
-                setConversationId(conversation.id);
-                setScenarioRunId(conversation.scenarioRunId);
-                setCurrentView("chat");
-                window.history.replaceState({}, '', '/home');
+                // 대화 화면으로 이동
+                setLocation(`/chat/${conversation.id}`);
               })
               .catch(error => {
                 console.error("대화 생성 실패:", error);
@@ -199,7 +188,13 @@ export default function Home() {
                   .filter((pr: any) => pr.status === 'completed')
                   .map((pr: any) => pr.personaId);
                 
+                // 완료된 personaRun들의 conversationId 저장
+                const completedConvIds = (run.personaRuns || [])
+                  .filter((pr: any) => pr.status === 'completed')
+                  .map((pr: any) => pr.id);
+                
                 setCompletedPersonaIds(completedIds);
+                setConversationIds(completedConvIds);
                 console.log(`✅ 완료된 페르소나 ${completedIds.length}개 불러옴:`, completedIds);
                 
                 // 🔒 난이도 고정: 첫 번째 persona_run의 난이도를 가져옴
@@ -210,24 +205,35 @@ export default function Home() {
                     console.log(`🔒 난이도 고정: ${firstDifficulty}`);
                   }
                 }
+                
+                // 🎯 전략 회고 화면으로 이동 요청인 경우
+                if (showStrategyReflection) {
+                  console.log('📍 전략 회고 화면으로 이동');
+                  setCurrentView("strategy-reflection");
+                } else {
+                  setCurrentView("persona-selection");
+                }
+                // URL 파라미터 제거 (비동기 처리 완료 후)
+                window.history.replaceState({}, '', '/home');
               } else {
                 setCompletedPersonaIds([]);
+                setCurrentView("persona-selection");
+                window.history.replaceState({}, '', '/home');
               }
             })
             .catch(error => {
               console.error('완료된 페르소나 목록 불러오기 실패:', error);
               setCompletedPersonaIds([]);
+              setCurrentView("persona-selection");
+              window.history.replaceState({}, '', '/home');
             });
         } else {
           // 새 시도인 경우 빈 배열
           setCompletedPersonaIds([]);
+          setCurrentView("persona-selection");
+          // URL 파라미터 제거
+          window.history.replaceState({}, '', '/home');
         }
-        
-        // 반드시 persona-selection 뷰로만 이동
-        setCurrentView("persona-selection");
-        
-        // URL에서 파라미터 제거
-        window.history.replaceState({}, '', '/home');
       }
     }
   }, [scenarios, isResuming, isCreatingConversation]);
@@ -316,7 +322,8 @@ export default function Home() {
       if (selectedScenario.introVideoUrl) {
         setCurrentView("video-intro");
       } else {
-        setCurrentView("chat");
+        // 대화 화면으로 이동
+        setLocation(`/chat/${conversation.id}`);
       }
     } catch (error) {
       console.error("대화 생성 실패:", error);
@@ -328,49 +335,18 @@ export default function Home() {
 
   // 영상 인트로 완료 후 대화 시작
   const handleVideoComplete = () => {
-    setIsVideoTransitioning(true);
-    // 오버레이가 확실히 렌더링된 후 view 변경 (다음 프레임에서 실행)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setCurrentView("chat");
-      });
-    });
+    if (conversationId) {
+      setLocation(`/chat/${conversationId}`);
+    }
   };
 
   // 영상 건너뛰기
   const handleVideoSkip = () => {
-    setIsVideoTransitioning(true);
-    // 오버레이가 확실히 렌더링된 후 view 변경 (다음 프레임에서 실행)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setCurrentView("chat");
-      });
-    });
+    if (conversationId) {
+      setLocation(`/chat/${conversationId}`);
+    }
   };
 
-  // ChatWindow가 준비 완료되면 전환 오버레이 해제
-  const handleChatReady = () => {
-    setIsVideoTransitioning(false);
-  };
-
-  const handleChatComplete = () => {
-    if (!selectedScenario || !conversationId || !selectedPersona) return;
-    
-    // 전환 오버레이 표시 (화면 깜빡임 방지)
-    setIsTransitioningToFeedback(true);
-    
-    // 현재 대화 ID와 페르소나 ID를 완료 목록에 추가
-    setCompletedPersonaIds(prev => [...prev, selectedPersona.id]);
-    setConversationIds(prev => [...prev, conversationId]);
-    
-    // ✅ MyPage에서 업데이트된 대화 기록을 보여주기 위해 scenario-runs 캐시 무효화
-    queryClient.invalidateQueries({ queryKey: ['/api/scenario-runs'] });
-    console.log('🔄 대화 완료: scenario-runs 캐시 무효화');
-    
-    // 대화 완료 후 무조건 피드백을 먼저 보여줌
-    setCurrentView("feedback");
-  };
-  
   // 피드백 화면 준비 완료 시 전환 오버레이 해제
   const handleFeedbackReady = () => {
     setIsTransitioningToFeedback(false);
@@ -421,9 +397,8 @@ export default function Home() {
       return response.json();
     },
     onSuccess: (conversation) => {
-      setConversationId(conversation.id);
-      setScenarioRunId(conversation.scenarioRunId); // scenarioRunId 저장
-      setCurrentView("chat");
+      // 대화 화면으로 이동
+      setLocation(`/chat/${conversation.id}`);
     },
     onError: (error) => {
       console.error("재도전 대화 생성 실패:", error);
@@ -464,15 +439,11 @@ export default function Home() {
         <div className="relative">
           <AppHeader 
             onLogoClick={() => {
-              if (currentView === 'chat') {
-                setShowExitConversationDialog(true);
-              } else {
-                setCurrentView('scenarios');
-                setSelectedScenario(null);
-                setSelectedPersona(null);
-                setConversationId(null);
-                setIsHeaderVisible(false);
-              }
+              setCurrentView('scenarios');
+              setSelectedScenario(null);
+              setSelectedPersona(null);
+              setConversationId(null);
+              setIsHeaderVisible(false);
             }}
           />
           {/* 헤더 하단 중앙에 숨기기 버튼 */}
@@ -879,20 +850,6 @@ export default function Home() {
           />
         )}
 
-        {currentView === "chat" && selectedScenario && selectedPersona && conversationId && (
-          <div className="fixed inset-0 z-40">
-            <ChatWindow
-              scenario={selectedScenario}
-              persona={selectedPersona}
-              conversationId={conversationId}
-              onChatComplete={handleChatComplete}
-              onExit={handleReturnToScenarios}
-              onReady={handleChatReady}
-              onConversationEnding={() => setIsTransitioningToFeedback(true)}
-            />
-          </div>
-        )}
-        
         {isVideoTransitioning && (
           <div 
             className="fixed inset-0 z-[60] bg-black transition-opacity duration-500"

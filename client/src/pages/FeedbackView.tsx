@@ -1,33 +1,79 @@
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import PersonalDevelopmentReport from "@/components/PersonalDevelopmentReport";
 import { Button } from "@/components/ui/button";
-import { type Conversation } from "@shared/schema";
+
+interface ConversationWithScenarioRun {
+  id: string;
+  scenarioId: string;
+  personaId: string;
+  scenarioRunId?: string;
+  [key: string]: any;
+}
 
 export default function FeedbackView() {
   const [, params] = useRoute("/feedback/:conversationId");
   const conversationId = params?.conversationId;
+  const [, setLocation] = useLocation();
 
-  const { data: conversation, isLoading: conversationLoading } = useQuery<Conversation>({
+  const { data: conversation, isLoading: conversationLoading } = useQuery<ConversationWithScenarioRun>({
     queryKey: ["/api/conversations", conversationId],
     enabled: !!conversationId,
-    staleTime: 1000 * 60 * 5, // 5분간 캐시 유지
-    gcTime: 1000 * 60 * 10,   // 10분간 메모리 유지
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
   });
 
-  // 서버에서 모든 시나리오 데이터 가져오기
   const { data: scenarios = [], isLoading: scenariosLoading } = useQuery<any[]>({
     queryKey: ["/api/scenarios"],
-    staleTime: 1000 * 60 * 30, // 30분간 캐시 유지 (시나리오는 자주 변경되지 않음)
-    gcTime: 1000 * 60 * 60,     // 1시간 메모리 유지
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
   });
 
-  // ⚡ 성능 최적화: Map 기반 O(1) 조회
+  // 시나리오 기반 대화인 경우 scenarioRun 정보 가져오기
+  const { data: scenarioRuns = [] } = useQuery<any[]>({
+    queryKey: ["/api/scenario-runs"],
+    enabled: !!conversation?.scenarioRunId,
+    staleTime: 1000 * 60 * 5,
+  });
+
   const scenariosMap = useMemo(() => 
     new Map(scenarios.map(s => [s.id, s])),
     [scenarios]
   );
+
+  // 현재 scenarioRun 찾기
+  const scenarioRun = useMemo(() => {
+    if (!conversation?.scenarioRunId) return null;
+    return scenarioRuns.find((sr: any) => sr.id === conversation.scenarioRunId);
+  }, [scenarioRuns, conversation?.scenarioRunId]);
+
+  // 시나리오 진행 상태 계산
+  const { hasMorePersonas, allPersonasCompleted, completedPersonaIds } = useMemo(() => {
+    if (!scenarioRun || !conversation) {
+      return { hasMorePersonas: false, allPersonasCompleted: false, completedPersonaIds: [] };
+    }
+    
+    const scenario = scenariosMap.get(conversation.scenarioId);
+    const totalPersonas = scenario?.personas?.length || 0;
+    
+    const completedIds = (scenarioRun.personaRuns || [])
+      .filter((pr: any) => pr.status === 'completed')
+      .map((pr: any) => pr.personaId);
+    
+    // 현재 대화 완료 포함
+    if (!completedIds.includes(conversation.personaId)) {
+      completedIds.push(conversation.personaId);
+    }
+    
+    const completedCount = completedIds.length;
+    
+    return {
+      hasMorePersonas: completedCount < totalPersonas,
+      allPersonasCompleted: completedCount >= totalPersonas,
+      completedPersonaIds: completedIds
+    };
+  }, [scenarioRun, conversation, scenariosMap]);
 
   const isLoading = conversationLoading || scenariosLoading;
 
@@ -42,7 +88,6 @@ export default function FeedbackView() {
     );
   }
 
-  // ⚡ 서버 데이터에서 시나리오와 페르소나 찾기 (O(1) 조회)
   const scenario = scenariosMap.get(conversation.scenarioId);
   const persona = scenario?.personas?.find((p: any) => p.id === conversation.personaId);
 
@@ -65,13 +110,35 @@ export default function FeedbackView() {
     );
   }
 
+  // 다음 페르소나와 대화 또는 전략 회고로 이동
+  const handleNextPersona = () => {
+    if (!conversation.scenarioRunId) {
+      setLocation('/home');
+      return;
+    }
+    
+    if (allPersonasCompleted) {
+      // 전략 회고 페이지로 이동 (Home에서 처리)
+      setLocation(`/home?scenarioId=${conversation.scenarioId}&scenarioRunId=${conversation.scenarioRunId}&showStrategyReflection=true`);
+    } else {
+      // 다음 페르소나 선택 화면으로 이동
+      setLocation(`/home?scenarioId=${conversation.scenarioId}&scenarioRunId=${conversation.scenarioRunId}`);
+    }
+  };
+
+  // 시나리오 기반 대화인 경우 추가 props 전달
+  const isScenarioBasedConversation = !!conversation.scenarioRunId;
+
   return (
     <PersonalDevelopmentReport
       scenario={scenario}
       persona={persona}
       conversationId={conversationId || ""}
       onRetry={() => window.location.reload()}
-      onSelectNewScenario={() => window.location.href = '/home'}
+      onSelectNewScenario={() => setLocation('/home')}
+      hasMorePersonas={isScenarioBasedConversation ? hasMorePersonas : undefined}
+      allPersonasCompleted={isScenarioBasedConversation ? allPersonasCompleted : undefined}
+      onNextPersona={isScenarioBasedConversation ? handleNextPersona : undefined}
     />
   );
 }
