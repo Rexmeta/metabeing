@@ -1,13 +1,24 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { User, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
 import ChatWindow from "@/components/ChatWindow";
+import PersonaLoadingState from "@/components/PersonaLoadingState";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { ComplexScenario, ScenarioPersona } from "@/lib/scenario-system";
+
+interface PersonaImages {
+  base?: string;
+  style?: string;
+  male?: {
+    expressions?: Record<string, string>;
+  };
+  female?: {
+    expressions?: Record<string, string>;
+  };
+}
 
 interface PersonaRunData {
   id: string;
@@ -42,39 +53,59 @@ export default function ConversationView() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const personaRunId = params?.conversationId;
+  const [showChat, setShowChat] = useState(false);
 
-  // personaRun 조회
   const { data: personaRun, isLoading: prLoading } = useQuery<PersonaRunData>({
     queryKey: ["/api/persona-runs", personaRunId],
     enabled: !!personaRunId,
   });
 
-  // scenarioRun 조회
   const { data: scenarioRun, isLoading: srLoading } = useQuery<ScenarioRunData>({
     queryKey: ["/api/scenario-runs", personaRun?.scenarioRunId],
     enabled: !!personaRun?.scenarioRunId,
   });
 
-  // 채팅 메시지 조회 (항상 최신 데이터 가져오기)
   const { data: messages = [], isLoading: msgLoading } = useQuery<ChatMessageData[]>({
     queryKey: ["/api/persona-runs", personaRunId, "messages"],
     enabled: !!personaRunId,
-    staleTime: 0, // 항상 새로운 데이터 가져오기
-    refetchOnMount: 'always', // 마운트 시 항상 refetch
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const isLoading = prLoading || srLoading || msgLoading;
 
-  // ChatWindow용 더미 시나리오 생성
+  useEffect(() => {
+    if (!isLoading && personaRun && scenarioRun) {
+      setTimeout(() => setShowChat(true), 100);
+    }
+  }, [isLoading, personaRun, scenarioRun]);
+
+  const getProfileImage = useCallback((snapshot: any) => {
+    if (!snapshot) return null;
+    const gender = snapshot.gender || 'female';
+    const genderKey = gender.toLowerCase() === 'male' ? 'male' : 'female';
+    
+    if (snapshot.images?.[genderKey]?.expressions?.base) {
+      return snapshot.images[genderKey].expressions.base;
+    }
+    if (snapshot.images?.base) {
+      return snapshot.images.base;
+    }
+    if (snapshot.profileImage) {
+      return snapshot.profileImage;
+    }
+    return null;
+  }, []);
+
   const dummyScenario = useMemo((): ComplexScenario | null => {
     if (!personaRun || !scenarioRun) return null;
-    const personaSnapshot = personaRun.personaSnapshot || {};
+    const snapshot = personaRun.personaSnapshot || {};
     return {
       id: scenarioRun.scenarioId || '',
       title: scenarioRun.scenarioName || "자유 대화",
-      description: `${personaSnapshot.name || personaRun.personaId} 페르소나와의 대화`,
+      description: `${snapshot.name || personaRun.personaId} 페르소나와의 대화`,
       context: {
-        situation: `${personaSnapshot.name || personaRun.personaId}와 대화하는 상황입니다.`,
+        situation: `${snapshot.name || personaRun.personaId}와 대화하는 상황입니다.`,
         timeline: "제한 없음",
         stakes: "자유 대화",
         playerRole: {
@@ -99,8 +130,7 @@ export default function ConversationView() {
     };
   }, [personaRun, scenarioRun]);
 
-  // ChatWindow용 페르소나 스냅샷 생성
-  const personaSnapshot = useMemo((): ScenarioPersona | null => {
+  const personaSnapshotForChat = useMemo((): ScenarioPersona | null => {
     if (!personaRun) return null;
     const snapshot = personaRun.personaSnapshot || {};
     return {
@@ -144,7 +174,6 @@ export default function ConversationView() {
     };
   }, [personaRun]);
 
-  // 초기 메시지 변환
   const initialMessages = useMemo(() => {
     return messages.map((msg) => ({
       sender: msg.sender as 'user' | 'ai',
@@ -170,23 +199,31 @@ export default function ConversationView() {
     setLocation("/conversations");
   };
 
+  const snapshot = personaRun?.personaSnapshot;
+  const profileImage = getProfileImage(snapshot);
+  const personaName = snapshot?.name || personaRun?.personaName || personaRun?.personaId;
+  const mbtiDisplay = snapshot?.mbti || personaRun?.personaId?.toUpperCase();
+
   if (isLoading) {
     return (
-      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">대화 불러오는 중...</p>
-        </div>
-      </div>
+      <PersonaLoadingState
+        profileImage={profileImage}
+        personaName={personaName}
+        mbtiDisplay={mbtiDisplay}
+        loadingMessage="대화 불러오는 중..."
+      />
     );
   }
 
-  if (!personaRun || !dummyScenario || !personaSnapshot) {
+  if (!personaRun || !dummyScenario || !personaSnapshotForChat) {
     return (
-      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-destructive mb-4">대화를 찾을 수 없습니다.</p>
-          <Button onClick={() => setLocation("/conversations")} data-testid="button-back-conversations">
+      <div className="h-full flex items-center justify-center bg-gradient-to-b from-background to-muted/30">
+        <div className="text-center space-y-4 p-6">
+          <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+            <User className="w-8 h-8 text-destructive" />
+          </div>
+          <p className="text-destructive font-medium">대화를 찾을 수 없습니다</p>
+          <Button onClick={() => setLocation("/conversations")} variant="outline" data-testid="button-back-conversations">
             <ArrowLeft className="h-4 w-4 mr-2" />
             대화 목록으로 돌아가기
           </Button>
@@ -195,15 +232,13 @@ export default function ConversationView() {
     );
   }
 
-  // 완료된 대화는 읽기 전용으로 표시
-  const isCompleted = personaRun.status === 'completed';
-
   return (
-    <div className="h-[calc(100vh-3.5rem)] w-full relative">
+    <div className={`h-full w-full relative transition-opacity duration-300 ${showChat ? 'opacity-100' : 'opacity-0'}`}>
       <ChatWindow
         scenario={dummyScenario}
-        persona={personaSnapshot}
+        persona={personaSnapshotForChat}
         conversationId={personaRun.id}
+        personaRunId={personaRun.id}
         onChatComplete={handleChatComplete}
         onExit={handleExit}
         initialChatMode="messenger"
