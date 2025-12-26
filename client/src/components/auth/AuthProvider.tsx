@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { AuthContext } from "@/hooks/useAuth";
 import type { User, AuthContextType } from "@/hooks/useAuth";
-import { AuthModal } from "./AuthModal";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -159,8 +158,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const requireAuth = useCallback((message?: string): boolean => {
     if (!user) {
-      setAuthModalMessage(message || "이 기능을 사용하려면 로그인이 필요합니다.");
-      setShowAuthModal(true);
+      sessionStorage.setItem("redirectAfterAuth", window.location.pathname);
+      if (message) {
+        sessionStorage.setItem("authMessage", message);
+      }
+      window.location.href = "/auth";
       return false;
     }
     return true;
@@ -183,11 +185,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={contextValue}>
       {children}
-      <AuthModal 
-        open={showAuthModal} 
-        onOpenChange={setShowAuthModal}
-        message={authModalMessage}
-      />
     </AuthContext.Provider>
   );
 }
