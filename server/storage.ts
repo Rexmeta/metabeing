@@ -771,7 +771,19 @@ export class PostgreSQLStorage implements IStorage {
 
   async createUser(userData: { email: string; password: string; name: string; assignedCategoryId?: string | null }): Promise<User> {
     try {
-      const result = await db.insert(users).values(userData).returning();
+      // Only include assignedCategoryId if it's a valid non-empty string (UUID)
+      const insertData: any = {
+        email: userData.email,
+        password: userData.password,
+        name: userData.name,
+      };
+      
+      // Only add assignedCategoryId if it's a valid UUID (not null, undefined, or empty string)
+      if (userData.assignedCategoryId && userData.assignedCategoryId.trim().length > 0) {
+        insertData.assignedCategoryId = userData.assignedCategoryId;
+      }
+      
+      const result = await db.insert(users).values(insertData).returning();
       if (result && result.length > 0) {
         return result[0];
       }
