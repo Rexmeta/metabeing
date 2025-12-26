@@ -120,7 +120,7 @@ const adminItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { user, isAuthenticated, logout, setShowAuthModal } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [showProfileEdit, setShowProfileEdit] = useState(false);
 
   const { data: categories } = useQuery<{ id: string; name: string }[]>({
@@ -165,7 +165,7 @@ export function AppSidebar() {
   };
 
   const handleLogin = () => {
-    setShowAuthModal(true);
+    window.location.href = "/auth";
   };
 
   const isActive = (url: string) => {
