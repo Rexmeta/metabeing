@@ -4268,11 +4268,20 @@ ${personaSnapshot.name}:`;
     }
   });
 
-  // 페르소나 관리 API
-  app.get("/api/admin/personas", async (req, res) => {
+  // 페르소나 관리 API (인증 필요, 역할별 필터링)
+  app.get("/api/admin/personas", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
       const personas = await fileManager.getAllMBTIPersonas();
-      res.json(personas);
+      
+      // 관리자는 모든 페르소나, 그 외는 본인 소유만 반환
+      if (userRole === 'admin') {
+        res.json(personas);
+      } else {
+        const myPersonas = personas.filter((p: any) => p.ownerId === userId && p.id);
+        res.json(myPersonas);
+      }
     } catch (error) {
       console.error("Error getting MBTI personas:", error);
       res.status(500).json({ error: "Failed to get MBTI personas" });
