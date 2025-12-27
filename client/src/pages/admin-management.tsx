@@ -37,7 +37,7 @@ export default function AdminManagement() {
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  const { data: personas = [], isLoading: loadingPersonas } = useQuery({
+  const { data: personasData, isLoading: loadingPersonas, isError: personasError } = useQuery({
     queryKey: ["/api/admin/personas"],
     queryFn: async () => {
       const res = await fetch("/api/admin/personas", { headers: getAuthHeaders() });
@@ -45,6 +45,9 @@ export default function AdminManagement() {
       return res.json();
     },
   });
+  
+  // 안전한 배열 보장
+  const personas = Array.isArray(personasData) ? personasData : [];
 
   const updatePersonaVisibilityMutation = useMutation({
     mutationFn: async ({ id, visibility }: { id: string; visibility: string }) => {

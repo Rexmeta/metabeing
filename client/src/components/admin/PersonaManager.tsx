@@ -275,10 +275,21 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
   });
 
   // MBTI 페르소나 목록 조회
-  const { data: personas = [], isLoading, error } = useQuery({
+  const { data: personasData, isLoading, error } = useQuery({
     queryKey: ['/api/admin/personas'],
-    queryFn: () => fetch('/api/admin/personas').then(res => res.json())
+    queryFn: () => {
+      const token = localStorage.getItem("authToken");
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      return fetch('/api/admin/personas', { headers }).then(res => {
+        if (!res.ok) throw new Error("Failed to fetch personas");
+        return res.json();
+      });
+    }
   });
+  
+  // 안전한 배열 보장
+  const personas = Array.isArray(personasData) ? personasData : [];
 
   // 시나리오 목록 조회 (페르소나 사용 현황 확인용)
   const { data: scenarios = [] } = useQuery({
