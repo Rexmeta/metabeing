@@ -1,12 +1,19 @@
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format, isToday, isYesterday } from "date-fns";
 import { ko } from "date-fns/locale";
-import { MessageCircle, X, ChevronRight, Sparkles } from "lucide-react";
+import { MessageCircle, X, ChevronRight, Sparkles, CalendarDays, Trash2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { type ScenarioRun, type PersonaRun } from "@shared/schema";
 
 interface ActiveConversation {
   id: string;
@@ -27,8 +34,13 @@ interface ActiveConversation {
 }
 
 export default function Conversations() {
+  const [activeTab, setActiveTab] = useState<"persona" | "scenario">("persona");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [scenarioRunToDelete, setScenarioRunToDelete] = useState<string | null>(null);
   const { toast } = useToast();
-  const { data: activeConversations, isLoading, refetch } = useQuery<ActiveConversation[]>({
+  const { user } = useAuth();
+
+  const { data: activeConversations, isLoading: personaLoading, refetch } = useQuery<ActiveConversation[]>({
     queryKey: ["/api/active-conversations"],
     refetchInterval: 10000,
   });
@@ -67,6 +79,110 @@ export default function Conversations() {
     },
   });
 
+  const { data: rawScenarioRuns = [], isLoading: scenarioLoading } = useQuery<(ScenarioRun & { personaRuns: PersonaRun[] })[]>({
+    queryKey: ['/api/scenario-runs'],
+    enabled: !!user,
+  });
+
+  const { data: feedbacks = [] } = useQuery<any[]>({
+    queryKey: ['/api/feedbacks'],
+    enabled: !!user,
+  });
+
+  const { data: scenarios = [] } = useQuery<any[]>({
+    queryKey: ['/api/scenarios'],
+  });
+
+  const scenarioRuns = useMemo(() => {
+    if (!feedbacks || feedbacks.length === 0) {
+      return rawScenarioRuns;
+    }
+    const feedbackScores: Record<string, number> = {};
+    feedbacks.forEach(f => {
+      if (f.personaRunId) {
+        feedbackScores[f.personaRunId] = f.overallScore || 0;
+      }
+    });
+    return rawScenarioRuns.map(sr => ({
+      ...sr,
+      personaRuns: (sr.personaRuns || []).map(pr => ({
+        ...pr,
+        score: pr.score !== null ? pr.score : (feedbackScores[pr.id] || 0)
+      }))
+    }));
+  }, [rawScenarioRuns, feedbacks]);
+
+  const scenariosMap = useMemo(() => {
+    const map = new Map<string, any>();
+    scenarios.forEach(s => map.set(s.id, s));
+    return map;
+  }, [scenarios]);
+
+  const getScenarioInfo = (scenarioId: string | null) => {
+    if (!scenarioId) return { title: '알 수 없는 시나리오', difficulty: 1, personas: [] };
+    return scenariosMap.get(scenarioId) || { title: '알 수 없는 시나리오', difficulty: 1, personas: [] };
+  };
+
+  const displayableScenarioRuns = useMemo(() => {
+    return scenarioRuns
+      .filter(sr => sr.personaRuns && sr.personaRuns.length > 0)
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+  }, [scenarioRuns]);
+
+  const scenarioAttemptNumbers = useMemo(() => {
+    const attemptMap = new Map<string, number>();
+    const scenarioCounters: Record<string, number> = {};
+    const chronologicalRuns = [...scenarioRuns]
+      .filter(sr => sr.personaRuns && sr.personaRuns.length > 0 && sr.scenarioId)
+      .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
+    chronologicalRuns.forEach((run) => {
+      const scenarioId = run.scenarioId!;
+      if (!scenarioCounters[scenarioId]) {
+        scenarioCounters[scenarioId] = 0;
+      }
+      scenarioCounters[scenarioId]++;
+      attemptMap.set(run.id, scenarioCounters[scenarioId]);
+    });
+    return attemptMap;
+  }, [scenarioRuns]);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (scenarioRunId: string) => {
+      return await apiRequest('DELETE', `/api/scenario-runs/${scenarioRunId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/scenario-runs'] });
+      toast({
+        title: "삭제 완료",
+        description: "시나리오 실행 기록이 삭제되었습니다.",
+      });
+      setScenarioRunToDelete(null);
+    },
+    onError: () => {
+      toast({
+        title: "삭제 실패",
+        description: "시나리오 실행 기록을 삭제할 수 없습니다.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteClick = (scenarioRunId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setScenarioRunToDelete(scenarioRunId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (scenarioRunToDelete) {
+      deleteMutation.mutate(scenarioRunToDelete);
+    }
+    setDeleteDialogOpen(false);
+  };
+
   const getPersonaImage = (persona: any) => {
     if (!persona?.images) return null;
     const gender = persona.gender || 'male';
@@ -88,133 +204,344 @@ export default function Conversations() {
     }
   };
 
+  const personaConversationsCount = activeConversations?.length || 0;
+  const scenarioConversationsCount = displayableScenarioRuns.length;
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-primary" />
-            <h1 className="text-lg font-bold">대화</h1>
-          </div>
-          {activeConversations && activeConversations.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {activeConversations.length}
-            </Badge>
-          )}
+        <div className="flex items-center gap-2">
+          <MessageCircle className="w-5 h-5 text-primary" />
+          <h1 className="text-lg font-bold">대화</h1>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "persona" | "scenario")} className="flex-1 flex flex-col">
+          <div className="px-4 pt-3">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="persona" className="flex items-center gap-2" data-testid="tab-persona-chat">
+                <MessageCircle className="w-4 h-4" />
+                페르소나 대화
+                {personaConversationsCount > 0 && (
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {personaConversationsCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="scenario" className="flex items-center gap-2" data-testid="tab-scenario-chat">
+                <Users className="w-4 h-4" />
+                시나리오 대화
+                {scenarioConversationsCount > 0 && (
+                  <Badge variant="secondary" className="text-xs ml-1">
+                    {scenarioConversationsCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
           </div>
-        ) : activeConversations && activeConversations.length > 0 ? (
-          <div className="divide-y divide-border/50">
-            {activeConversations.map((conv) => {
-              const personaInfo = personas[conv.personaId];
+
+          <TabsContent value="persona" className="flex-1 overflow-y-auto m-0 mt-2">
+            {personaLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+              </div>
+            ) : activeConversations && activeConversations.length > 0 ? (
+              <div className="divide-y divide-border/50">
+                {activeConversations.map((conv) => {
+                  const personaInfo = personas[conv.personaId];
+                  const personaImage = getPersonaImage(personaInfo);
+                  const lastMessageTime = formatMessageTime(conv.lastActivityAt || conv.createdAt);
+                  
+                  const getLastMessageText = () => {
+                    if (!conv.lastMessage) return "대화를 시작해보세요";
+                    if (typeof conv.lastMessage === 'string') {
+                      return conv.lastMessage;
+                    }
+                    if (typeof conv.lastMessage === 'object' && conv.lastMessage.message) {
+                      return (conv.lastMessage.sender === "user" ? "나: " : "") + conv.lastMessage.message;
+                    }
+                    return "대화를 시작해보세요";
+                  };
+                  
+                  const hasUnread = (conv.unreadCount ?? 0) > 0;
+                  
+                  return (
+                    <div 
+                      key={conv.id}
+                      className="relative"
+                      data-testid={`conversation-item-${conv.id}`}
+                    >
+                      <Link href={`/chat/${conv.id}`}>
+                        <div className="flex items-center gap-3 px-4 py-3 active:bg-muted/50 transition-colors">
+                          <div className="relative flex-shrink-0">
+                            {personaImage ? (
+                              <img 
+                                src={personaImage} 
+                                alt={conv.personaName || conv.personaId}
+                                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover ring-2 ring-background shadow-sm"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-primary font-bold text-lg shadow-sm">
+                                {(conv.personaName || conv.personaId).charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            {hasUnread && (
+                              <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-[10px] font-bold px-1 shadow-sm">
+                                {conv.unreadCount! > 99 ? '99+' : conv.unreadCount}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0 pr-2">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <span className={`font-medium truncate text-sm sm:text-base ${hasUnread ? 'text-foreground' : 'text-foreground/90'}`}>
+                                {conv.personaName || conv.personaId}
+                              </span>
+                              <span className="text-[11px] sm:text-xs text-muted-foreground flex-shrink-0">
+                                {lastMessageTime}
+                              </span>
+                            </div>
+                            
+                            {conv.scenarioRun?.scenarioName && (
+                              <div className="flex items-center gap-1 mb-0.5">
+                                <Sparkles className="w-3 h-3 text-amber-500" />
+                                <span className="text-[11px] text-muted-foreground truncate">
+                                  {conv.scenarioRun.scenarioName}
+                                </span>
+                              </div>
+                            )}
+                            
+                            <p className={`text-xs sm:text-sm truncate ${hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                              {getLastMessageText()}
+                            </p>
+                          </div>
+
+                          <ChevronRight className="w-4 h-4 text-muted-foreground/50 flex-shrink-0 hidden sm:block" />
+                        </div>
+                      </Link>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 text-muted-foreground/60 sm:hidden"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (confirm("대화방을 닫으시겠습니까?")) {
+                            closeMutation.mutate(conv.id);
+                          }
+                        }}
+                        disabled={closeMutation.isPending}
+                        data-testid={`button-close-${conv.id}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <MessageCircle className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground mb-2 text-sm">진행 중인 페르소나 대화가 없습니다</p>
+                <Link href="/">
+                  <Button variant="link" className="text-primary p-0 h-auto text-sm">
+                    라이브러리에서 대화 시작하기
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="scenario" className="flex-1 overflow-y-auto m-0 mt-2 px-4">
+            {scenarioLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+              </div>
+            ) : displayableScenarioRuns.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Users className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground mb-2 text-sm">완료한 시나리오 대화 기록이 없습니다</p>
+                <Link href="/home">
+                  <Button variant="link" className="text-primary p-0 h-auto text-sm">
+                    시나리오 시작하기
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="pt-4">
+                  <Accordion type="multiple" className="w-full">
+                    {displayableScenarioRuns.map((scenarioRun) => {
+                      const scenarioInfo = getScenarioInfo(scenarioRun.scenarioId);
+                      const attemptNumber = scenarioAttemptNumbers.get(scenarioRun.id) || 1;
+                      
+                      const hasMultiplePersonas = scenarioInfo.personas?.length > 1;
+                      const isScenarioCompleted = hasMultiplePersonas 
+                        ? (scenarioRun.status === 'completed' && !!scenarioRun.strategyReflection)
+                        : scenarioRun.status === 'completed';
+                      
+                      return (
+                        <AccordionItem 
+                          key={scenarioRun.id} 
+                          value={scenarioRun.id} 
+                          data-testid={`scenario-run-${scenarioRun.id}`}
+                        >
+                          <div className="flex items-center justify-between border-b">
+                            <AccordionTrigger className="hover:no-underline flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">
+                                  {scenarioRun.startedAt ? (() => {
+                                    const date = new Date(scenarioRun.startedAt);
+                                    return !isNaN(date.getTime()) ? format(date, 'yyyy년 MM월 dd일 HH:mm') : '시간 정보 없음';
+                                  })() : '시간 정보 없음'}
+                                </span>
+                                <h3 className="font-semibold text-left">{scenarioInfo.title}</h3>
+                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800">
+                                  난이도 {scenarioRun.difficulty || scenarioInfo.difficulty}
+                                </Badge>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800">
+                                  #{attemptNumber}회 시도
+                                </Badge>
+                                {isScenarioCompleted ? (
+                                  <Badge className="bg-green-600">완료</Badge>
+                                ) : (
+                                  <Badge className="bg-yellow-600">진행 중</Badge>
+                                )}
+                              </div>
+                            </AccordionTrigger>
+                            <button
+                              onClick={(e) => handleDeleteClick(scenarioRun.id, e)}
+                              className="p-2 text-destructive hover:bg-destructive/10 rounded transition-colors mr-2"
+                              data-testid={`delete-scenario-run-${scenarioRun.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <AccordionContent>
+                            <ScenarioRunDetails 
+                              scenarioRun={scenarioRun} 
+                              scenarioInfo={scenarioInfo}
+                              personaRuns={scenarioRun.personaRuns || []}
+                              personas={personas}
+                            />
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>시나리오 실행 기록 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 시나리오 실행 기록을 삭제하시겠습니까? 관련된 모든 대화와 피드백이 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function ScenarioRunDetails({ 
+  scenarioRun, 
+  scenarioInfo,
+  personaRuns,
+  personas
+}: { 
+  scenarioRun: ScenarioRun; 
+  scenarioInfo: any;
+  personaRuns: PersonaRun[];
+  personas: Record<string, any>;
+}) {
+  const completedPersonaRuns = personaRuns.filter(pr => pr.status === 'completed');
+
+  const getPersonaImage = (persona: any) => {
+    if (!persona?.images) return null;
+    const gender = persona.gender || 'male';
+    const genderImages = persona.images[gender as 'male' | 'female'];
+    return genderImages?.expressions?.['중립'] || persona.images.base || null;
+  };
+
+  return (
+    <div className="space-y-4 pt-4">
+      {scenarioRun.strategyReflection && (
+        <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+          <h4 className="font-semibold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-2">
+            <Sparkles className="w-4 h-4" />
+            전략 회고
+          </h4>
+          <p className="text-sm text-amber-900 dark:text-amber-200 whitespace-pre-wrap">
+            {scenarioRun.strategyReflection}
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <h4 className="font-semibold text-sm text-muted-foreground">대화 기록</h4>
+        {personaRuns.length === 0 ? (
+          <p className="text-sm text-muted-foreground">아직 대화 기록이 없습니다.</p>
+        ) : (
+          <div className="space-y-2">
+            {personaRuns.map((pr) => {
+              const personaInfo = personas[pr.personaId];
               const personaImage = getPersonaImage(personaInfo);
-              const lastMessageTime = formatMessageTime(conv.lastActivityAt || conv.createdAt);
-              
-              const getLastMessageText = () => {
-                if (!conv.lastMessage) return "대화를 시작해보세요";
-                if (typeof conv.lastMessage === 'string') {
-                  return conv.lastMessage;
-                }
-                if (typeof conv.lastMessage === 'object' && conv.lastMessage.message) {
-                  return (conv.lastMessage.sender === "user" ? "나: " : "") + conv.lastMessage.message;
-                }
-                return "대화를 시작해보세요";
-              };
-              
-              const hasUnread = (conv.unreadCount ?? 0) > 0;
+              const personaName = personaInfo?.name || pr.personaId;
               
               return (
-                <div 
-                  key={conv.id}
-                  className="relative"
-                  data-testid={`conversation-item-${conv.id}`}
-                >
-                  <Link href={`/chat/${conv.id}`}>
-                    <div className="flex items-center gap-3 px-4 py-3 active:bg-muted/50 transition-colors">
-                      <div className="relative flex-shrink-0">
-                        {personaImage ? (
-                          <img 
-                            src={personaImage} 
-                            alt={conv.personaName || conv.personaId}
-                            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover ring-2 ring-background shadow-sm"
-                          />
+                <Link key={pr.id} href={`/feedback/${pr.conversationId}`}>
+                  <div className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                    {personaImage ? (
+                      <img 
+                        src={personaImage} 
+                        alt={personaName}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                        {personaName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{personaName}</span>
+                        {pr.status === 'completed' ? (
+                          <Badge className="bg-green-600 text-xs">완료</Badge>
                         ) : (
-                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-primary font-bold text-lg shadow-sm">
-                            {(conv.personaName || conv.personaId).charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        {hasUnread && (
-                          <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-destructive rounded-full flex items-center justify-center text-destructive-foreground text-[10px] font-bold px-1 shadow-sm">
-                            {conv.unreadCount! > 99 ? '99+' : conv.unreadCount}
-                          </div>
+                          <Badge className="bg-yellow-600 text-xs">진행 중</Badge>
                         )}
                       </div>
-
-                      <div className="flex-1 min-w-0 pr-2">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className={`font-medium truncate text-sm sm:text-base ${hasUnread ? 'text-foreground' : 'text-foreground/90'}`}>
-                            {conv.personaName || conv.personaId}
-                          </span>
-                          <span className="text-[11px] sm:text-xs text-muted-foreground flex-shrink-0">
-                            {lastMessageTime}
-                          </span>
+                      {pr.score !== null && pr.score > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          점수: {pr.score}점
                         </div>
-                        
-                        {conv.scenarioRun?.scenarioName && (
-                          <div className="flex items-center gap-1 mb-0.5">
-                            <Sparkles className="w-3 h-3 text-amber-500" />
-                            <span className="text-[11px] text-muted-foreground truncate">
-                              {conv.scenarioRun.scenarioName}
-                            </span>
-                          </div>
-                        )}
-                        
-                        <p className={`text-xs sm:text-sm truncate ${hasUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-                          {getLastMessageText()}
-                        </p>
-                      </div>
-
-                      <ChevronRight className="w-4 h-4 text-muted-foreground/50 flex-shrink-0 hidden sm:block" />
+                      )}
                     </div>
-                  </Link>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 text-muted-foreground/60 sm:hidden"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (confirm("대화방을 닫으시겠습니까?")) {
-                        closeMutation.mutate(conv.id);
-                      }
-                    }}
-                    disabled={closeMutation.isPending}
-                    data-testid={`button-close-${conv.id}`}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </Link>
               );
             })}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <MessageCircle className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <p className="text-muted-foreground mb-2 text-sm">진행 중인 대화가 없습니다</p>
-            <Link href="/">
-              <Button variant="link" className="text-primary p-0 h-auto text-sm">
-                라이브러리에서 대화 시작하기
-              </Button>
-            </Link>
           </div>
         )}
       </div>
