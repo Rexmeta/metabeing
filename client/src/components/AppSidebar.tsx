@@ -210,7 +210,7 @@ export function AppSidebar() {
                     >
                       <Link href="/conversations">
                         <MessageCircle className="w-4 h-4" />
-                        <span>대화 중</span>
+                        <span>채팅</span>
                         {activeConversations && activeConversations.length > 0 && (
                           <Badge variant="secondary" className="ml-auto text-xs">
                             {activeConversations.length}

@@ -98,9 +98,9 @@ export default function AdminManagement() {
       <div className="container mx-auto p-6 space-y-6" data-testid="admin-management">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="manage-personas" data-testid="tab-manage-personas">페르소나 관리</TabsTrigger>
-            <TabsTrigger value="manage-scenarios" data-testid="tab-manage-scenarios">시나리오 관리</TabsTrigger>
-            <TabsTrigger value="difficulty-settings" data-testid="tab-difficulty-settings">난이도 설정</TabsTrigger>
+            <TabsTrigger value="manage-personas" data-testid="tab-manage-personas">페르소나</TabsTrigger>
+            <TabsTrigger value="manage-scenarios" data-testid="tab-manage-scenarios">시나리오</TabsTrigger>
+            <TabsTrigger value="difficulty-settings" data-testid="tab-difficulty-settings">대화 난이도</TabsTrigger>
           </TabsList>
 
           <TabsContent value="manage-scenarios" className="space-y-6">

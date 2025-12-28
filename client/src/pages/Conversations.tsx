@@ -243,7 +243,7 @@ export default function Conversations() {
               <TabsTrigger value="scenario" className="flex items-center gap-1 sm:gap-2 px-1 sm:px-3 py-2 text-xs sm:text-sm" data-testid="tab-scenario-chat">
                 <Users className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span className="hidden xs:inline">시나리오</span>
-                <span className="xs:hidden">기록</span>
+                <span className="xs:hidden">시나리오 채팅</span>
                 {scenarioConversationsCount > 0 && (
                   <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-1.5">
                     {scenarioConversationsCount}
@@ -252,7 +252,7 @@ export default function Conversations() {
               </TabsTrigger>
               <TabsTrigger value="analytics" className="flex items-center gap-1 sm:gap-2 px-1 sm:px-3 py-2 text-xs sm:text-sm" data-testid="tab-analytics">
                 <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                <span>분석</span>
+                <span>채팅 분석</span>
               </TabsTrigger>
             </TabsList>
           </div>
