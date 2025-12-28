@@ -67,12 +67,6 @@ const mainMenuItems = [
 
 const myContentItems = [
   {
-    title: "대화",
-    url: "/conversations",
-    icon: MessageCircle,
-    requiresAuth: true,
-  },
-  {
     title: "콘텐츠 관리",
     url: "/admin-management",
     icon: Cog,
