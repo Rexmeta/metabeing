@@ -1,0 +1,69 @@
+{
+  "id": "gggasvy",
+  "mbti": "isss",
+  "gender": "male",
+  "name": "Golfgirl",
+  "department": "ak",
+  "position": "",
+  "experience": "Golfgirl",
+  "stance": "Golfgirl",
+  "goal": "Golfgirl",
+  "tradeoff": "",
+  "personality_traits": [],
+  "communication_style": "",
+  "motivation": "",
+  "fears": [],
+  "background": {
+    "personal_values": [],
+    "hobbies": [],
+    "social": {
+      "preference": "",
+      "behavior": ""
+    }
+  },
+  "communication_patterns": {
+    "opening_style": "",
+    "key_phrases": [],
+    "response_to_arguments": {},
+    "win_conditions": []
+  },
+  "voice": {
+    "tone": "",
+    "pace": "",
+    "emotion": ""
+  },
+  "images": {
+    "base": "",
+    "style": "",
+    "male": {
+      "expressions": {
+        "중립": "",
+        "기쁨": "",
+        "슬픔": "",
+        "분노": "",
+        "놀람": "",
+        "호기심": "",
+        "불안": "",
+        "단호": "",
+        "실망": "",
+        "당혹": ""
+      }
+    },
+    "female": {
+      "expressions": {
+        "중립": "",
+        "기쁨": "",
+        "슬픔": "",
+        "분노": "",
+        "놀람": "",
+        "호기심": "",
+        "불안": "",
+        "단호": "",
+        "실망": "",
+        "당혹": ""
+      }
+    }
+  },
+  "ownerId": "64c66c17-4f42-4279-96fe-0d269f8b0235",
+  "visibility": "public"
+}
