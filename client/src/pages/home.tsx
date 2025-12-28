@@ -422,17 +422,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* 시나리오 목록에서는 항상 헤더 표시 */}
-      {!isDetailPage && (
-        <AppHeader 
-          onLogoClick={() => {
-            setCurrentView('scenarios');
-            setSelectedScenario(null);
-            setSelectedPersona(null);
-            setConversationId(null);
-          }}
-        />
-      )}
       
       {/* 상세 페이지에서는 토글 가능한 헤더 */}
       {isDetailPage && isHeaderVisible && (
