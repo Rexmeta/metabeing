@@ -555,6 +555,7 @@ export const ugcScenarios = pgTable("ugc_scenarios", {
   sourceScenarioId: varchar("source_scenario_id"), // 리믹스 원본
   image: text("image"), // 대표 이미지 URL
   introVideoUrl: text("intro_video_url"), // 인트로 비디오 URL
+  personaIds: jsonb("persona_ids").$type<string[]>().default([]), // 등장 페르소나 ID 목록
   viewCount: integer("view_count").notNull().default(0),
   usageCount: integer("usage_count").notNull().default(0),
   version: integer("version").notNull().default(1),

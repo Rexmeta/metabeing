@@ -92,13 +92,18 @@ function ScenarioCard({ scenario, personas = [] }: { scenario: Scenario; persona
     .map(personaId => personas.find(p => p.id === personaId))
     .filter((p): p is Persona => p !== undefined)
     .slice(0, 5); // Show max 5 personas
+  
 
   const getProfileImage = (persona: Persona) => {
     const gender = persona.gender || 'female';
     const genderKey = gender.toLowerCase() === 'male' ? 'male' : 'female';
     
-    if (persona.images?.[genderKey]?.expressions?.base) {
-      return persona.images[genderKey].expressions.base;
+    // 한국어 또는 영어 표정 키로 이미지 찾기
+    const expressions = persona.images?.[genderKey]?.expressions;
+    if (expressions) {
+      // 한국어 "중립" 또는 영어 "neutral" 또는 "base" 시도
+      const baseImage = expressions['중립'] || expressions['neutral'] || expressions['base'];
+      if (baseImage) return baseImage;
     }
     if (persona.images?.base) {
       return persona.images.base;
@@ -179,7 +184,7 @@ function ScenarioCard({ scenario, personas = [] }: { scenario: Scenario; persona
       </div>
       
       {scenarioPersonas.length > 0 && (
-        <div className="flex items-center gap-1.5 mb-2 px-1">
+        <div className="flex items-center gap-1.5 mb-2 px-1" data-testid={`scenario-personas-container-${scenario.id}`}>
           <div className="flex -space-x-2">
             {scenarioPersonas.map((persona) => {
               const profileImage = getProfileImage(persona);

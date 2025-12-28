@@ -133,10 +133,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     const personaCache = GlobalPersonaCache.getInstance();
+    const personaIds: string[] = [];
+    
     const enrichedPersonas = scenario.personas.map((p: any) => {
       // personaRef로 페르소나 데이터 조회
       const personaRef = p.personaRef || p.id;
       if (!personaRef) return p;
+
+      // personaIds 배열에 추가 (탐색 페이지 시나리오 카드에서 사용)
+      // .json 확장자 제거하여 페르소나 ID와 매칭되도록 함
+      const cleanPersonaId = personaRef.replace(/\.json$/, '');
+      personaIds.push(cleanPersonaId);
 
       const personaData = personaCache.getPersonaData(personaRef);
       if (!personaData) return p;
@@ -152,7 +159,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     return {
       ...scenario,
-      personas: enrichedPersonas
+      personas: enrichedPersonas,
+      personaIds: personaIds // 탐색 페이지에서 페르소나 아바타 표시용
     };
   }
 
