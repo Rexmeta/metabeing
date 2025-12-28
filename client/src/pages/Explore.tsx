@@ -50,6 +50,7 @@ interface Scenario {
   visibility?: "public" | "private";
   image?: string | null;
   introVideoUrl?: string | null;
+  personaIds?: string[];
 }
 
 interface PersonaImages {
@@ -79,12 +80,34 @@ interface Persona {
   usageCount?: number;
 }
 
-function ScenarioCard({ scenario }: { scenario: Scenario }) {
+function ScenarioCard({ scenario, personas = [] }: { scenario: Scenario; personas?: Persona[] }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
   const difficultyLabels = ["", "입문", "기본", "도전", "고급"];
   const difficultyColors = ["", "bg-green-500/90 text-white", "bg-blue-500/90 text-white", "bg-orange-500/90 text-white", "bg-red-500/90 text-white"];
+
+  // Get personas for this scenario
+  const scenarioPersonas = (scenario.personaIds || [])
+    .map(personaId => personas.find(p => p.id === personaId))
+    .filter((p): p is Persona => p !== undefined)
+    .slice(0, 5); // Show max 5 personas
+
+  const getProfileImage = (persona: Persona) => {
+    const gender = persona.gender || 'female';
+    const genderKey = gender.toLowerCase() === 'male' ? 'male' : 'female';
+    
+    if (persona.images?.[genderKey]?.expressions?.base) {
+      return persona.images[genderKey].expressions.base;
+    }
+    if (persona.images?.base) {
+      return persona.images.base;
+    }
+    if (persona.profileImage) {
+      return persona.profileImage;
+    }
+    return null;
+  };
 
   const { data: stats } = useQuery<ScenarioStats>({
     queryKey: ['/api/scenarios', scenario.id, 'stats'],
@@ -154,6 +177,39 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
           </h3>
         </div>
       </div>
+      
+      {scenarioPersonas.length > 0 && (
+        <div className="flex items-center gap-1.5 mb-2 px-1">
+          <div className="flex -space-x-2">
+            {scenarioPersonas.map((persona) => {
+              const profileImage = getProfileImage(persona);
+              return (
+                <div
+                  key={persona.id}
+                  className="relative w-7 h-7 rounded-full overflow-hidden border-2 border-background bg-muted flex-shrink-0"
+                  title={persona.name}
+                  data-testid={`scenario-persona-avatar-${scenario.id}-${persona.id}`}
+                >
+                  {profileImage ? (
+                    <img
+                      src={profileImage}
+                      alt={persona.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-[10px] font-bold text-primary">
+                      {persona.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {scenarioPersonas.length > 5 && (
+            <span className="text-[10px] text-muted-foreground">+{scenarioPersonas.length - 5}</span>
+          )}
+        </div>
+      )}
       
       <div className="flex items-center justify-between gap-2 px-1">
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -451,7 +507,7 @@ export default function Explore() {
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
                   {scenarios.map((scenario) => (
-                    <ScenarioCard key={scenario.id} scenario={scenario} />
+                    <ScenarioCard key={scenario.id} scenario={scenario} personas={personas} />
                   ))}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
