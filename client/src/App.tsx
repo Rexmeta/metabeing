@@ -21,6 +21,7 @@ import Explore from "@/pages/Explore";
 import ProfileSettings from "@/pages/ProfileSettings";
 import PersonaChat from "@/pages/PersonaChat";
 import Conversations from "@/pages/Conversations";
+import CreatePersona from "@/pages/CreatePersona";
 import { AuthPage } from "@/pages/AuthPage";
 
 function ContentManagementRedirect() {
@@ -153,6 +154,12 @@ function MainRouter() {
       <Route path="/library" component={ContentManagementRedirect} />
       <Route path="/conversations">
         {() => <ProtectedRoute component={Conversations} />}
+      </Route>
+      <Route path="/create-persona">
+        {() => <ProtectedRoute component={CreatePersona} />}
+      </Route>
+      <Route path="/create-persona/:personaId">
+        {() => <ProtectedRoute component={CreatePersona} />}
       </Route>
       <Route component={NotFound} />
     </Switch>

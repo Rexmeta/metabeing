@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScenarioManager } from "@/components/admin/ScenarioManager";
-import { PersonaManager } from "@/components/admin/PersonaManager";
 import { DifficultySettingsTab } from "@/components/admin/DifficultySettingsTab";
 import { AppHeader } from "@/components/AppHeader";
 import { useToast } from "@/hooks/use-toast";
@@ -22,8 +21,6 @@ export default function AdminManagement() {
   const [activeTab, setActiveTab] = useState(tabFromUrl || "manage-scenarios");
   const { toast } = useToast();
 
-  const [editingPersona, setEditingPersona] = useState<any | null>(null);
-  const [personaDialogOpen, setPersonaDialogOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ type: string; id: string; name: string } | null>(null);
 
   useEffect(() => {
@@ -116,10 +113,7 @@ export default function AdminManagement() {
               <Button 
                 className="gap-2" 
                 data-testid="button-create-persona"
-                onClick={() => {
-                  setEditingPersona(null);
-                  setPersonaDialogOpen(true);
-                }}
+                onClick={() => setLocation('/create-persona')}
               >
                 <Plus className="h-4 w-4" />
                 페르소나 만들기
@@ -135,10 +129,7 @@ export default function AdminManagement() {
                 <Button 
                   className="mt-4" 
                   data-testid="button-create-persona-empty"
-                  onClick={() => {
-                    setEditingPersona(null);
-                    setPersonaDialogOpen(true);
-                  }}
+                  onClick={() => setLocation('/create-persona')}
                 >
                   페르소나 만들기
                 </Button>
@@ -203,8 +194,7 @@ export default function AdminManagement() {
                               <DropdownMenuItem 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setEditingPersona(persona);
-                                  setPersonaDialogOpen(true);
+                                  setLocation(`/create-persona/${persona.id}`);
                                 }}
                                 data-testid={`button-edit-persona-${persona.id}`}
                               >
@@ -282,17 +272,6 @@ export default function AdminManagement() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <PersonaManager
-        dialogOnly={true}
-        externalOpen={personaDialogOpen}
-        externalPersona={editingPersona}
-        onExternalClose={() => {
-          setPersonaDialogOpen(false);
-          setEditingPersona(null);
-          queryClient.invalidateQueries({ queryKey: ["/api/admin/personas"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/personas/mine"] });
-        }}
-      />
     </div>
   );
 }

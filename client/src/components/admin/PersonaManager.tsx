@@ -197,9 +197,11 @@ interface PersonaManagerProps {
   externalPersona?: any;
   onExternalClose?: () => void;
   dialogOnly?: boolean;
+  pageMode?: boolean;
+  onSaveSuccess?: () => void;
 }
 
-export function PersonaManager({ externalOpen, externalPersona, onExternalClose, dialogOnly = false }: PersonaManagerProps = {}) {
+export function PersonaManager({ externalOpen, externalPersona, onExternalClose, dialogOnly = false, pageMode = false, onSaveSuccess }: PersonaManagerProps = {}) {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingPersona, setEditingPersona] = useState<MBTIPersona | null>(null);
@@ -345,6 +347,9 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
         title: "성공",
         description: "MBTI 페르소나가 생성되었습니다."
       });
+      if (pageMode && onSaveSuccess) {
+        onSaveSuccess();
+      }
     },
     onError: () => {
       toast({
@@ -372,6 +377,9 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
           title: "성공",
           description: "MBTI 페르소나가 수정되었습니다."
         });
+        if (pageMode && onSaveSuccess) {
+          onSaveSuccess();
+        }
       } else {
         autoSavingRef.current = false;
       }
@@ -868,14 +876,14 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
   // dialogOnly 모드에서는 externalOpen만으로 다이얼로그 열림 제어
   const isDialogOpen = dialogOnly ? externalOpen : (isCreateOpen || !!editingPersona);
   
-  // dialogOnly 모드에서 수정/생성 모드 판단 (externalPersona 우선 사용으로 상태 동기화 문제 방지)
-  const isEditMode = dialogOnly ? !!externalPersona : !!editingPersona;
+  // dialogOnly/pageMode 모드에서 수정/생성 모드 판단 (externalPersona 우선 사용으로 상태 동기화 문제 방지)
+  const isEditMode = (dialogOnly || pageMode) ? !!externalPersona : !!editingPersona;
 
-  if (isLoading && !dialogOnly) {
+  if (isLoading && !dialogOnly && !pageMode) {
     return <div className="text-center py-8">로딩 중...</div>;
   }
 
-  if (error && !dialogOnly) {
+  if (error && !dialogOnly && !pageMode) {
     return <div className="text-center py-8 text-red-600">페르소나 데이터를 불러올 수 없습니다.</div>;
   }
 
@@ -1521,6 +1529,163 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
         )}
         
         {/* 기본 이미지 재생성 확인 다이얼로그 - dialogOnly 모드에서도 필요 */}
+        <AlertDialog open={showBaseImageConfirm} onOpenChange={setShowBaseImageConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>기본 이미지 재생성</AlertDialogTitle>
+              <AlertDialogDescription>
+                이미 생성된 기본 이미지가 있습니다. 기존 이미지를 삭제하고 새로운 기본 이미지를 생성하시겠어요?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>취소</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setShowBaseImageConfirm(false);
+                  generateBaseImage();
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                재생성
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
+
+  // pageMode 모드: Dialog 없이 폼만 렌더링 (단독 페이지용)
+  if (pageMode) {
+    return (
+      <>
+        <div className="bg-slate-50 rounded-lg">
+          <div className="bg-indigo-600 p-6 rounded-t-lg">
+            <h1 className="text-white text-xl font-semibold flex items-center gap-2">
+              <i className="fas fa-user-edit"></i>
+              {isEditMode ? '페르소나 수정' : '페르소나 생성'}
+            </h1>
+          </div>
+          
+          <div className="p-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <i className="fas fa-id-card text-indigo-600"></i>
+                  기본 정보
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="id-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">페르소나 ID (소문자)</Label>
+                    <Input
+                      id="id-page"
+                      value={formData.id}
+                      onChange={(e) => setFormData(prev => ({ ...prev, id: e.target.value }))}
+                      placeholder="istj, enfp, intp 등"
+                      required
+                      disabled={isEditMode}
+                      className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white disabled:bg-slate-100"
+                      data-testid="input-persona-id-page"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="mbti-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">성격 유형 (대문자)</Label>
+                    <Input
+                      id="mbti-page"
+                      value={formData.mbti}
+                      onChange={(e) => setFormData(prev => ({ ...prev, mbti: e.target.value }))}
+                      placeholder="ISTJ, ENFP, INTP 등"
+                      required
+                      className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="input-mbti-page"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <i className="fas fa-user-tie text-teal-600"></i>
+                  시나리오 페르소나 정의
+                </h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <Label htmlFor="persona_name-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">이름</Label>
+                      <Input
+                        id="persona_name-page"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="김철수"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-persona-name-page"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="persona_department-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">부서</Label>
+                      <Input
+                        id="persona_department-page"
+                        value={formData.department}
+                        onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
+                        placeholder="영업팀"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-persona-department-page"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="persona_position-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">직책</Label>
+                      <Input
+                        id="persona_position-page"
+                        value={formData.position}
+                        onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
+                        placeholder="팀장"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-persona-position-page"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="persona_gender-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">성별</Label>
+                    <Select 
+                      value={formData.gender} 
+                      onValueChange={(value: 'male' | 'female') => setFormData(prev => ({ ...prev, gender: value }))}
+                    >
+                      <SelectTrigger className="border-slate-300 bg-white" data-testid="select-gender-page">
+                        <SelectValue placeholder="성별 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">남성</SelectItem>
+                        <SelectItem value="female">여성</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => onExternalClose?.()}
+                  data-testid="button-cancel-page"
+                >
+                  취소
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  className="bg-corporate-600 hover:bg-corporate-700"
+                  data-testid="button-save-persona-page"
+                >
+                  {createMutation.isPending || updateMutation.isPending ? '저장 중...' : '저장'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        {/* 기본 이미지 재생성 확인 다이얼로그 */}
         <AlertDialog open={showBaseImageConfirm} onOpenChange={setShowBaseImageConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>

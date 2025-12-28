@@ -190,14 +190,14 @@ export function AppSidebar() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side="right" align="start">
                       <DropdownMenuItem
-                        onClick={() => window.location.href = '/personas'}
+                        onClick={() => window.location.href = '/create-persona'}
                         data-testid="menu-create-persona"
                       >
                         <User className="w-4 h-4 mr-2" />
                         페르소나
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => window.location.href = '/scenarios'}
+                        onClick={() => window.location.href = '/create-scenario'}
                         data-testid="menu-create-scenario"
                       >
                         <FileText className="w-4 h-4 mr-2" />
