@@ -187,10 +187,10 @@ export default function Conversations() {
   };
 
   const confirmDelete = () => {
-    if (scenarioRunToDelete) {
+    if (scenarioRunToDelete && !deleteMutation.isPending) {
       deleteMutation.mutate(scenarioRunToDelete);
+      setDeleteDialogOpen(false);
     }
-    setDeleteDialogOpen(false);
   };
 
   const getPersonaImage = (persona: any) => {

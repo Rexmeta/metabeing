@@ -2133,7 +2133,18 @@ ${personaSnapshot.name}:`;
     try {
       // @ts-ignore - req.user는 auth 미들웨어에서 설정됨
       const userId = req.user?.id;
-      const scenarioRun = await storage.getScenarioRun(req.params.id);
+      
+      let scenarioRun;
+      try {
+        scenarioRun = await storage.getScenarioRun(req.params.id);
+      } catch (fetchError: any) {
+        // Neon null 오류 시 레코드가 이미 삭제된 것으로 간주
+        if (fetchError?.message?.includes('Cannot read properties of null')) {
+          console.log(`ScenarioRun ${req.params.id} already deleted or not found`);
+          return res.status(404).json({ error: "Scenario run not found" });
+        }
+        throw fetchError;
+      }
       
       if (!scenarioRun) {
         return res.status(404).json({ error: "Scenario run not found" });
