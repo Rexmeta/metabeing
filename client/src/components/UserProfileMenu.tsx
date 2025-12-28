@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, MessageCircle, Settings, BarChart3, UserCog, ShieldCheck } from "lucide-react";
+import { User, LogOut, MessageCircle, Settings, BarChart3, ShieldCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +11,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
-import { ProfileEditDialog } from "./ProfileEditDialog";
 
 const roleConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   admin: { label: "시스템관리자", color: "text-red-700", bgColor: "bg-red-100" },
@@ -22,7 +20,6 @@ const roleConfig: Record<string, { label: string; color: string; bgColor: string
 
 export function UserProfileMenu() {
   const { logout, user } = useAuth();
-  const [showProfileEdit, setShowProfileEdit] = useState(false);
 
   const { data: categories } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['/api/categories'],
@@ -81,14 +78,6 @@ export function UserProfileMenu() {
             대화
           </DropdownMenuItem>
           
-          <DropdownMenuItem
-            onClick={() => setShowProfileEdit(true)}
-            data-testid="menu-profile-edit"
-          >
-            <UserCog className="w-4 h-4 mr-2" />
-            회원정보 수정
-          </DropdownMenuItem>
-          
           {user?.role === 'admin' && (
             <>
               <DropdownMenuSeparator />
@@ -136,20 +125,6 @@ export function UserProfileMenu() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {user && (
-        <ProfileEditDialog
-          open={showProfileEdit}
-          onOpenChange={setShowProfileEdit}
-          currentUser={{
-            id: user.id,
-            email: user.email || "",
-            name: user.name || "",
-            role: user.role,
-            profileImage: user.profileImage,
-            tier: user.tier,
-          }}
-        />
-      )}
     </>
   );
 }

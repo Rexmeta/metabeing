@@ -26,7 +26,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { ProfileEditDialog } from "@/components/ProfileEditDialog";
 import {
   Compass,
   User,
@@ -42,7 +41,6 @@ import {
   HelpCircle,
   ChartBar,
   History,
-  UserCog,
   ShieldCheck,
   BarChart3,
   ChevronUp,
@@ -109,7 +107,6 @@ const adminItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
-  const [showProfileEdit, setShowProfileEdit] = useState(false);
 
   const { data: categories } = useQuery<{ id: string; name: string }[]>({
     queryKey: ['/api/categories'],
@@ -364,14 +361,6 @@ export function AppSidebar() {
                   대화
                 </DropdownMenuItem>
                 
-                <DropdownMenuItem
-                  onClick={() => setShowProfileEdit(true)}
-                  data-testid="menu-profile-edit"
-                >
-                  <UserCog className="w-4 h-4 mr-2" />
-                  회원정보 수정
-                </DropdownMenuItem>
-                
                 {user?.role === 'admin' && (
                   <>
                     <DropdownMenuSeparator />
@@ -416,20 +405,6 @@ export function AppSidebar() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {user && (
-              <ProfileEditDialog
-                open={showProfileEdit}
-                onOpenChange={setShowProfileEdit}
-                currentUser={{
-                  id: user.id,
-                  email: user.email || "",
-                  name: user.name || "",
-                  role: user.role,
-                  profileImage: user.profileImage,
-                  tier: user.tier,
-                }}
-              />
-            )}
           </>
         ) : (
           <Button
