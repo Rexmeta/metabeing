@@ -62,11 +62,12 @@ Preferred communication style: Simple, everyday language.
     - Supports gender (male/female) and MBTI-based visual traits.
 - **Unified Persona Management**: Library page uses `PersonaManager` component (dialogOnly mode) for consistent persona creation/editing experience across admin and user interfaces. Supports external control via props (`externalOpen`, `externalPersona`, `onExternalClose`, `dialogOnly`).
 - **KakaoTalk-style Conversation UX**: 
-    - Conversations page (`/conversations`) shows all active/open chat rooms
-    - Clicking a chat room opens a full messenger view with existing messages and input capability
+    - Conversations page (`/conversations`) with 3 tabs: 페르소나 대화, 시나리오 대화, 분석
+    - "페르소나 대화" tab: Active persona chat rooms with 10-second auto-refresh
+    - "시나리오 대화" tab: Scenario run history with accordion UI
+    - "분석" tab: Analytics dashboard with score trends, category breakdowns, strengths/improvements
+    - Mobile-optimized responsive layout with smaller text/icons on small screens
     - Chat rooms persist until explicitly closed by user (closedAt field in personaRuns)
-    - X button to close/remove conversations from the list
-    - 10-second auto-refresh for real-time updates
 
 # External Dependencies
 

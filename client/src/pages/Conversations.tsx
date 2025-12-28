@@ -3,13 +3,16 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format, isToday, isYesterday } from "date-fns";
 import { ko } from "date-fns/locale";
-import { MessageCircle, X, ChevronRight, Sparkles, CalendarDays, Trash2, Users } from "lucide-react";
+import { MessageCircle, X, ChevronRight, Sparkles, CalendarDays, Trash2, Users, BarChart3, TrendingUp, Star, Award, Target, Loader2, CheckCircle, AlertCircle, ArrowRight, Minus, TrendingDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer } from "recharts";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,7 +37,7 @@ interface ActiveConversation {
 }
 
 export default function Conversations() {
-  const [activeTab, setActiveTab] = useState<"persona" | "scenario">("persona");
+  const [activeTab, setActiveTab] = useState<"persona" | "scenario" | "analytics">("persona");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [scenarioRunToDelete, setScenarioRunToDelete] = useState<string | null>(null);
   const { toast } = useToast();
@@ -91,6 +94,13 @@ export default function Conversations() {
 
   const { data: scenarios = [] } = useQuery<any[]>({
     queryKey: ['/api/scenarios'],
+  });
+
+  const { data: analyticsData, isLoading: analyticsLoading } = useQuery<any>({
+    queryKey: ['/api/analytics/summary'],
+    enabled: !!user,
+    staleTime: 1000 * 60,
+    gcTime: 1000 * 60 * 5,
   });
 
   const scenarioRuns = useMemo(() => {
@@ -217,26 +227,32 @@ export default function Conversations() {
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "persona" | "scenario")} className="flex-1 flex flex-col">
-          <div className="px-4 pt-3">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="persona" className="flex items-center gap-2" data-testid="tab-persona-chat">
-                <MessageCircle className="w-4 h-4" />
-                페르소나 대화
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "persona" | "scenario" | "analytics")} className="flex-1 flex flex-col">
+          <div className="px-2 sm:px-4 pt-3">
+            <TabsList className="grid w-full grid-cols-3 h-auto">
+              <TabsTrigger value="persona" className="flex items-center gap-1 sm:gap-2 px-1 sm:px-3 py-2 text-xs sm:text-sm" data-testid="tab-persona-chat">
+                <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">페르소나</span>
+                <span className="xs:hidden">대화</span>
                 {personaConversationsCount > 0 && (
-                  <Badge variant="secondary" className="text-xs ml-1">
+                  <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-1.5">
                     {personaConversationsCount}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="scenario" className="flex items-center gap-2" data-testid="tab-scenario-chat">
-                <Users className="w-4 h-4" />
-                시나리오 대화
+              <TabsTrigger value="scenario" className="flex items-center gap-1 sm:gap-2 px-1 sm:px-3 py-2 text-xs sm:text-sm" data-testid="tab-scenario-chat">
+                <Users className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">시나리오</span>
+                <span className="xs:hidden">기록</span>
                 {scenarioConversationsCount > 0 && (
-                  <Badge variant="secondary" className="text-xs ml-1">
+                  <Badge variant="secondary" className="text-[10px] sm:text-xs px-1 sm:px-1.5">
                     {scenarioConversationsCount}
                   </Badge>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-1 sm:gap-2 px-1 sm:px-3 py-2 text-xs sm:text-sm" data-testid="tab-analytics">
+                <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                <span>분석</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -438,6 +454,215 @@ export default function Conversations() {
                   </Accordion>
                 </CardContent>
               </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="analytics" className="flex-1 overflow-y-auto m-0 mt-2 px-2 sm:px-4 pb-4">
+            {analyticsLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : !analyticsData ? (
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <BarChart3 className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground mb-2 text-sm">분석할 대화 데이터가 없습니다</p>
+                <Link href="/home">
+                  <Button variant="link" className="text-primary p-0 h-auto text-sm">
+                    첫 대화 시작하기
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <TooltipProvider>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                    <Card>
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Star className="w-4 h-4 text-amber-500" />
+                          <span className="text-xs sm:text-sm text-muted-foreground">평균 점수</span>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-bold">
+                          {analyticsData.averageScore?.toFixed(1) || 0}
+                          <span className="text-sm font-normal text-muted-foreground">/100</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <MessageCircle className="w-4 h-4 text-blue-500" />
+                          <span className="text-xs sm:text-sm text-muted-foreground">총 대화</span>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-bold">
+                          {analyticsData.totalConversations || 0}
+                          <span className="text-sm font-normal text-muted-foreground">회</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          {(analyticsData.growthRate || 0) >= 0 ? (
+                            <TrendingUp className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <TrendingDown className="w-4 h-4 text-red-500" />
+                          )}
+                          <span className="text-xs sm:text-sm text-muted-foreground">성장률</span>
+                        </div>
+                        <div className={`text-xl sm:text-2xl font-bold ${(analyticsData.growthRate || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {(analyticsData.growthRate || 0) >= 0 ? '+' : ''}{analyticsData.growthRate?.toFixed(1) || 0}%
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Award className="w-4 h-4 text-purple-500" />
+                          <span className="text-xs sm:text-sm text-muted-foreground">최고 점수</span>
+                        </div>
+                        <div className="text-xl sm:text-2xl font-bold">
+                          {analyticsData.scoreHistory?.length > 0 
+                            ? Math.max(...analyticsData.scoreHistory.map((e: any) => e.score)) 
+                            : 0}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {analyticsData.categoryAverages && (
+                    <Card>
+                      <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-4">
+                        <CardTitle className="text-sm sm:text-base">영역별 점수</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4 space-y-3">
+                        {Object.entries(analyticsData.categoryAverages).map(([key, value]) => {
+                          const categoryNames: Record<string, string> = {
+                            clarity: "명확성",
+                            empathy: "공감력",
+                            problemSolving: "문제해결",
+                            professionalism: "전문성",
+                            strategicCommunication: "전략적 소통"
+                          };
+                          return (
+                            <div key={key}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs sm:text-sm font-medium">{categoryNames[key] || key}</span>
+                                <span className="text-xs sm:text-sm font-semibold">{(value as number).toFixed(1)} / 5.0</span>
+                              </div>
+                              <Progress value={(value as number) * 20} className="h-2" />
+                            </div>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {analyticsData.scoreHistory && analyticsData.scoreHistory.length > 1 && (
+                    <Card>
+                      <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-4">
+                        <CardTitle className="text-sm sm:text-base">점수 추이</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-1 sm:px-4 pb-3 sm:pb-4">
+                        <div className="w-full h-48 sm:h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={Object.entries(
+                                analyticsData.scoreHistory.reduce((acc: Record<string, { scores: number[], date: string }>, entry: any) => {
+                                  const dateKey = entry.date;
+                                  if (!acc[dateKey]) {
+                                    acc[dateKey] = { scores: [], date: dateKey };
+                                  }
+                                  acc[dateKey].scores.push(entry.score);
+                                  return acc;
+                                }, {})
+                              )
+                              .sort((a, b) => a[0].localeCompare(b[0]))
+                              .map(([_, data]) => {
+                                const d = data as { date: string; scores: number[] };
+                                const [year, month, day] = d.date.split('-');
+                                return {
+                                  date: `${month}.${day}`,
+                                  score: Math.round(d.scores.reduce((a, b) => a + b, 0) / d.scores.length),
+                                };
+                              })}
+                              margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                              <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '10px' }} />
+                              <YAxis stroke="hsl(var(--muted-foreground))" domain={[0, 100]} style={{ fontSize: '10px' }} />
+                              <ChartTooltip
+                                contentStyle={{
+                                  backgroundColor: 'hsl(var(--card))',
+                                  border: '1px solid hsl(var(--border))',
+                                  borderRadius: '8px',
+                                  padding: '8px 12px',
+                                  fontSize: '12px'
+                                }}
+                                formatter={(value: any) => [`${value}점`, '평균 점수']}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="score"
+                                stroke="hsl(var(--primary))"
+                                strokeWidth={2}
+                                dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+                                activeDot={{ r: 6 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    {analyticsData.topStrengths && analyticsData.topStrengths.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-4">
+                          <CardTitle className="text-sm sm:text-base text-green-600 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            주요 강점
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4 space-y-2">
+                          {analyticsData.topStrengths.slice(0, 3).map((strength: any, index: number) => (
+                            <div key={index} className="flex items-start gap-2 text-xs sm:text-sm">
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 text-[10px] sm:text-xs shrink-0">
+                                {strength.count}회
+                              </Badge>
+                              <span className="text-muted-foreground line-clamp-2">{strength.category}</span>
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {analyticsData.topImprovements && analyticsData.topImprovements.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2 px-3 sm:px-6 pt-3 sm:pt-4">
+                          <CardTitle className="text-sm sm:text-base text-orange-600 flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            개선 필요
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4 space-y-2">
+                          {analyticsData.topImprovements.slice(0, 3).map((improvement: any, index: number) => (
+                            <div key={index} className="flex items-start gap-2 text-xs sm:text-sm">
+                              <Badge className="bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300 text-[10px] sm:text-xs shrink-0">
+                                {improvement.count}회
+                              </Badge>
+                              <span className="text-muted-foreground line-clamp-2">{improvement.category}</span>
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+              </TooltipProvider>
             )}
           </TabsContent>
         </Tabs>

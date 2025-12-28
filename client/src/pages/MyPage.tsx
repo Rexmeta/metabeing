@@ -190,7 +190,8 @@ export default function MyPage() {
   });
 
   // 시나리오 정보 가져오기
-  const getScenarioInfo = (scenarioId: string) => {
+  const getScenarioInfo = (scenarioId: string | null) => {
+    if (!scenarioId) return { title: '알 수 없는 시나리오', difficulty: 1, personas: [] };
     const scenario = scenariosMap.get(scenarioId);
     return {
       title: scenario?.title || scenarioId,
@@ -206,11 +207,11 @@ export default function MyPage() {
     
     // ✨ persona_run이 있는 scenario_run을 시간순으로 정렬 (완료 여부 무관)
     const chronologicalRuns = [...scenarioRuns]
-      .filter(sr => sr.personaRuns && sr.personaRuns.length > 0)
+      .filter(sr => sr.personaRuns && sr.personaRuns.length > 0 && sr.scenarioId)
       .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
     
     chronologicalRuns.forEach(run => {
-      const scenarioId = run.scenarioId;
+      const scenarioId = run.scenarioId!;
       const currentCount = (scenarioCounters.get(scenarioId) || 0) + 1;
       scenarioCounters.set(scenarioId, currentCount);
       attemptMap.set(run.id, currentCount);
@@ -517,12 +518,13 @@ export default function MyPage() {
                               }, {})
                             )
                             .sort((a, b) => a[0].localeCompare(b[0]))
-                            .map(([_, data]: [string, { date: string; scores: number[] }]) => {
-                              const [year, month, day] = data.date.split('-');
+                            .map(([_, data]) => {
+                              const d = data as { date: string; scores: number[] };
+                              const [year, month, day] = d.date.split('-');
                               return {
                                 date: `${month}.${day}`,
-                                score: Math.round(data.scores.reduce((a: number, b: number) => a + b, 0) / data.scores.length),
-                                count: data.scores.length
+                                score: Math.round(d.scores.reduce((a: number, b: number) => a + b, 0) / d.scores.length),
+                                count: d.scores.length
                               };
                             })}
                             margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
@@ -965,16 +967,16 @@ function ScenarioRunDetails({
             const personaImage = getPersonaImage();
             const displayName = `${persona.department ? persona.department + ' ' : ''}${persona.name}${persona.position ? ' ' + persona.position : ''}`;
             
-            // 유효한 날짜 확인
-            const getValidDate = (dateStr?: string) => {
-              if (!dateStr) return null;
+            const getFormattedTime = () => {
+              if (!personaRun?.completedAt) return '미시작';
+              const dateStr = typeof personaRun.completedAt === 'string' 
+                ? personaRun.completedAt 
+                : personaRun.completedAt.toISOString();
               const parsed = new Date(dateStr);
-              return isNaN(parsed.getTime()) ? null : parsed;
+              return isNaN(parsed.getTime()) ? '미시작' : format(parsed, 'MM/dd HH:mm');
             };
             
-            const lastMessageTime = personaRun?.completedAt 
-              ? format(getValidDate(personaRun.completedAt) || new Date(), 'MM/dd HH:mm') 
-              : '미시작';
+            const lastMessageTime = getFormattedTime();
             
             return (
               <div 
