@@ -8,9 +8,6 @@ interface AppHeaderProps {
   backLabel?: string;
   onLogoClick?: () => void;
   rightContent?: React.ReactNode;
-  variant?: 'default' | 'mypage';
-  userName?: string;
-  userEmail?: string;
 }
 
 export function AppHeader({
@@ -21,9 +18,6 @@ export function AppHeader({
   backLabel = "홈으로",
   onLogoClick,
   rightContent,
-  variant = 'default',
-  userName,
-  userEmail
 }: AppHeaderProps) {
   const LogoContent = (
     <div>
@@ -31,36 +25,6 @@ export function AppHeader({
       <p className="text-sm text-slate-600">{subtitle}</p>
     </div>
   );
-
-  if (variant === 'mypage') {
-    return (
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link 
-                href="/home" 
-                className="flex items-center space-x-2 text-corporate-600 hover:text-corporate-700" 
-                data-testid="back-to-home"
-              >
-                <i className="fas fa-arrow-left"></i>
-                <span className="text-sm">홈으로</span>
-              </Link>
-              <div className="border-l border-slate-300 pl-4">
-                <h1 className="text-sm font-bold text-slate-900" data-testid="user-name">
-                  {userName || '사용자'}님의 MyPage
-                </h1>
-                <p className="text-xs text-slate-600" data-testid="user-email">{userEmail}</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              {rightContent}
-            </div>
-          </div>
-        </div>
-      </header>
-    );
-  }
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-50">

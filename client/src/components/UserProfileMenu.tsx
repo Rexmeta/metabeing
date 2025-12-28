@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, History, Settings, BarChart3, UserCog, ShieldCheck } from "lucide-react";
+import { User, LogOut, MessageCircle, Settings, BarChart3, UserCog, ShieldCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,11 +74,11 @@ export function UserProfileMenu() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={() => window.location.href = '/mypage'}
-            data-testid="menu-history"
+            onClick={() => window.location.href = '/conversations'}
+            data-testid="menu-conversations"
           >
-            <History className="w-4 h-4 mr-2" />
-            History
+            <MessageCircle className="w-4 h-4 mr-2" />
+            대화
           </DropdownMenuItem>
           
           <DropdownMenuItem

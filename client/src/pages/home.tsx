@@ -822,12 +822,12 @@ export default function Home() {
 
               <div className="flex gap-4 justify-center pt-4">
                 <Button
-                  onClick={() => window.location.href = '/mypage'}
+                  onClick={() => window.location.href = '/conversations'}
                   variant="outline"
                   size="lg"
                   data-testid="view-history-button"
                 >
-                  대화 히스토리 보기
+                  대화 목록 보기
                 </Button>
                 <Button
                   onClick={handleReturnToScenarios}

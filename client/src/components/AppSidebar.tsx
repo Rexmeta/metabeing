@@ -67,21 +67,15 @@ const mainMenuItems = [
 
 const myContentItems = [
   {
-    title: "마이 페이지",
-    url: "/mypage",
-    icon: User,
+    title: "대화",
+    url: "/conversations",
+    icon: MessageCircle,
     requiresAuth: true,
   },
   {
     title: "콘텐츠 관리",
     url: "/admin-management",
     icon: Cog,
-    requiresAuth: true,
-  },
-  {
-    title: "분석 리포트",
-    url: "/analytics",
-    icon: ChartBar,
     requiresAuth: true,
   },
 ];
@@ -369,11 +363,11 @@ export function AppSidebar() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => window.location.href = '/mypage'}
-                  data-testid="menu-history"
+                  onClick={() => window.location.href = '/conversations'}
+                  data-testid="menu-conversations"
                 >
-                  <History className="w-4 h-4 mr-2" />
-                  History
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  대화
                 </DropdownMenuItem>
                 
                 <DropdownMenuItem

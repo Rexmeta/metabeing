@@ -65,9 +65,10 @@ Preferred communication style: Simple, everyday language.
     - Conversations page (`/conversations`) with 3 tabs: 페르소나 대화, 시나리오 대화, 분석
     - "페르소나 대화" tab: Active persona chat rooms with 10-second auto-refresh
     - "시나리오 대화" tab: Scenario run history with accordion UI
-    - "분석" tab: Analytics dashboard with score trends, category breakdowns, strengths/improvements
+    - "분석" tab: Analytics dashboard with score trends, category breakdowns, strengths/improvements (replaces separate Analytics page)
     - Mobile-optimized responsive layout with smaller text/icons on small screens
     - Chat rooms persist until explicitly closed by user (closedAt field in personaRuns)
+    - Note: MyPage and Analytics pages removed - all functionality consolidated into Conversations page
 
 # External Dependencies
 

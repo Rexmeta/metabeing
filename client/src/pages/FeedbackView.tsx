@@ -100,10 +100,10 @@ export default function FeedbackView() {
             Scenario ID: {conversation.scenarioId}, Persona ID: {conversation.personaId}
           </p>
           <Button 
-            onClick={() => window.location.href = '/mypage'}
+            onClick={() => window.location.href = '/conversations'}
             className="mt-4"
           >
-            마이페이지로 돌아가기
+            대화 목록으로 돌아가기
           </Button>
         </div>
       </div>

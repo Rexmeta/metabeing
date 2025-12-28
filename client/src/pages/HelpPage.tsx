@@ -126,33 +126,33 @@ export default function HelpPage() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-help-mypage">
+          <Card data-testid="card-help-conversations">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-orange-600" />
-                마이페이지
+                대화
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-slate-600">
-                마이페이지에서 훈련 기록과 성장 추이를 확인할 수 있습니다.
+                대화 페이지에서 훈련 기록과 성장 추이를 확인할 수 있습니다.
               </p>
               <ul className="space-y-2 text-sm text-slate-600">
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-4 w-4 text-slate-400" />
-                  <span>완료한 대화 히스토리 조회</span>
+                  <span>페르소나 대화: 활성 대화방 목록</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-4 w-4 text-slate-400" />
-                  <span>시나리오별 점수 변화 추이</span>
+                  <span>시나리오 대화: 시나리오 실행 기록</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-4 w-4 text-slate-400" />
-                  <span>항목별 역량 분석</span>
+                  <span>분석: 종합 분석 대시보드</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <ChevronRight className="h-4 w-4 text-slate-400" />
-                  <span>과거 피드백 다시 확인</span>
+                  <span>점수 추이 및 역량 분석</span>
                 </li>
               </ul>
             </CardContent>

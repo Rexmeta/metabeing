@@ -708,10 +708,10 @@ export default function PersonalDevelopmentReport({
           </Button>
           <Button 
             variant="outline" 
-            onClick={() => window.location.href = '/mypage'} 
-            data-testid="back-to-mypage"
+            onClick={() => window.location.href = '/conversations'} 
+            data-testid="back-to-conversations"
           >
-            마이페이지로 돌아가기
+            대화 목록으로 돌아가기
           </Button>
         </div>
       </div>
@@ -733,10 +733,10 @@ export default function PersonalDevelopmentReport({
           </Button>
           <Button 
             variant="outline" 
-            onClick={() => window.location.href = '/mypage'} 
-            data-testid="back-to-mypage"
+            onClick={() => window.location.href = '/conversations'} 
+            data-testid="back-to-conversations"
           >
-            마이페이지로 돌아가기
+            대화 목록으로 돌아가기
           </Button>
         </div>
       </div>
@@ -808,14 +808,14 @@ export default function PersonalDevelopmentReport({
         <div className="flex items-center justify-between mb-4">
           <div></div>
           <Button 
-            onClick={() => window.location.href = '/mypage'}
+            onClick={() => window.location.href = '/conversations'}
             variant="ghost"
             size="sm"
             className="text-white/80 hover:text-white hover:bg-white/10"
-            data-testid="mypage-button"
+            data-testid="conversations-button"
           >
-            <i className="fas fa-user mr-2"></i>
-            마이페이지로
+            <i className="fas fa-comments mr-2"></i>
+            대화 목록
           </Button>
         </div>
         <div className="flex items-center justify-between">
@@ -1332,13 +1332,13 @@ export default function PersonalDevelopmentReport({
       {/* 액션 버튼 - 데스크톱 */}
       <div className="hidden md:flex justify-center flex-wrap gap-3 pt-6 border-t border-slate-200 no-print">
         <Button 
-          onClick={() => window.location.href = '/mypage'}
+          onClick={() => window.location.href = '/conversations'}
           variant="outline"
           className="min-w-[120px]"
-          data-testid="back-to-mypage-button"
+          data-testid="back-to-conversations-button"
         >
-          <i className="fas fa-home mr-2"></i>
-          마이페이지
+          <i className="fas fa-comments mr-2"></i>
+          대화 목록
         </Button>
         
         {/* Home.tsx에서 전달된 다음 페르소나 버튼 (우선순위 높음) */}
@@ -1511,13 +1511,13 @@ export default function PersonalDevelopmentReport({
         {/* 하단 스마트 버튼 바 */}
         <div className="flex items-center justify-between p-3">
           <Button 
-            onClick={() => window.location.href = '/mypage'}
+            onClick={() => window.location.href = '/conversations'}
             variant="outline"
             className="flex-1 mr-2"
-            data-testid="mobile-mypage-button"
+            data-testid="mobile-conversations-button"
           >
-            <i className="fas fa-home mr-2"></i>
-            마이페이지
+            <i className="fas fa-comments mr-2"></i>
+            대화 목록
           </Button>
           
           <Button 

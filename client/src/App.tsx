@@ -10,8 +10,6 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import Intro from "@/pages/intro";
 import Home from "@/pages/home";
-import MyPage from "@/pages/MyPage";
-import Analytics from "@/pages/Analytics";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminManagement from "@/pages/admin-management";
 import SystemAdminPage from "@/pages/system-admin";
@@ -123,12 +121,6 @@ function MainRouter() {
       <Route path="/intro" component={Intro} />
       <Route path="/home">
         {() => <ProtectedRoute component={Home} />}
-      </Route>
-      <Route path="/mypage">
-        {() => <ProtectedRoute component={MyPage} />}
-      </Route>
-      <Route path="/analytics">
-        {() => <ProtectedRoute component={Analytics} />}
       </Route>
       <Route path="/profile-settings">
         {() => <ProtectedRoute component={ProfileSettings} />}
