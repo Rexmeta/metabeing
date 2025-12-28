@@ -45,6 +45,7 @@ import {
   BarChart3,
   ChevronUp,
   MessageCircle,
+  Plus,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ko } from "date-fns/locale";
@@ -175,9 +176,39 @@ export function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>메인</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {/* 만들기 드롭다운 버튼 */}
+              {isAuthenticated && (
+                <SidebarMenuItem>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <SidebarMenuButton data-testid="menu-create">
+                        <Plus className="w-4 h-4" />
+                        <span>만들기</span>
+                      </SidebarMenuButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="right" align="start">
+                      <DropdownMenuItem
+                        onClick={() => window.location.href = '/personas'}
+                        data-testid="menu-create-persona"
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        페르소나
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => window.location.href = '/scenarios'}
+                        data-testid="menu-create-scenario"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        시나리오
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </SidebarMenuItem>
+              )}
+              
+              {/* 탐색 메뉴 */}
               {mainMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
