@@ -690,10 +690,10 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
     });
   };
 
-  // 외부에서 다이얼로그 제어 (dialogOnly 모드)
+  // 외부에서 다이얼로그 제어 (dialogOnly 또는 pageMode 모드)
   useEffect(() => {
-    if (dialogOnly) {
-      if (externalOpen && externalPersona) {
+    if (dialogOnly || pageMode) {
+      if ((externalOpen || pageMode) && externalPersona) {
         // 수정 모드 - 폼 데이터 설정
         setFormData({
           id: externalPersona.id,
@@ -763,18 +763,18 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
           }
         });
         setEditingPersona(externalPersona);
-      } else if (externalOpen && !externalPersona) {
+      } else if ((externalOpen || pageMode) && !externalPersona) {
         // 생성 모드 - 폼 초기화
         resetForm();
         setEditingPersona(null);
-      } else if (!externalOpen) {
-        // 다이얼로그 닫힘 - 모든 내부 상태 초기화
+      } else if (!externalOpen && !pageMode) {
+        // 다이얼로그 닫힘 - 모든 내부 상태 초기화 (pageMode에서는 적용 안됨)
         setIsCreateOpen(false);
         setEditingPersona(null);
         resetForm();
       }
     }
-  }, [dialogOnly, externalOpen, externalPersona]);
+  }, [dialogOnly, pageMode, externalOpen, externalPersona]);
 
   const handleDialogClose = (open: boolean) => {
     if (!open) {
@@ -1569,6 +1569,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
           
           <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* 기본 정보 섹션 */}
               <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
                 <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
                   <i className="fas fa-id-card text-indigo-600"></i>
@@ -1603,6 +1604,7 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                 </div>
               </div>
 
+              {/* 시나리오 페르소나 정의 섹션 */}
               <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
                 <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
                   <i className="fas fa-user-tie text-teal-600"></i>
@@ -1644,14 +1646,346 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                       />
                     </div>
                   </div>
-                  
+
                   <div>
-                    <Label htmlFor="persona_gender-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">성별</Label>
-                    <Select 
-                      value={formData.gender} 
-                      onValueChange={(value: 'male' | 'female') => setFormData(prev => ({ ...prev, gender: value }))}
-                    >
-                      <SelectTrigger className="border-slate-300 bg-white" data-testid="select-gender-page">
+                    <Label htmlFor="persona_experience-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">경력/경험</Label>
+                    <Textarea
+                      id="persona_experience-page"
+                      value={formData.experience}
+                      onChange={(e) => setFormData(prev => ({ ...prev, experience: e.target.value }))}
+                      placeholder="10년 경력의 영업 전문가, 다양한 고객 대응 경험 보유"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-persona-experience-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="persona_stance-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">입장/태도</Label>
+                    <Textarea
+                      id="persona_stance-page"
+                      value={formData.stance}
+                      onChange={(e) => setFormData(prev => ({ ...prev, stance: e.target.value }))}
+                      placeholder="가격보다 품질과 신뢰를 중시하며, 장기적 파트너십을 원함"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-persona-stance-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="persona_goal-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">목표</Label>
+                    <Textarea
+                      id="persona_goal-page"
+                      value={formData.goal}
+                      onChange={(e) => setFormData(prev => ({ ...prev, goal: e.target.value }))}
+                      placeholder="팀 실적 달성과 고객 만족도 향상"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-persona-goal-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="persona_tradeoff-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">트레이드오프 (고려 사항)</Label>
+                    <Textarea
+                      id="persona_tradeoff-page"
+                      value={formData.tradeoff}
+                      onChange={(e) => setFormData(prev => ({ ...prev, tradeoff: e.target.value }))}
+                      placeholder="비용 절감과 품질 유지 사이의 균형"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-persona-tradeoff-page"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 성격 특성 섹션 */}
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <i className="fas fa-brain text-purple-600"></i>
+                  성격 특성
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="personality_traits-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">성격 특성 (쉼표로 구분)</Label>
+                    <Textarea
+                      id="personality_traits-page"
+                      value={formData.personality_traits.join(', ')}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        personality_traits: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                      }))}
+                      placeholder="경험 기반 사고, 현실적, 해결책 지향"
+                      className="min-h-[80px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-personality-traits-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="communication_style-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">의사소통 스타일</Label>
+                    <Textarea
+                      id="communication_style-page"
+                      value={formData.communication_style}
+                      onChange={(e) => setFormData(prev => ({ ...prev, communication_style: e.target.value }))}
+                      placeholder="차분하고 논리적이며, 구체적 사례를 중시함"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-communication-style-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="motivation-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">동기</Label>
+                    <Textarea
+                      id="motivation-page"
+                      value={formData.motivation}
+                      onChange={(e) => setFormData(prev => ({ ...prev, motivation: e.target.value }))}
+                      placeholder="효율적 문제 해결과 신뢰 구축"
+                      className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="input-motivation-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="fears-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">두려움/우려사항 (쉼표로 구분)</Label>
+                    <Input
+                      id="fears-page"
+                      value={formData.fears.join(', ')}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        fears: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                      }))}
+                      placeholder="통제 불가능한 상황, 과부하, 혼란"
+                      className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="input-fears-page"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 배경 정보 섹션 */}
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <i className="fas fa-user-circle text-green-600"></i>
+                  배경 정보
+                </h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="personal_values-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">개인 가치관 (쉼표로 구분)</Label>
+                    <Input
+                      id="personal_values-page"
+                      value={formData.background?.personal_values?.join(', ') || ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        background: {
+                          ...prev.background,
+                          personal_values: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                        }
+                      }))}
+                      placeholder="협력, 공감, 조화, 자유, 즐거움"
+                      className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="input-personal-values-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="hobbies-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">취미 (쉼표로 구분)</Label>
+                    <Input
+                      id="hobbies-page"
+                      value={formData.background?.hobbies?.join(', ') || ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        background: {
+                          ...prev.background,
+                          hobbies: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                        }
+                      }))}
+                      placeholder="리더십 활동, 멘토링, 파티, 여행"
+                      className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="input-hobbies-page"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="social_preference-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">사회적 선호</Label>
+                      <Input
+                        id="social_preference-page"
+                        value={formData.background?.social?.preference || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          background: {
+                            ...prev.background,
+                            social: {
+                              ...prev.background?.social,
+                              preference: e.target.value
+                            }
+                          }
+                        }))}
+                        placeholder="넓은 관계 유지"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-social-preference-page"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="social_behavior-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">사회적 행동</Label>
+                      <Input
+                        id="social_behavior-page"
+                        value={formData.background?.social?.behavior || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          background: {
+                            ...prev.background,
+                            social: {
+                              ...prev.background?.social,
+                              behavior: e.target.value
+                            }
+                          }
+                        }))}
+                        placeholder="협력과 조율 강조"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-social-behavior-page"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 의사소통 패턴 섹션 */}
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <i className="fas fa-comments text-blue-600"></i>
+                  의사소통 패턴
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="opening_style-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">대화 시작 스타일</Label>
+                    <Input
+                      id="opening_style-page"
+                      value={formData.communication_patterns?.opening_style || ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        communication_patterns: {
+                          ...prev.communication_patterns,
+                          opening_style: e.target.value
+                        }
+                      }))}
+                      placeholder="바로 핵심 주제로 직행 / 유머나 경험 공유로 시작"
+                      className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="input-opening-style-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="key_phrases-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">주요 표현 (쉼표로 구분)</Label>
+                    <Textarea
+                      id="key_phrases-page"
+                      value={formData.communication_patterns?.key_phrases?.join(', ') || ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        communication_patterns: {
+                          ...prev.communication_patterns,
+                          key_phrases: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                        }
+                      }))}
+                      placeholder="솔직히 말씀드리면..., 이거 재미있지 않아요?, 논리적으로 맞지 않습니다."
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-key-phrases-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="win_conditions-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">승리 조건 (쉼표로 구분)</Label>
+                    <Textarea
+                      id="win_conditions-page"
+                      value={formData.communication_patterns?.win_conditions?.join(', ') || ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        communication_patterns: {
+                          ...prev.communication_patterns,
+                          win_conditions: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                        }
+                      }))}
+                      placeholder="상대가 논리적 허점을 인정, 즐거움과 합리적 해결책 균형"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-win-conditions-page"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 음성 및 성별 섹션 */}
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <i className="fas fa-microphone text-orange-600"></i>
+                  음성 특성 및 성별
+                </h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <Label htmlFor="voice_tone-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">톤</Label>
+                      <Input
+                        id="voice_tone-page"
+                        value={formData.voice?.tone || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          voice: { ...prev.voice, tone: e.target.value }
+                        }))}
+                        placeholder="따뜻하고 설득적"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-voice-tone-page"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="voice_pace-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">속도</Label>
+                      <Input
+                        id="voice_pace-page"
+                        value={formData.voice?.pace || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          voice: { ...prev.voice, pace: e.target.value }
+                        }))}
+                        placeholder="중간 / 빠름"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-voice-pace-page"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="voice_emotion-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">감정</Label>
+                      <Input
+                        id="voice_emotion-page"
+                        value={formData.voice?.emotion || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          voice: { ...prev.voice, emotion: e.target.value }
+                        }))}
+                        placeholder="공감과 진지함"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-voice-emotion-page"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="gender-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">성별</Label>
+                    <Select value={formData.gender} onValueChange={(value: 'male' | 'female') => {
+                      setFormData(prev => {
+                        const neutralImage = value === 'male' 
+                          ? prev.images?.male?.expressions?.['중립']
+                          : prev.images?.female?.expressions?.['중립'];
+                        
+                        return {
+                          ...prev, 
+                          gender: value,
+                          images: {
+                            ...prev.images,
+                            base: neutralImage || prev.images?.base || ''
+                          }
+                        };
+                      });
+                    }}>
+                      <SelectTrigger data-testid="select-gender-page" className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white">
                         <SelectValue placeholder="성별 선택" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1660,6 +1994,159 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+              </div>
+
+              {/* 이미지 정보 섹션 */}
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2 pb-2 border-b border-slate-200">
+                  <i className="fas fa-image text-pink-600"></i>
+                  이미지 정보
+                </h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="images_base-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">기본 이미지 URL</Label>
+                      <Input
+                        id="images_base-page"
+                        value={formData.images?.base || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          images: { 
+                            ...prev.images, 
+                            base: e.target.value, 
+                            style: prev.images.style || '',
+                            male: prev.images.male,
+                            female: prev.images.female
+                          }
+                        }))}
+                        placeholder="https://picsum.photos/seed/mbti/150/150"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-images-base-page"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="images_style-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">이미지 스타일</Label>
+                      <Input
+                        id="images_style-page"
+                        value={formData.images?.style || ''}
+                        onChange={(e) => setFormData(prev => ({ 
+                          ...prev, 
+                          images: { 
+                            ...prev.images, 
+                            style: e.target.value, 
+                            base: prev.images.base || '',
+                            male: prev.images.male,
+                            female: prev.images.female
+                          }
+                        }))}
+                        placeholder="실제 인물 사진 느낌"
+                        className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                        data-testid="input-images-style-page"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 표정 이미지 생성 섹션 */}
+              <div className="bg-white rounded-lg p-5 shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-200">
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i className="fas fa-magic text-amber-600"></i>
+                    표정 이미지 생성
+                  </h3>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateBaseImage}
+                      disabled={isGeneratingBase || !externalPersona}
+                      data-testid="button-generate-base-image-page"
+                    >
+                      {isGeneratingBase ? '생성 중...' : '기본 이미지 생성'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateExpressions}
+                      disabled={isGeneratingExpressions || !externalPersona}
+                      data-testid="button-generate-expressions-page"
+                    >
+                      {isGeneratingExpressions ? `생성 중... (${generationProgress.current}/${generationProgress.total})` : '전체 표정 생성'}
+                    </Button>
+                  </div>
+                </div>
+                
+                {!externalPersona && (
+                  <p className="text-sm text-slate-500">
+                    이미지 생성은 페르소나를 먼저 저장한 후 수정 모드에서 사용할 수 있습니다.
+                  </p>
+                )}
+
+                <div className="mb-4">
+                  <p className="text-sm text-slate-600 mb-3">현재 선택: <span className="font-semibold">{formData.gender === 'male' ? '남성' : '여성'} 표정 이미지</span></p>
+                </div>
+
+                <div className="grid grid-cols-5 gap-3">
+                  {['중립', '기쁨', '슬픔', '분노', '놀람', '호기심', '불안', '단호', '실망', '당혹'].map((emotion) => {
+                    const currentGender = formData.gender;
+                    let imageUrl = '';
+                    
+                    if (currentGender === 'male') {
+                      imageUrl = formData.images?.male?.expressions?.[emotion as keyof typeof formData.images.male.expressions] || '';
+                    } else if (currentGender === 'female') {
+                      imageUrl = formData.images?.female?.expressions?.[emotion as keyof typeof formData.images.female.expressions] || '';
+                    }
+                    
+                    const isGenerating = generatingSingleEmotion === emotion;
+                    
+                    return (
+                      <div key={emotion} className="flex flex-col items-center gap-1">
+                        <div 
+                          className={`w-20 h-20 rounded-lg border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center ${imageUrl ? 'cursor-pointer hover:border-blue-400 transition-colors' : ''}`}
+                          onClick={() => {
+                            if (imageUrl) {
+                              setViewingImage({ url: imageUrl, emotion });
+                            }
+                          }}
+                        >
+                          {isGenerating ? (
+                            <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
+                          ) : imageUrl ? (
+                            <img 
+                              src={imageUrl} 
+                              alt={emotion} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-xs text-slate-400">없음</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-slate-600 font-medium">{emotion}</span>
+                          {externalPersona && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerateSingleExpression(emotion);
+                              }}
+                              disabled={isGenerating || isGeneratingExpressions}
+                              className="p-0.5 rounded hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title={`${emotion} 이미지 재생성`}
+                              data-testid={`button-regenerate-${emotion}-page`}
+                            >
+                              <RefreshCw className={`w-3 h-3 text-slate-500 ${isGenerating ? 'animate-spin' : ''}`} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1684,6 +2171,27 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
             </form>
           </div>
         </div>
+        
+        {/* 이미지 원본 보기 모달 */}
+        {viewingImage && (
+          <Dialog open={!!viewingImage} onOpenChange={() => setViewingImage(null)}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>{viewingImage.emotion} 표정 이미지</DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center justify-center p-4 bg-slate-50 rounded-lg">
+                <img 
+                  src={viewingImage.url} 
+                  alt={viewingImage.emotion}
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={() => setViewingImage(null)}>닫기</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
         
         {/* 기본 이미지 재생성 확인 다이얼로그 */}
         <AlertDialog open={showBaseImageConfirm} onOpenChange={setShowBaseImageConfirm}>
