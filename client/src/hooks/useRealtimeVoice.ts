@@ -141,7 +141,8 @@ export function useRealtimeVoice({
         source.stop();
         source.disconnect();
       } catch (err) {
-        // Source may have already finished playing
+        // Source may have already finished playing - log for debugging but continue
+        console.warn('Failed to stop audio source (may have already finished):', err);
       }
     }
     scheduledSourcesRef.current = [];
