@@ -672,11 +672,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           emotion: msg.emotion || 'neutral'
         }));
         
-        // 세션 ID 생성 (WebSocket용)
-        const sessionId = `persona-session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
+        // 기존 대화를 이어가므로 personaRunId를 id로 사용 (메시지 저장 시 일관성 보장)
         return res.json({
-          id: sessionId,
+          id: existingChat.id, // personaRunId를 id로 사용하여 메시지 저장 시 올바른 ID 사용
           personaRunId: existingChat.id,
           scenarioRunId: existingChat.scenarioRunId,
           scenarioId: `persona-chat-${personaId}`,
@@ -755,12 +753,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       console.log(`✅ DB에 페르소나 대화 저장: scenarioRunId=${scenarioRun.id}, personaRunId=${personaRun.id}`);
-      
+
       // 실시간 음성 모드는 WebSocket을 통해 처리
       if (mode === 'realtime_voice') {
         console.log('🎙️ 페르소나 직접 대화 - 실시간 음성 모드');
         return res.json({
-          id: sessionId,
+          id: personaRun.id, // personaRunId를 id로 사용하여 메시지 저장 시 올바른 ID 사용
           personaRunId: personaRun.id,
           scenarioRunId: scenarioRun.id,
           scenarioId: virtualScenarioId,
@@ -836,7 +834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         
         return res.json({
-          id: sessionId,
+          id: personaRun.id, // personaRunId를 id로 사용하여 메시지 저장 시 올바른 ID 사용
           personaRunId: personaRun.id,
           scenarioRunId: scenarioRun.id,
           scenarioId: virtualScenarioId,
@@ -852,12 +850,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isPersonaChat: true,
           createdAt: new Date().toISOString()
         });
-        
+
       } catch (aiError) {
         console.error("페르소나 AI 초기 메시지 생성 실패:", aiError);
         // AI 실패해도 대화 세션은 반환
         return res.json({
-          id: sessionId,
+          id: personaRun.id, // personaRunId를 id로 사용하여 메시지 저장 시 올바른 ID 사용
           personaRunId: personaRun.id,
           scenarioRunId: scenarioRun.id,
           scenarioId: virtualScenarioId,
