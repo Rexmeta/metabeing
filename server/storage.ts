@@ -1286,14 +1286,15 @@ export class PostgreSQLStorage implements IStorage {
 
   async findExistingPersonaDirectChat(userId: string, personaId: string): Promise<(PersonaRun & { scenarioRun: ScenarioRun; messages: ChatMessage[] }) | null> {
     try {
-      // 1. 해당 유저의 persona_direct 대화 중 같은 personaId를 가진 활성 대화 찾기
+      // 1. 해당 유저의 persona_direct 대화 중 같은 personaId를 가진 대화 찾기
+      // ✨ 'active' 대화 우선, 없으면 가장 최근 'completed' 대화도 포함
       const userScenarioRuns = await db
         .select()
         .from(scenarioRuns)
         .where(and(
           eq(scenarioRuns.userId, userId),
-          eq(scenarioRuns.conversationType, 'persona_direct'),
-          eq(scenarioRuns.status, 'active')
+          eq(scenarioRuns.conversationType, 'persona_direct')
+          // status 조건 제거 - active와 completed 모두 검색
         ))
         .orderBy(desc(scenarioRuns.startedAt));
 
@@ -1302,26 +1303,29 @@ export class PostgreSQLStorage implements IStorage {
       }
 
       // 2. 해당 scenarioRuns에서 personaId가 일치하는 personaRun 찾기
+      // ✨ 'active' 우선, 없으면 'completed'도 검색 (최신순으로 정렬되어 있음)
       for (const sr of userScenarioRuns) {
         const personaRunsResult = await db
           .select()
           .from(personaRuns)
           .where(and(
             eq(personaRuns.scenarioRunId, sr.id),
-            eq(personaRuns.personaId, personaId),
-            eq(personaRuns.status, 'active')
+            eq(personaRuns.personaId, personaId)
+            // status 조건 제거 - active와 completed 모두 검색
           ))
           .limit(1);
 
         if (personaRunsResult && personaRunsResult.length > 0) {
           const existingPersonaRun = personaRunsResult[0];
-          
+
           // 3. 해당 대화의 메시지 가져오기
           const messages = await db
             .select()
             .from(chatMessages)
             .where(eq(chatMessages.personaRunId, existingPersonaRun.id))
             .orderBy(asc(chatMessages.turnIndex));
+
+          console.log(`✅ 기존 대화 발견: personaRunId=${existingPersonaRun.id}, status=${existingPersonaRun.status}, messages=${messages.length}개`);
 
           return {
             ...existingPersonaRun,

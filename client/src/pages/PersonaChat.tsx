@@ -54,6 +54,8 @@ interface PersonaChatSession {
   mode: string;
   difficulty: number;
   isPersonaChat: boolean;
+  isResumed?: boolean;
+  wasCompleted?: boolean;
 }
 
 export default function PersonaChat() {
@@ -172,10 +174,25 @@ export default function PersonaChat() {
           mode: "text",
           difficulty: 2
         });
-        
+
         const session = await response.json();
         setChatSession(session);
-        
+
+        // ✨ 기존 대화를 재개하는 경우 사용자에게 알림
+        if (session.isResumed && session.wasCompleted) {
+          toast({
+            title: "대화 재개",
+            description: `이전 대화를 이어갑니다 (${session.messages?.length || 0}개 메시지)`,
+            duration: 3000,
+          });
+        } else if (session.isResumed) {
+          toast({
+            title: "대화 계속",
+            description: "진행 중이던 대화를 이어갑니다",
+            duration: 3000,
+          });
+        }
+
         setTimeout(() => setShowChat(true), 100);
       } catch (error) {
         console.error("페르소나 대화 생성 실패:", error);

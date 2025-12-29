@@ -658,12 +658,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`🎭 페르소나 직접 대화 시작: personaId=${personaId}, mode=${mode}`);
       
-      // 🔍 기존 대화방 검색 - 같은 유저와 페르소나의 활성 대화가 있는지 확인
+      // 🔍 기존 대화방 검색 - 같은 유저와 페르소나의 대화가 있는지 확인 (active 또는 completed)
       const existingChat = await storage.findExistingPersonaDirectChat(userId, personaId);
-      
+
       if (existingChat) {
-        console.log(`♻️ 기존 대화방 발견: personaRunId=${existingChat.id}, messages=${existingChat.messages.length}개`);
-        
+        const wasCompleted = existingChat.status === 'completed';
+        console.log(`♻️ 기존 대화방 발견: personaRunId=${existingChat.id}, status=${existingChat.status}, messages=${existingChat.messages.length}개`);
+
+        // ✨ 완료된 대화를 재개하는 경우, status를 'active'로 변경
+        if (wasCompleted) {
+          await storage.updatePersonaRun(existingChat.id, {
+            status: 'active',
+            completedAt: null
+          });
+
+          // scenarioRun도 active로 변경
+          await storage.updateScenarioRun(existingChat.scenarioRunId, {
+            status: 'active',
+            completedAt: null
+          });
+
+          console.log(`🔄 완료된 대화 재개: personaRunId=${existingChat.id} → status: active`);
+        }
+
         // 기존 대화방의 메시지를 포맷팅
         const formattedMessages = existingChat.messages.map(msg => ({
           sender: msg.sender as 'user' | 'ai',
@@ -671,10 +688,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           timestamp: msg.createdAt?.toISOString() || new Date().toISOString(),
           emotion: msg.emotion || 'neutral'
         }));
-        
+
         // 세션 ID 생성 (WebSocket용)
         const sessionId = `persona-session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
+
         return res.json({
           id: sessionId,
           personaRunId: existingChat.id,
@@ -691,6 +708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId,
           isPersonaChat: true,
           isResumed: true, // 기존 대화 이어가기 표시
+          wasCompleted, // 완료된 대화를 재개했는지 표시
           createdAt: existingChat.startedAt?.toISOString() || new Date().toISOString()
         });
       }
