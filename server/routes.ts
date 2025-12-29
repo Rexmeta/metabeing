@@ -15,6 +15,7 @@ import {
 import { db } from "./storage";
 import { eq, and, sql } from "drizzle-orm";
 import { generateAIResponse, generateFeedback, generateStrategyReflectionFeedback } from "./services/geminiService";
+import { generateAndSaveFeedback } from "./services/feedbackService";
 import { createSampleData } from "./sampleData";
 import ttsRoutes from "./routes/tts.js";
 import imageGenerationRoutes, { saveImageToLocal } from "./routes/imageGeneration.js";
@@ -207,179 +208,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Helper function to generate and save feedback automatically
-  async function generateAndSaveFeedback(
-    conversationId: string, 
-    conversation: any, 
-    scenarioObj: any, 
+  // Refactored: Complex logic extracted to feedbackService.ts
+  async function generateAndSaveFeedbackLocal(
+    conversationId: string,
+    conversation: any,
+    scenarioObj: any,
     persona: any
   ) {
-    // 이미 피드백이 있는지 확인
-    const existingFeedback = await storage.getFeedbackByConversationId(conversationId);
-    if (existingFeedback) {
-      console.log(`피드백이 이미 존재함: ${conversationId}`);
-      return existingFeedback;
-    }
-
-    console.log(`피드백 생성 중: ${conversationId}`);
-
-    // ✨ 메시지 기반 대화 시간 계산 - 5분 이상 간격은 제외하여 실제 대화 시간만 계산
-    const IDLE_THRESHOLD_MS = 5 * 60 * 1000; // 5분 = 대화 중단으로 간주
-    
-    const calculateActualConversationTime = (messages: any[]): number => {
-      if (messages.length < 2) {
-        // 메시지가 1개 이하면 기본값 반환
-        return messages.length > 0 ? 60 : 0; // 최소 1분
-      }
-      
-      // 메시지를 시간순으로 정렬
-      const sortedMessages = [...messages].sort((a, b) => 
-        new Date(a.timestamp || a.createdAt).getTime() - new Date(b.timestamp || b.createdAt).getTime()
-      );
-      
-      let totalActiveTime = 0;
-      
-      for (let i = 1; i < sortedMessages.length; i++) {
-        const prevTime = new Date(sortedMessages[i - 1].timestamp || sortedMessages[i - 1].createdAt).getTime();
-        const currTime = new Date(sortedMessages[i].timestamp || sortedMessages[i].createdAt).getTime();
-        const gap = currTime - prevTime;
-        
-        // 5분 이하의 간격만 대화 시간에 포함
-        if (gap <= IDLE_THRESHOLD_MS) {
-          totalActiveTime += gap;
-        } else {
-          console.log(`⏸️ 대화 중단 감지: ${Math.floor(gap / 1000 / 60)}분 간격 (제외됨)`);
-        }
-      }
-      
-      return Math.floor(totalActiveTime / 1000); // 초 단위로 반환
-    };
-    
-    const conversationDurationSeconds = calculateActualConversationTime(conversation.messages);
-    const conversationDuration = Math.floor(conversationDurationSeconds / 60);
-    const userMessages = conversation.messages.filter((m: any) => m.sender === 'user');
-    const totalUserWords = userMessages.reduce((sum: number, msg: any) => sum + msg.message.length, 0);
-    const averageResponseTime = userMessages.length > 0 ? Math.round(conversationDurationSeconds / userMessages.length) : 0;
-
-    // 피드백 데이터 생성
-    const feedbackData = await generateFeedback(
-      scenarioObj,
-      conversation.messages,
-      persona,
-      conversation
-    );
-
-    // 시간 성과 평가
-    const timePerformance = (() => {
-      if (userMessages.length === 0 || totalUserWords === 0) {
-        return {
-          rating: 'slow' as const,
-          feedback: '대화 참여 없음 - 시간 평가 불가'
-        };
-      }
-
-      const speechDensity = conversationDuration > 0 ? totalUserWords / conversationDuration : 0;
-      const avgMessageLength = totalUserWords / userMessages.length;
-
-      let rating: 'excellent' | 'good' | 'average' | 'slow' = 'slow';
-      let feedback = '';
-
-      if (speechDensity >= 30 && avgMessageLength >= 20) {
-        rating = conversationDuration <= 10 ? 'excellent' : 'good';
-        feedback = `활발한 대화 참여 (밀도: ${speechDensity.toFixed(1)}자/분, 평균: ${avgMessageLength.toFixed(0)}자/발언)`;
-      } else if (speechDensity >= 15 && avgMessageLength >= 10) {
-        rating = conversationDuration <= 15 ? 'good' : 'average';
-        feedback = `적절한 대화 참여 (밀도: ${speechDensity.toFixed(1)}자/분, 평균: ${avgMessageLength.toFixed(0)}자/발언)`;
-      } else if (speechDensity >= 5 && avgMessageLength >= 5) {
-        rating = 'average';
-        feedback = `소극적 참여 (밀도: ${speechDensity.toFixed(1)}자/분, 평균: ${avgMessageLength.toFixed(0)}자/발언)`;
-      } else {
-        rating = 'slow';
-        feedback = `매우 소극적 참여 (밀도: ${speechDensity.toFixed(1)}자/분, 평균: ${avgMessageLength.toFixed(0)}자/발언)`;
-      }
-
-      return { rating, feedback };
-    })();
-
-    // 피드백에 시간 정보 추가
-    feedbackData.conversationDuration = conversationDurationSeconds;
-    feedbackData.averageResponseTime = averageResponseTime;
-    feedbackData.timePerformance = timePerformance;
-
-    // EvaluationScore 배열 생성
-    const evaluationScores = [
-      {
-        category: "clarityLogic",
-        name: "명확성 & 논리성",
-        score: feedbackData.scores.clarityLogic,
-        feedback: "발언의 구조화, 핵심 전달, 모호성 최소화",
-        icon: "🎯",
-        color: "blue"
-      },
-      {
-        category: "listeningEmpathy", 
-        name: "경청 & 공감",
-        score: feedbackData.scores.listeningEmpathy,
-        feedback: "재진술·요약, 감정 인식, 우려 존중",
-        icon: "👂",
-        color: "green"
-      },
-      {
-        category: "appropriatenessAdaptability",
-        name: "적절성 & 상황 대응", 
-        score: feedbackData.scores.appropriatenessAdaptability,
-        feedback: "맥락 적합한 표현, 유연한 갈등 대응",
-        icon: "⚡",
-        color: "yellow"
-      },
-      {
-        category: "persuasivenessImpact",
-        name: "설득력 & 영향력",
-        score: feedbackData.scores.persuasivenessImpact, 
-        feedback: "논리적 근거, 사례 활용, 행동 변화 유도",
-        icon: "🎪",
-        color: "purple"
-      },
-      {
-        category: "strategicCommunication",
-        name: "전략적 커뮤니케이션",
-        score: feedbackData.scores.strategicCommunication,
-        feedback: "목표 지향적 대화, 협상·조율, 주도성", 
-        icon: "🎲",
-        color: "red"
-      }
-    ];
-
-    // 피드백 저장
-    const feedback = await storage.createFeedback({
+    return generateAndSaveFeedback(
       conversationId,
-      personaRunId: conversationId,
-      overallScore: feedbackData.overallScore,
-      scores: evaluationScores,
-      detailedFeedback: feedbackData,
-    });
-
-    // ✨ personaRun의 score 업데이트
-    try {
-      const personaRun = await storage.getPersonaRun(conversationId);
-      if (personaRun) {
-        await storage.updatePersonaRun(conversationId, {
-          score: feedbackData.overallScore
-        });
-        console.log(`✅ PersonaRun ${conversationId} score 업데이트: ${feedbackData.overallScore}`);
-      }
-    } catch (error) {
-      console.warn(`PersonaRun score 업데이트 실패: ${error}`);
-    }
-
-    console.log(`피드백 자동 생성 완료: ${conversationId}`);
-
-    // 전략적 선택 분석도 백그라운드에서 수행
-    performStrategicAnalysis(conversationId, conversation, scenarioObj)
-      .catch(error => {
-        console.error("전략 분석 오류 (무시):", error);
-      });
-
-    return feedback;
+      conversation,
+      scenarioObj,
+      persona,
+      performStrategicAnalysis
+    );
   }
 
   // ===== User Profile Management =====
@@ -2274,141 +2116,36 @@ ${personaSnapshot.name}:`;
         background: mbtiPersona?.background?.personal_values?.join(', ') || '전문성'
       };
 
-      // ✨ 메시지 기반 대화 시간 계산 - 5분 이상 간격은 제외하여 실제 대화 시간만 계산
-      const IDLE_THRESHOLD_MS = 5 * 60 * 1000; // 5분 = 대화 중단으로 간주
-      
-      const calculateActualConversationTime = (messages: any[]): number => {
-        if (messages.length < 2) {
-          return messages.length > 0 ? 60 : 0; // 최소 1분
-        }
-        
-        const sortedMessages = [...messages].sort((a, b) => 
-          new Date(a.timestamp || a.createdAt).getTime() - new Date(b.timestamp || b.createdAt).getTime()
-        );
-        
-        let totalActiveTime = 0;
-        
-        for (let i = 1; i < sortedMessages.length; i++) {
-          const prevTime = new Date(sortedMessages[i - 1].timestamp || sortedMessages[i - 1].createdAt).getTime();
-          const currTime = new Date(sortedMessages[i].timestamp || sortedMessages[i].createdAt).getTime();
-          const gap = currTime - prevTime;
-          
-          if (gap <= IDLE_THRESHOLD_MS) {
-            totalActiveTime += gap;
-          } else {
-            console.log(`⏸️ 대화 중단 감지: ${Math.floor(gap / 1000 / 60)}분 간격 (제외됨)`);
-          }
-        }
-        
-        return Math.floor(totalActiveTime / 1000); // 초 단위로 반환
-      };
-      
-      const conversationDurationSeconds = calculateActualConversationTime(conversation.messages);
-      const conversationDuration = Math.floor(conversationDurationSeconds / 60); // 분 단위 (기존 로직 호환성)
+      // ✨ Refactored: Use feedbackService for calculations
+      const {
+        calculateConversationMetrics,
+        evaluateTimePerformance,
+        transformToEvaluationScores
+      } = await import("./services/feedbackService");
 
-      const userMessages = conversation.messages.filter(m => m.sender === 'user');
-      const totalUserWords = userMessages.reduce((sum, msg) => sum + msg.message.length, 0);
-      const averageResponseTime = userMessages.length > 0 ? Math.round(conversationDurationSeconds / userMessages.length) : 0; // 초 단위
+      // Calculate conversation metrics
+      const metrics = calculateConversationMetrics(conversation.messages);
 
-
+      // Generate AI feedback
       const feedbackData = await generateFeedback(
-        scenarioObj, // 전체 시나리오 객체 전달
+        scenarioObj,
         conversation.messages,
         persona,
-        conversation // 전략 회고 평가를 위해 conversation 전달
+        conversation
       );
 
-      // 체계적인 시간 성과 평가 시스템
-      const timePerformance = (() => {
-        // 1. 사용자 발언이 없으면 최하점
-        if (userMessages.length === 0 || totalUserWords === 0) {
-          return {
-            rating: 'slow' as const,
-            feedback: '대화 참여 없음 - 시간 평가 불가'
-          };
-        }
+      // Evaluate time performance
+      const timePerformance = evaluateTimePerformance(metrics);
 
-        // 2. 발화 밀도 계산 (분당 글자 수)
-        const speechDensity = conversationDuration > 0 ? totalUserWords / conversationDuration : 0;
-        
-        // 3. 평균 발언 길이
-        const avgMessageLength = totalUserWords / userMessages.length;
-
-        // 4. 종합 평가 (발화량과 시간 고려)
-        let rating: 'excellent' | 'good' | 'average' | 'slow' = 'slow';
-        let feedback = '';
-
-        if (speechDensity >= 30 && avgMessageLength >= 20) {
-          // 활발하고 충실한 대화
-          rating = conversationDuration <= 10 ? 'excellent' : 'good';
-          feedback = `활발한 대화 참여 (밀도: ${speechDensity.toFixed(1)}자/분, 평균: ${avgMessageLength.toFixed(0)}자/발언)`;
-        } else if (speechDensity >= 15 && avgMessageLength >= 10) {
-          // 보통 수준의 대화
-          rating = conversationDuration <= 15 ? 'good' : 'average';
-          feedback = `적절한 대화 참여 (밀도: ${speechDensity.toFixed(1)}자/분, 평균: ${avgMessageLength.toFixed(0)}자/발언)`;
-        } else if (speechDensity >= 5 && avgMessageLength >= 5) {
-          // 소극적이지만 참여한 대화
-          rating = 'average';
-          feedback = `소극적 참여 (밀도: ${speechDensity.toFixed(1)}자/분, 평균: ${avgMessageLength.toFixed(0)}자/발언)`;
-        } else {
-          // 매우 소극적인 대화
-          rating = 'slow';
-          feedback = `매우 소극적 참여 (밀도: ${speechDensity.toFixed(1)}자/분, 평균: ${avgMessageLength.toFixed(0)}자/발언)`;
-        }
-
-        return { rating, feedback };
-      })();
-
-      // 피드백에 시간 정보 추가
-      feedbackData.conversationDuration = conversationDurationSeconds; // 초 단위로 저장
-      feedbackData.averageResponseTime = averageResponseTime;
+      // Add time information to feedback
+      feedbackData.conversationDuration = metrics.conversationDurationSeconds;
+      feedbackData.averageResponseTime = metrics.averageResponseTime;
       feedbackData.timePerformance = timePerformance;
 
       console.log("피드백 데이터 생성 완료:", feedbackData);
 
-      // EvaluationScore 배열 생성
-      const evaluationScores = [
-        {
-          category: "clarityLogic",
-          name: "명확성 & 논리성",
-          score: feedbackData.scores.clarityLogic,
-          feedback: "발언의 구조화, 핵심 전달, 모호성 최소화",
-          icon: "🎯",
-          color: "blue"
-        },
-        {
-          category: "listeningEmpathy", 
-          name: "경청 & 공감",
-          score: feedbackData.scores.listeningEmpathy,
-          feedback: "재진술·요약, 감정 인식, 우려 존중",
-          icon: "👂",
-          color: "green"
-        },
-        {
-          category: "appropriatenessAdaptability",
-          name: "적절성 & 상황 대응", 
-          score: feedbackData.scores.appropriatenessAdaptability,
-          feedback: "맥락 적합한 표현, 유연한 갈등 대응",
-          icon: "⚡",
-          color: "yellow"
-        },
-        {
-          category: "persuasivenessImpact",
-          name: "설득력 & 영향력",
-          score: feedbackData.scores.persuasivenessImpact, 
-          feedback: "논리적 근거, 사례 활용, 행동 변화 유도",
-          icon: "🎪",
-          color: "purple"
-        },
-        {
-          category: "strategicCommunication",
-          name: "전략적 커뮤니케이션",
-          score: feedbackData.scores.strategicCommunication,
-          feedback: "목표 지향적 대화, 협상·조율, 주도성", 
-          icon: "🎲",
-          color: "red"
-        }
-      ];
+      // Transform scores to evaluation format
+      const evaluationScores = transformToEvaluationScores(feedbackData.scores);
 
       const feedback = await storage.createFeedback({
         conversationId: null, // 레거시 지원 (nullable)
