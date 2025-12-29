@@ -820,20 +820,11 @@ export class RealtimeVoiceService {
             type: 'user.transcription',
             transcript: userMessage,
           });
-          
-          // ✨ 사용자 메시지 DB 자동 저장 (직렬화된 큐로 순서 보장, 실패 시 클라이언트 통지)
-          const convId = session.conversationId;
-          const sessionRef = session;
-          this.queueMessageSave(convId, 'user', userMessage, null, null)
-            .then(() => {
-              console.log(`💾 User message saved from inputTranscription`);
-              this.sendToClient(sessionRef, { type: 'user.message.saved', transcript: userMessage });
-            })
-            .catch(err => {
-              console.error(`❌ Failed to save user message from inputTranscription:`, err);
-              this.sendToClient(sessionRef, { type: 'user.message.failed', transcript: userMessage, error: String(err) });
-            });
-          
+
+          // ✨ Note: DB 저장은 클라이언트의 Web Speech API를 통한 'user.message' 이벤트에서만 처리
+          // 이렇게 하여 중복 저장 방지 (messageId 기반 idempotent guard 활용)
+          // inputTranscription은 화면 표시용 transcript 전송만 담당
+
           session.userTranscriptBuffer = ''; // 버퍼 초기화
         }
 
