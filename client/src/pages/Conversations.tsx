@@ -22,6 +22,7 @@ interface ActiveConversation {
   id: string;
   personaId: string;
   personaName?: string;
+  scenarioRunId: string;
   scenarioRun?: {
     scenarioId?: string;
     scenarioName?: string;
@@ -48,22 +49,22 @@ export default function Conversations() {
     refetchInterval: 10000,
   });
 
-  const closeMutation = useMutation({
-    mutationFn: async (conversationId: string) => {
-      return await apiRequest("POST", `/api/conversations/${conversationId}/close`);
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (scenarioRunId: string) => {
+      return await apiRequest("DELETE", `/api/scenario-runs/${scenarioRunId}`);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/active-conversations"] });
       await refetch();
       toast({
-        title: "대화방 닫힘",
-        description: "대화방이 목록에서 제거되었습니다.",
+        title: "대화방 삭제됨",
+        description: "대화방과 채팅 기록이 삭제되었습니다.",
       });
     },
     onError: () => {
       toast({
         title: "오류",
-        description: "대화방을 닫는데 실패했습니다.",
+        description: "대화방을 삭제하는데 실패했습니다.",
         variant: "destructive",
       });
     },
@@ -344,11 +345,11 @@ export default function Conversations() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (confirm("대화방을 닫으시겠습니까?")) {
-                            closeMutation.mutate(conv.id);
+                          if (confirm("대화방을 나가시겠습니까? 채팅 기록이 모두 삭제됩니다.")) {
+                            deleteConversationMutation.mutate(conv.scenarioRunId);
                           }
                         }}
-                        disabled={closeMutation.isPending}
+                        disabled={deleteConversationMutation.isPending}
                         data-testid={`button-close-${conv.id}`}
                       >
                         <X className="w-4 h-4" />
