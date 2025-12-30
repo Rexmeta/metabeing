@@ -1286,14 +1286,14 @@ export class PostgreSQLStorage implements IStorage {
 
   async findExistingPersonaDirectChat(userId: string, personaId: string): Promise<(PersonaRun & { scenarioRun: ScenarioRun; messages: ChatMessage[] }) | null> {
     try {
-      // 1. 해당 유저의 persona_direct 대화 중 같은 personaId를 가진 활성 대화 찾기
+      // 1. 해당 유저의 persona_direct 대화 중 같은 personaId를 가진 대화 찾기
+      // 페르소나 직접 대화는 계속 이어갈 수 있으므로 status 조건 제거
       const userScenarioRuns = await db
         .select()
         .from(scenarioRuns)
         .where(and(
           eq(scenarioRuns.userId, userId),
-          eq(scenarioRuns.conversationType, 'persona_direct'),
-          eq(scenarioRuns.status, 'active')
+          eq(scenarioRuns.conversationType, 'persona_direct')
         ))
         .orderBy(desc(scenarioRuns.startedAt));
 
@@ -1302,20 +1302,20 @@ export class PostgreSQLStorage implements IStorage {
       }
 
       // 2. 해당 scenarioRuns에서 personaId가 일치하는 personaRun 찾기
+      // 페르소나 직접 대화는 계속 이어갈 수 있으므로 status 조건 제거
       for (const sr of userScenarioRuns) {
         const personaRunsResult = await db
           .select()
           .from(personaRuns)
           .where(and(
             eq(personaRuns.scenarioRunId, sr.id),
-            eq(personaRuns.personaId, personaId),
-            eq(personaRuns.status, 'active')
+            eq(personaRuns.personaId, personaId)
           ))
           .limit(1);
 
         if (personaRunsResult && personaRunsResult.length > 0) {
           const existingPersonaRun = personaRunsResult[0];
-          
+
           // 3. 해당 대화의 메시지 가져오기
           const messages = await db
             .select()
