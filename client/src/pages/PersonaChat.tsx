@@ -167,15 +167,22 @@ export default function PersonaChat() {
 
       setIsCreating(true);
       try {
+        console.log(`🎭 페르소나 채팅 시작: personaId=${params.personaId}`);
         const response = await apiRequest("POST", "/api/persona-chat", {
           personaId: params.personaId,
           mode: "text",
           difficulty: 2
         });
-        
+
         const session = await response.json();
+        console.log(`📦 세션 응답 받음:`, {
+          id: session.id,
+          isResumed: session.isResumed,
+          messagesCount: session.messages?.length || 0,
+          messages: session.messages
+        });
         setChatSession(session);
-        
+
         setTimeout(() => setShowChat(true), 100);
       } catch (error) {
         console.error("페르소나 대화 생성 실패:", error);
@@ -247,6 +254,13 @@ export default function PersonaChat() {
     emotion: msg.emotion,
     emotionReason: msg.emotionReason
   }));
+
+  console.log(`📨 initialMessages 생성:`, {
+    sessionMessagesCount: chatSession.messages?.length || 0,
+    initialMessagesCount: initialMessages.length,
+    firstMessage: initialMessages[0],
+    isResumed: chatSession.isResumed
+  });
 
   return (
     <div className={`h-full w-full relative transition-opacity duration-300 ${showChat ? 'opacity-100' : 'opacity-0'}`}>

@@ -683,7 +683,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sender: msg.sender as 'user' | 'ai',
           message: msg.message,
           timestamp: msg.createdAt?.toISOString() || new Date().toISOString(),
-          emotion: msg.emotion || 'neutral'
+          emotion: msg.emotion || 'neutral',
+          emotionReason: msg.emotionReason || ''
         }));
 
         // 기존 대화를 이어가므로 personaRunId를 id로 사용 (메시지 저장 시 일관성 보장)
