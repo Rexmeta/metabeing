@@ -1536,21 +1536,23 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                       </div>
                     </div>
                     
-                    {/* 하단 액션 버튼들 */}
-                    <div className="p-4 border-t bg-slate-50 dark:bg-slate-900 space-y-2">
-                      <Button
-                        variant="destructive"
-                        className="w-full"
-                        onClick={() => {
-                          setIsChatMenuOpen(false);
-                          setShowEndConversationDialog(true);
-                        }}
-                        data-testid="button-leave-chat"
-                      >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        채팅방 나가기
-                      </Button>
-                    </div>
+                    {/* 하단 액션 버튼들 - 시나리오 채팅에서만 표시 */}
+                    {!isPersonaChat && (
+                      <div className="p-4 border-t bg-slate-50 dark:bg-slate-900 space-y-2">
+                        <Button
+                          variant="destructive"
+                          className="w-full"
+                          onClick={() => {
+                            setIsChatMenuOpen(false);
+                            setShowEndConversationDialog(true);
+                          }}
+                          data-testid="button-leave-chat"
+                        >
+                          <LogOut className="w-4 h-4 mr-2" />
+                          채팅방 나가기
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </SheetContent>
               </Sheet>
