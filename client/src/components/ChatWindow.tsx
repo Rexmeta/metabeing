@@ -1749,18 +1749,20 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                     {/* 연결 완료 - 마이크 중심 레이아웃 (메신저 모드) */}
                     {realtimeVoice.status === 'connected' && (
                       <div className="flex items-center justify-center gap-4 py-2">
-                        {/* 대화 종료 버튼 - 왼쪽 */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleEndRealtimeConversation}
-                          disabled={realtimeVoice.isRecording || realtimeVoice.isAISpeaking}
-                          data-testid="button-end-conversation-messenger"
-                          className="text-red-600 border-red-200 hover:bg-red-50 shrink-0"
-                        >
-                          <i className="fas fa-stop-circle mr-1"></i>
-                          종료
-                        </Button>
+                        {/* 대화 종료 버튼 - 왼쪽 (시나리오 대화에서만 표시) */}
+                        {!isPersonaChat && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleEndRealtimeConversation}
+                            disabled={realtimeVoice.isRecording || realtimeVoice.isAISpeaking}
+                            data-testid="button-end-conversation-messenger"
+                            className="text-red-600 border-red-200 hover:bg-red-50 shrink-0"
+                          >
+                            <i className="fas fa-stop-circle mr-1"></i>
+                            종료
+                          </Button>
+                        )}
                         
                         {/* 중앙 마이크 버튼 - 크고 강조 */}
                         <button
@@ -2210,18 +2212,20 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                       {realtimeVoice.status === 'connected' && (
                         <div className="border-t border-slate-200/30 p-4">
                           <div className="flex items-center justify-center gap-4">
-                            {/* 대화 종료 버튼 - 왼쪽 */}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleEndRealtimeConversation}
-                              disabled={realtimeVoice.isRecording || realtimeVoice.isAISpeaking}
-                              data-testid="button-end-conversation-realtime"
-                              className="text-red-600 border-red-200 hover:bg-red-50 shrink-0"
-                            >
-                              <i className="fas fa-stop-circle mr-1"></i>
-                              종료
-                            </Button>
+                            {/* 대화 종료 버튼 - 왼쪽 (시나리오 대화에서만 표시) */}
+                            {!isPersonaChat && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleEndRealtimeConversation}
+                                disabled={realtimeVoice.isRecording || realtimeVoice.isAISpeaking}
+                                data-testid="button-end-conversation-realtime"
+                                className="text-red-600 border-red-200 hover:bg-red-50 shrink-0"
+                              >
+                                <i className="fas fa-stop-circle mr-1"></i>
+                                종료
+                              </Button>
+                            )}
                             
                             {/* 중앙 마이크 버튼 - 크고 강조 */}
                             <button
