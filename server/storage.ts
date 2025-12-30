@@ -1310,14 +1310,15 @@ export class PostgreSQLStorage implements IStorage {
       }
 
       // 2. 해당 scenarioRuns에서 personaId가 일치하는 personaRun 찾기
-      // 페르소나 직접 대화는 계속 이어갈 수 있으므로 status 조건 제거
+      // ✨ 닫히지 않은 대화만 찾기 (closedAt IS NULL)
       for (const sr of userScenarioRuns) {
         const personaRunsResult = await db
           .select()
           .from(personaRuns)
           .where(and(
             eq(personaRuns.scenarioRunId, sr.id),
-            eq(personaRuns.personaId, personaId)
+            eq(personaRuns.personaId, personaId),
+            isNull(personaRuns.closedAt) // ✨ 닫히지 않은 대화만
           ))
           .limit(1);
 
