@@ -113,17 +113,56 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   const [conversationStartTime, setConversationStartTime] = useState<Date | null>(null);
   const [localMessages, setLocalMessages] = useState<ConversationMessage[]>(initialMessages);
   const [chatMode, setChatMode] = useState<'messenger' | 'character'>(initialChatMode);
-  
+
   // initialMessages가 변경되면 localMessages 업데이트 (쿼리 로딩 완료 후)
   // 마운트 시점에 초기 메시지 로드 여부 추적
   const initialMessagesLoadedRef = useRef(false);
-  
+  const loadedMessagesCountRef = useRef(0);
+  const previousConversationIdRef = useRef<string | undefined>(conversationId);
+  const previousPersonaRunIdRef = useRef<string | undefined>(personaRunId);
+
   useEffect(() => {
-    // 초기 메시지가 있고 아직 로드하지 않았으면 로드
-    if (initialMessages && initialMessages.length > 0 && !initialMessagesLoadedRef.current) {
-      console.log('📬 Loading initial messages:', initialMessages.length);
+    const conversationChanged = previousConversationIdRef.current !== conversationId;
+    const personaRunChanged = previousPersonaRunIdRef.current !== personaRunId;
+
+    console.log(`🔄 ChatWindow mounted/updated:`, {
+      conversationId,
+      personaRunId,
+      conversationChanged,
+      personaRunChanged,
+      initialMessagesCount: initialMessages?.length || 0,
+      localMessagesCount: localMessages.length,
+      loadedRef: initialMessagesLoadedRef.current,
+      loadedCount: loadedMessagesCountRef.current
+    });
+
+    // conversationId나 personaRunId가 변경되면 ref 리셋
+    if (conversationChanged || personaRunChanged) {
+      console.log(`🆕 새로운 대화방 감지 - ref 리셋`);
+      initialMessagesLoadedRef.current = false;
+      loadedMessagesCountRef.current = 0;
+      setLocalMessages([]); // 이전 메시지 클리어
+      previousConversationIdRef.current = conversationId;
+      previousPersonaRunIdRef.current = personaRunId;
+    }
+  }, [conversationId, personaRunId]);
+
+  useEffect(() => {
+    // 초기 메시지가 있고 (아직 로드하지 않았거나 메시지 개수가 변경되었으면) 로드
+    const shouldLoad = initialMessages &&
+                      initialMessages.length > 0 &&
+                      (!initialMessagesLoadedRef.current || initialMessages.length !== loadedMessagesCountRef.current);
+
+    if (shouldLoad) {
+      console.log('📬 Loading initial messages:', {
+        count: initialMessages.length,
+        previousCount: loadedMessagesCountRef.current,
+        wasLoaded: initialMessagesLoadedRef.current,
+        messages: initialMessages
+      });
       setLocalMessages(initialMessages);
       initialMessagesLoadedRef.current = true;
+      loadedMessagesCountRef.current = initialMessages.length;
     }
   }, [initialMessages]);
   const [isWideScreen, setIsWideScreen] = useState(false);
