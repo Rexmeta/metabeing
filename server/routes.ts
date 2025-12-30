@@ -1416,11 +1416,30 @@ ${personaSnapshot.name}:`;
         return res.status(403).json({ error: "Unauthorized access" });
       }
 
-      // ✨ 새로운 구조: 각 메시지를 chat_messages에 저장
-      let turnIndex = 0;
+      // ✨ 새로운 구조: 각 메시지를 chat_messages에 저장 (중복 방지)
       const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId);
-      turnIndex = (existingMessages || []).length;
 
+      // 🔒 이미 메시지가 저장되어 있으면 중복 저장 방지
+      if (existingMessages && existingMessages.length > 0) {
+        console.log(`⏭️ Skipping duplicate save: ${existingMessages.length} messages already exist for personaRunId ${personaRunId}`);
+
+        // 이미 저장된 메시지가 있으므로 성공 응답만 반환
+        const userMessageCount = existingMessages.filter(msg => msg.sender === 'user').length;
+
+        return res.json({
+          conversation: {
+            id: personaRunId,
+            status: 'completed'
+          },
+          messagesSaved: 0,
+          messagesSkipped: existingMessages.length,
+          turnCount: userMessageCount,
+          note: 'Messages already saved during realtime conversation'
+        });
+      }
+
+      // 메시지가 없으면 저장 진행
+      let turnIndex = 0;
       for (const msg of messages) {
         await storage.createChatMessage({
           personaRunId,
