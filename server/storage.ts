@@ -1036,10 +1036,14 @@ export class PostgreSQLStorage implements IStorage {
 
   async getUserScenarioRunsWithPersonaRuns(userId: string): Promise<(ScenarioRun & { personaRuns: PersonaRun[] })[]> {
     // 1) 유저의 모든 시나리오 실행 가져오기 (리스트의 "줄"이 되는 단위)
+    // ✨ 시나리오 기반 대화만 가져오기 (conversationType = 'scenario_based')
     const userScenarioRuns = await db
       .select()
       .from(scenarioRuns)
-      .where(eq(scenarioRuns.userId, userId))
+      .where(and(
+        eq(scenarioRuns.userId, userId),
+        eq(scenarioRuns.conversationType, 'scenario_based')
+      ))
       .orderBy(desc(scenarioRuns.startedAt));
 
     if (userScenarioRuns.length === 0) {
@@ -1174,12 +1178,16 @@ export class PostgreSQLStorage implements IStorage {
   async getActivePersonaRunsWithLastMessage(userId: string): Promise<(PersonaRun & { lastMessage?: ChatMessage; scenarioRun?: ScenarioRun })[]> {
     try {
       // 1. 해당 유저의 scenario runs 먼저 가져오기 (단순 쿼리로 Neon 안정성 확보)
+      // ✨ 페르소나 직접 대화만 가져오기 (conversationType = 'persona_direct')
       let userScenarioRuns: ScenarioRun[] = [];
       try {
         const result = await db
           .select()
           .from(scenarioRuns)
-          .where(eq(scenarioRuns.userId, userId));
+          .where(and(
+            eq(scenarioRuns.userId, userId),
+            eq(scenarioRuns.conversationType, 'persona_direct')
+          ));
         userScenarioRuns = result || [];
       } catch (queryError) {
         console.error('Query error in getActivePersonaRunsWithLastMessage (step 1 - scenario runs):', queryError);
