@@ -356,17 +356,12 @@ export class RealtimeVoiceService {
     const realtimeModel = await this.getRealtimeModel();
     
     // 🔢 세션 등록 전에 messageIndex 초기화 (경쟁 조건 방지)
+    // personaRunId 파라미터를 직접 사용하여 기존 메시지 조회
     let initialMessageIndex = 0;
     try {
-      const parts = conversationId.split('-');
-      let personaRunId = conversationId;
-      if (parts.length >= 11) {
-        personaRunId = parts.slice(5, 10).join('-');
-      }
-      
       const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId) || [];
       initialMessageIndex = existingMessages.length;
-      console.log(`🔢 Pre-initialized messageIndex to ${initialMessageIndex} from existing ${existingMessages.length} messages`);
+      console.log(`🔢 Pre-initialized messageIndex to ${initialMessageIndex} from existing ${existingMessages.length} messages (personaRunId: ${personaRunId})`);
     } catch (err) {
       console.warn('⚠️ Failed to pre-initialize messageIndex from DB, starting at 0:', err);
       initialMessageIndex = 0;
