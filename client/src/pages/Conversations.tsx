@@ -334,14 +334,13 @@ export default function Conversations() {
                             </p>
                           </div>
 
-                          <ChevronRight className="w-4 h-4 text-muted-foreground/50 flex-shrink-0 hidden sm:block" />
                         </div>
                       </Link>
 
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 text-muted-foreground/60 sm:hidden"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -351,6 +350,7 @@ export default function Conversations() {
                         }}
                         disabled={deleteConversationMutation.isPending}
                         data-testid={`button-close-${conv.id}`}
+                        title="대화방 나가기"
                       >
                         <X className="w-4 h-4" />
                       </Button>
