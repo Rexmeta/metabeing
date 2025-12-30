@@ -667,7 +667,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // 기존 대화가 완료 상태면 다시 활성화 (페르소나 직접 대화는 계속 이어갈 수 있음)
         if (existingChat.status === 'completed') {
           console.log(`🔄 완료된 대화를 다시 활성화: personaRunId=${existingChat.id}`);
-          await storage.updatePersonaRun(existingChat.id, { status: 'active' });
+          try {
+            await storage.updatePersonaRun(existingChat.id, { status: 'active' });
+            console.log(`✅ 대화 상태 업데이트 성공: active`);
+          } catch (updateError) {
+            // updatePersonaRun 실패해도 대화 재개는 계속 진행
+            // storage.ts의 updatePersonaRun이 폴백 로직을 가지고 있지만,
+            // 만약의 경우를 대비해 에러를 잡아서 로그만 남기고 계속 진행
+            console.error(`⚠️ 대화 상태 업데이트 실패했지만 대화는 계속 진행: ${updateError}`);
+          }
         }
 
         // 기존 대화방의 메시지를 포맷팅
