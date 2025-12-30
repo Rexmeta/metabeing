@@ -662,8 +662,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingChat = await storage.findExistingPersonaDirectChat(userId, personaId);
       
       if (existingChat) {
-        console.log(`♻️ 기존 대화방 발견: personaRunId=${existingChat.id}, messages=${existingChat.messages.length}개`);
-        
+        console.log(`♻️ 기존 대화방 발견: personaRunId=${existingChat.id}, messages=${existingChat.messages.length}개, status=${existingChat.status}`);
+
+        // 기존 대화가 완료 상태면 다시 활성화 (페르소나 직접 대화는 계속 이어갈 수 있음)
+        if (existingChat.status === 'completed') {
+          console.log(`🔄 완료된 대화를 다시 활성화: personaRunId=${existingChat.id}`);
+          await storage.updatePersonaRun(existingChat.id, { status: 'active' });
+        }
+
         // 기존 대화방의 메시지를 포맷팅
         const formattedMessages = existingChat.messages.map(msg => ({
           sender: msg.sender as 'user' | 'ai',
@@ -671,7 +677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           timestamp: msg.createdAt?.toISOString() || new Date().toISOString(),
           emotion: msg.emotion || 'neutral'
         }));
-        
+
         // 기존 대화를 이어가므로 personaRunId를 id로 사용 (메시지 저장 시 일관성 보장)
         return res.json({
           id: existingChat.id, // personaRunId를 id로 사용하여 메시지 저장 시 올바른 ID 사용
@@ -1313,7 +1319,9 @@ ${personaSnapshot.name}:`;
         emotionReason: aiResult.emotionReason
       });
 
-      const isCompleted = newTurnCount >= 3;
+      // 페르소나 직접 대화는 자동 완료되지 않음 (계속 이어서 대화 가능)
+      const isPersonaDirectChat = scenarioRun.conversationType === 'persona_direct';
+      const isCompleted = !isPersonaDirectChat && newTurnCount >= 3;
 
       // ✨ 새 구조: persona_run 업데이트
       const updatedPersonaRun = await storage.updatePersonaRun(personaRunId, {
@@ -1323,7 +1331,8 @@ ${personaSnapshot.name}:`;
       });
 
       // ✨ 모든 페르소나가 완료되었는지 확인하고 시나리오 자동 완료
-      if (isCompleted) {
+      // 페르소나 직접 대화는 제외
+      if (isCompleted && !isPersonaDirectChat) {
         await checkAndCompleteScenario(personaRun.scenarioRunId);
       }
 
