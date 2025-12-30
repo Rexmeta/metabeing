@@ -192,12 +192,14 @@ export default function ConversationView() {
       title: "대화 완료",
       description: "대화가 성공적으로 완료되었습니다.",
     });
-    
+
     // 시나리오 기반 대화인 경우 피드백 페이지로, 개별 페르소나 대화인 경우 대화 목록으로
-    if (personaRun?.scenarioRunId) {
-      setLocation(`/feedback/${personaRunId}`);
-    } else {
+    if (scenarioRun?.conversationType === 'persona_direct') {
+      // 페르소나 직접 대화는 피드백 없이 대화 목록으로
       setLocation("/conversations");
+    } else {
+      // 시나리오 대화는 피드백 페이지로
+      setLocation(`/feedback/${personaRunId}`);
     }
   };
 
@@ -239,6 +241,9 @@ export default function ConversationView() {
     );
   }
 
+  // 페르소나 직접 대화인지 시나리오 대화인지 구분
+  const isPersonaDirectChat = scenarioRun?.conversationType === 'persona_direct';
+
   return (
     <div className={`h-full w-full relative transition-opacity duration-300 ${showChat ? 'opacity-100' : 'opacity-0'}`}>
       <ChatWindow
@@ -249,7 +254,7 @@ export default function ConversationView() {
         onChatComplete={handleChatComplete}
         onExit={handleExit}
         initialChatMode="messenger"
-        isPersonaChat={true}
+        isPersonaChat={isPersonaDirectChat}
         initialMessages={initialMessages}
       />
     </div>
