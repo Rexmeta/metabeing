@@ -147,7 +147,7 @@ export default function AdminManagement() {
                     <Card
                       key={persona.id}
                       className="overflow-hidden cursor-pointer hover-elevate group"
-                      onClick={() => setLocation(`/persona-chat/${persona.id}`)}
+                      onClick={() => setLocation(`/persona-analytics/${persona.id}`)}
                       data-testid={`card-persona-${persona.id}`}
                     >
                       <div className="aspect-[3/4] relative bg-gradient-to-br from-blue-500 to-purple-600">
