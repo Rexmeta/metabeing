@@ -302,7 +302,14 @@ function PersonaCard({ persona, size = "default", isAuthenticated }: { persona: 
     staleTime: 30000,
     enabled: isAuthenticated, // 로그인 시에만 API 호출
   });
-  
+
+  // 활성 대화 목록 조회 (기존 대화 확인용)
+  const { data: activeConversations } = useQuery<any[]>({
+    queryKey: ['/api/active-conversations'],
+    enabled: isAuthenticated,
+    staleTime: 30000,
+  });
+
   const reactMutation = useMutation({
     mutationFn: async (type: 'like' | 'dislike') => {
       return apiRequest('POST', `/api/personas/${persona.id}/react`, { type });
@@ -319,7 +326,17 @@ function PersonaCard({ persona, size = "default", isAuthenticated }: { persona: 
   };
 
   const handlePersonaClick = () => {
-    // PersonaChat 페이지로 이동 - 세션 생성은 PersonaChat.tsx에서 처리
+    // 기존 대화 확인: 이미 해당 페르소나와의 대화가 있으면 그 대화로 이동
+    if (activeConversations) {
+      const existingConversation = activeConversations.find((c: any) => c.personaId === persona.id);
+      if (existingConversation) {
+        console.log(`♻️ 기존 대화 발견: ${existingConversation.id}, 해당 대화로 이동`);
+        setLocation(`/chat/${existingConversation.id}`);
+        return;
+      }
+    }
+
+    // 기존 대화가 없으면 새 대화 생성
     console.log(`🎭 페르소나 클릭: ${persona.id}, PersonaChat으로 이동`);
     setLocation(`/persona/${persona.id}/chat`);
   };
