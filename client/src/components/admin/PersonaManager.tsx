@@ -95,6 +95,7 @@ interface MBTIPersona {
       당혹: string;
     };
   };
+  initialMessage?: string;  // 첫 대화 메시지
 }
 
 // 시나리오별 페르소나 정보
@@ -190,6 +191,7 @@ interface MBTIPersonaFormData {
       당혹: string;
     };
   };
+  initialMessage?: string;  // 첫 대화 메시지
 }
 
 interface PersonaManagerProps {
@@ -273,7 +275,8 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
         실망: '',
         당혹: ''
       }
-    }
+    },
+    initialMessage: ''
   });
 
   // MBTI 페르소나 목록 조회
@@ -1193,8 +1196,8 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                     <Input
                       id="opening_style"
                       value={formData.communication_patterns?.opening_style || ''}
-                      onChange={(e) => setFormData(prev => ({ 
-                        ...prev, 
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
                         communication_patterns: {
                           ...prev.communication_patterns,
                           opening_style: e.target.value
@@ -1203,6 +1206,18 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                       placeholder="바로 핵심 주제로 직행 / 유머나 경험 공유로 시작"
                       className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
                       data-testid="input-opening-style"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="initialMessage" className="text-sm font-semibold text-slate-700 mb-1.5 block">첫 대화 메시지 (선택)</Label>
+                    <Textarea
+                      id="initialMessage"
+                      value={formData.initialMessage || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, initialMessage: e.target.value }))}
+                      placeholder="페르소나와 대화 시작 시 자동으로 전송될 첫 메시지 (비워두면 사용자가 직접 입력)"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-initial-message"
                     />
                   </div>
 
@@ -1862,8 +1877,8 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                     <Input
                       id="opening_style-page"
                       value={formData.communication_patterns?.opening_style || ''}
-                      onChange={(e) => setFormData(prev => ({ 
-                        ...prev, 
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
                         communication_patterns: {
                           ...prev.communication_patterns,
                           opening_style: e.target.value
@@ -1872,6 +1887,18 @@ export function PersonaManager({ externalOpen, externalPersona, onExternalClose,
                       placeholder="바로 핵심 주제로 직행 / 유머나 경험 공유로 시작"
                       className="border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
                       data-testid="input-opening-style-page"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="initialMessage-page" className="text-sm font-semibold text-slate-700 mb-1.5 block">첫 대화 메시지 (선택)</Label>
+                    <Textarea
+                      id="initialMessage-page"
+                      value={formData.initialMessage || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, initialMessage: e.target.value }))}
+                      placeholder="페르소나와 대화 시작 시 자동으로 전송될 첫 메시지 (비워두면 사용자가 직접 입력)"
+                      className="min-h-[60px] border-slate-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white"
+                      data-testid="textarea-initial-message-page"
                     />
                   </div>
 
