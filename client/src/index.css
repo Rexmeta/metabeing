@@ -175,9 +175,16 @@
     @apply border-border;
   }
 
-  body {
+  html, body {
     @apply font-sans antialiased text-foreground;
     background-color: #f8fafc !important;
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  body {
+    width: 100%;
+    position: relative;
   }
 }
 

@@ -176,11 +176,11 @@ function AppLayout() {
     <SidebarProvider style={sidebarStyle}>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <main className="flex-1 flex flex-col min-h-screen">
-          <header className="sticky top-0 z-50 flex items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 h-14">
+        <main className="flex-1 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
+          <header className="sticky top-0 z-50 flex items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-2 sm:px-4 h-12 sm:h-14">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
           </header>
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto w-full">
             <MainRouter />
           </div>
         </main>

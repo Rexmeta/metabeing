@@ -79,10 +79,10 @@ export default function FeedbackView() {
 
   if (isLoading || !conversation) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">피드백을 불러오는 중...</p>
+          <div className="animate-spin rounded-full h-20 w-20 sm:h-32 sm:w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-sm sm:text-base">피드백을 불러오는 중...</p>
         </div>
       </div>
     );
@@ -93,15 +93,15 @@ export default function FeedbackView() {
 
   if (!scenario || !persona) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <p className="text-red-600">시나리오 또는 페르소나를 찾을 수 없습니다.</p>
-          <p className="text-sm text-gray-500 mt-2">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+        <div className="text-center max-w-md w-full p-4 sm:p-6">
+          <p className="text-red-600 text-sm sm:text-base font-medium">시나리오 또는 페르소나를 찾을 수 없습니다.</p>
+          <p className="text-xs sm:text-sm text-gray-500 mt-2">
             Scenario ID: {conversation.scenarioId}, Persona ID: {conversation.personaId}
           </p>
-          <Button 
+          <Button
             onClick={() => window.location.href = '/conversations'}
-            className="mt-4"
+            className="mt-4 text-sm sm:text-base"
           >
             대화 목록으로 돌아가기
           </Button>
