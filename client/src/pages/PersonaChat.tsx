@@ -77,14 +77,12 @@ export default function PersonaChat() {
   const { data: chatSession, isLoading: loadingSession, error: sessionError } = useQuery<PersonaChatSession>({
     queryKey: ["/api/persona-chat", params.personaId],
     queryFn: async () => {
-      const res = await apiRequest('/api/persona-chat', {
-        method: 'POST',
-        body: JSON.stringify({
-          personaId: params.personaId,
-          mode: 'realtime_voice'
-        }),
+      const res = await apiRequest('POST', '/api/persona-chat', {
+        personaId: params.personaId,
+        mode: 'text',
+        difficulty: 2
       });
-      return res;
+      return res.json();
     },
     enabled: !!params.personaId,
     staleTime: 0, // 항상 최신 데이터 로드
