@@ -217,7 +217,7 @@ export default function PersonaChat() {
       <ChatWindow
         scenario={dummyScenario}
         persona={personaSnapshot}
-        conversationId={`persona-${params.personaId}`}
+        conversationId={`persona-session-${params.personaId}-${Date.now()}`}
         personaRunId=""
         onChatComplete={handleChatComplete}
         onExit={handleExit}
