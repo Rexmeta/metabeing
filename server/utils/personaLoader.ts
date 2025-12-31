@@ -103,8 +103,8 @@ export async function loadPersonaData(personaRef: string): Promise<PersonaData |
     
     // 캐시에 저장 (정규화된 키 사용)
     personaCache.set(normalizedRef, personaData);
-    
-    console.log(`✅ Persona loaded: ${personaData.personaKey} (${personaData.id})`);
+
+    // 로그 제거: GlobalPersonaCache에서 이미 프리로드 완료 메시지 출력
     return personaData;
     
   } catch (error) {
@@ -147,7 +147,7 @@ export async function enrichPersonaWithData(scenarioPersona: any, personaRef?: s
     images: personaData.images
   };
 
-  console.log(`🔗 Persona enriched: ${scenarioPersona.name} with ${personaData.personaKey} traits`);
+  // 로그 제거: 서버 시작 시 불필요한 로그 방지
   return enrichedPersona;
 }
 

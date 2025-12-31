@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 function formatSNSNumber(num: number): string {
   if (num >= 1000000) {
@@ -81,7 +82,7 @@ interface Persona {
   usageCount?: number;
 }
 
-function ScenarioCard({ scenario, personas = [] }: { scenario: Scenario; personas?: Persona[] }) {
+function ScenarioCard({ scenario, personas = [], isAuthenticated }: { scenario: Scenario; personas?: Persona[]; isAuthenticated: boolean }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
@@ -136,6 +137,7 @@ function ScenarioCard({ scenario, personas = [] }: { scenario: Scenario; persona
       return res.json();
     },
     staleTime: 30000,
+    enabled: isAuthenticated, // 로그인 시에만 API 호출
   });
   
   const reactMutation = useMutation({
@@ -254,7 +256,7 @@ function ScenarioCard({ scenario, personas = [] }: { scenario: Scenario; persona
   );
 }
 
-function PersonaCard({ persona, size = "default" }: { persona: Persona; size?: "default" | "small" }) {
+function PersonaCard({ persona, size = "default", isAuthenticated }: { persona: Persona; size?: "default" | "small"; isAuthenticated: boolean }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
@@ -298,6 +300,7 @@ function PersonaCard({ persona, size = "default" }: { persona: Persona; size?: "
       return res.json();
     },
     staleTime: 30000,
+    enabled: isAuthenticated, // 로그인 시에만 API 호출
   });
   
   const reactMutation = useMutation({
@@ -431,6 +434,7 @@ function LoadingCards({ count = 4, type = "persona" }: { count?: number; type?: 
 export default function Explore() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const { isAuthenticated } = useAuth();
 
   const { data: scenarios = [], isLoading: loadingScenarios } = useQuery<Scenario[]>({
     queryKey: ["/api/scenarios/public"],
@@ -495,7 +499,7 @@ export default function Explore() {
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
                   {recommendedPersonas.map((persona) => (
-                    <PersonaCard key={persona.id} persona={persona} />
+                    <PersonaCard key={persona.id} persona={persona} isAuthenticated={isAuthenticated} />
                   ))}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
@@ -519,7 +523,7 @@ export default function Explore() {
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
                   {scenarios.map((scenario) => (
-                    <ScenarioCard key={scenario.id} scenario={scenario} personas={personas} />
+                    <ScenarioCard key={scenario.id} scenario={scenario} personas={personas} isAuthenticated={isAuthenticated} />
                   ))}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
@@ -537,7 +541,7 @@ export default function Explore() {
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
                   {personas.slice(0, 10).map((persona) => (
-                    <PersonaCard key={persona.id} persona={persona} size="small" />
+                    <PersonaCard key={persona.id} persona={persona} size="small" isAuthenticated={isAuthenticated} />
                   ))}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
@@ -555,7 +559,7 @@ export default function Explore() {
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
                   {popularPersonas.map((persona) => (
-                    <PersonaCard key={persona.id} persona={persona} />
+                    <PersonaCard key={persona.id} persona={persona} isAuthenticated={isAuthenticated} />
                   ))}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
@@ -573,7 +577,7 @@ export default function Explore() {
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
                   {trendingPersonas.map((persona) => (
-                    <PersonaCard key={persona.id} persona={persona} />
+                    <PersonaCard key={persona.id} persona={persona} isAuthenticated={isAuthenticated} />
                   ))}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
