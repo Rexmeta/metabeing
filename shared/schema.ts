@@ -200,6 +200,8 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("idx_chat_messages_persona_run_id").on(table.personaRunId),
+  // ✨ 중복 메시지 방지: 같은 대화방(personaRunId)의 같은 턴(turnIndex)에는 하나의 메시지만 존재
+  uniqueIndex("idx_chat_messages_unique_turn").on(table.personaRunId, table.turnIndex),
 ]);
 
 export type ConversationMessage = {
