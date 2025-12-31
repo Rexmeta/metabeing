@@ -980,30 +980,62 @@ ${personaSnapshot.name}:`;
         // 현재 대화의 메시지 수 조회하여 turnIndex 결정
         const existingMessages = await storage.getChatMessagesByPersonaRun(sessionId) || [];
         const nextTurnIndex = existingMessages.length;
-        
-        // 사용자 메시지 저장
-        await storage.createChatMessage({
-          personaRunId: sessionId,
-          turnIndex: nextTurnIndex,
-          sender: 'user',
-          message: message,
-          emotion: null,
-          emotionReason: null,
-        });
-        
-        // AI 메시지 저장
-        await storage.createChatMessage({
-          personaRunId: sessionId,
-          turnIndex: nextTurnIndex + 1,
-          sender: 'ai',
-          message: aiResponse,
-          emotion: emotion,
-          emotionReason: '',
-        });
-        
+
+        // 🔒 중복 방지: 이미 해당 turnIndex에 메시지가 있는지 확인
+        const existingUserMessage = existingMessages.find(msg => msg.turnIndex === nextTurnIndex);
+        const existingAiMessage = existingMessages.find(msg => msg.turnIndex === nextTurnIndex + 1);
+
+        // 사용자 메시지 저장 (중복이 아닌 경우에만)
+        if (!existingUserMessage) {
+          try {
+            await storage.createChatMessage({
+              personaRunId: sessionId,
+              turnIndex: nextTurnIndex,
+              sender: 'user',
+              message: message,
+              emotion: null,
+              emotionReason: null,
+            });
+            console.log(`✅ 사용자 메시지 저장: turnIndex=${nextTurnIndex}`);
+          } catch (userMsgError: any) {
+            // Unique constraint 위반 시 무시 (이미 저장된 메시지)
+            if (userMsgError?.message?.includes('unique') || userMsgError?.code === '23505') {
+              console.log(`⏭️ 사용자 메시지 이미 존재: turnIndex=${nextTurnIndex}`);
+            } else {
+              throw userMsgError;
+            }
+          }
+        } else {
+          console.log(`⏭️ 사용자 메시지 이미 존재: turnIndex=${nextTurnIndex}`);
+        }
+
+        // AI 메시지 저장 (중복이 아닌 경우에만)
+        if (!existingAiMessage) {
+          try {
+            await storage.createChatMessage({
+              personaRunId: sessionId,
+              turnIndex: nextTurnIndex + 1,
+              sender: 'ai',
+              message: aiResponse,
+              emotion: emotion,
+              emotionReason: '',
+            });
+            console.log(`✅ AI 메시지 저장: turnIndex=${nextTurnIndex + 1}`);
+          } catch (aiMsgError: any) {
+            // Unique constraint 위반 시 무시 (이미 저장된 메시지)
+            if (aiMsgError?.message?.includes('unique') || aiMsgError?.code === '23505') {
+              console.log(`⏭️ AI 메시지 이미 존재: turnIndex=${nextTurnIndex + 1}`);
+            } else {
+              throw aiMsgError;
+            }
+          }
+        } else {
+          console.log(`⏭️ AI 메시지 이미 존재: turnIndex=${nextTurnIndex + 1}`);
+        }
+
         // 메시지 미리보기 생성 (최대 50자)
         const messagePreview = aiResponse.length > 50 ? aiResponse.substring(0, 50) + '...' : aiResponse;
-        
+
         // persona_run 메신저 필드 업데이트
         const userTurnCount = Math.floor((nextTurnIndex + 2) / 2); // 사용자 턴 수 계산
         await storage.updatePersonaRun(sessionId, {
@@ -1012,7 +1044,7 @@ ${personaSnapshot.name}:`;
           lastMessage: messagePreview,
           unreadCount: 1, // AI 메시지가 왔으니 읽지 않음 표시
         });
-        
+
         console.log(`✅ 메시지 저장 완료: sessionId=${sessionId}, turnIndex=${nextTurnIndex}, ${nextTurnIndex + 1}`);
       } catch (saveError) {
         console.error('메시지 저장 오류 (대화는 계속 진행):', saveError);
@@ -1420,37 +1452,53 @@ ${personaSnapshot.name}:`;
       // ✨ 새로운 구조: 각 메시지를 chat_messages에 저장 (중복 방지)
       const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId);
 
-      // 🔒 이미 메시지가 저장되어 있으면 중복 저장 방지
+      // 🔒 개선된 중복 방지: 각 메시지를 개별적으로 확인
+      let messagesSaved = 0;
+      let messagesSkipped = 0;
+
+      // 기존 메시지를 turnIndex 기반 Map으로 변환
+      const existingMessageMap = new Map<number, boolean>();
       if (existingMessages && existingMessages.length > 0) {
-        console.log(`⏭️ Skipping duplicate save: ${existingMessages.length} messages already exist for personaRunId ${personaRunId}`);
-
-        // 이미 저장된 메시지가 있으므로 성공 응답만 반환
-        const userMessageCount = existingMessages.filter(msg => msg.sender === 'user').length;
-
-        return res.json({
-          conversation: {
-            id: personaRunId,
-            status: 'completed'
-          },
-          messagesSaved: 0,
-          messagesSkipped: existingMessages.length,
-          turnCount: userMessageCount,
-          note: 'Messages already saved during realtime conversation'
+        existingMessages.forEach(msg => {
+          if (msg.turnIndex !== null && msg.turnIndex !== undefined) {
+            existingMessageMap.set(msg.turnIndex, true);
+          }
         });
       }
 
-      // 메시지가 없으면 저장 진행
+      // 메시지 저장 (중복되지 않은 것만)
       let turnIndex = 0;
       for (const msg of messages) {
-        await storage.createChatMessage({
-          personaRunId,
-          sender: msg.sender,
-          message: msg.message,
-          turnIndex,
-          emotion: msg.emotion || null,
-          emotionReason: msg.emotionReason || null,
-          createdAt: msg.timestamp ? new Date(msg.timestamp) : undefined
-        });
+        // 이미 해당 turnIndex에 메시지가 있는지 확인
+        if (existingMessageMap.has(turnIndex)) {
+          console.log(`⏭️ Skipping duplicate message at turnIndex ${turnIndex}`);
+          messagesSkipped++;
+          turnIndex++;
+          continue;
+        }
+
+        try {
+          await storage.createChatMessage({
+            personaRunId,
+            sender: msg.sender,
+            message: msg.message,
+            turnIndex,
+            emotion: msg.emotion || null,
+            emotionReason: msg.emotionReason || null,
+            createdAt: msg.timestamp ? new Date(msg.timestamp) : undefined
+          });
+          messagesSaved++;
+          console.log(`✅ Saved message at turnIndex ${turnIndex}, sender: ${msg.sender}`);
+        } catch (msgError: any) {
+          // Unique constraint 위반 시 무시 (이미 저장된 메시지)
+          if (msgError?.message?.includes('unique') || msgError?.code === '23505') {
+            console.log(`⏭️ Message already exists at turnIndex ${turnIndex} (caught by unique constraint)`);
+            messagesSkipped++;
+          } else {
+            throw msgError;
+          }
+        }
+
         turnIndex++;
       }
 
@@ -1466,7 +1514,7 @@ ${personaSnapshot.name}:`;
       // ✨ 모든 페르소나가 완료되었는지 확인하고 시나리오 자동 완료
       await checkAndCompleteScenario(personaRun.scenarioRunId);
 
-      console.log(`✅ Saved ${messages.length} realtime messages to chat_messages (${userMessageCount} user turns), persona_run status: completed`);
+      console.log(`✅ Saved ${messagesSaved} realtime messages to chat_messages (${messagesSkipped} skipped, ${userMessageCount} user turns), persona_run status: completed`);
 
       // 레거시 호환성을 위한 응답
       res.json({
@@ -1474,8 +1522,10 @@ ${personaSnapshot.name}:`;
           id: personaRunId,
           status: 'completed'
         },
-        messagesSaved: messages.length,
+        messagesSaved,
+        messagesSkipped,
         turnCount: userMessageCount,
+        note: messagesSkipped > 0 ? 'Some messages were already saved and skipped' : 'All messages saved successfully'
       });
     } catch (error) {
       console.error("Realtime messages save error:", error);
