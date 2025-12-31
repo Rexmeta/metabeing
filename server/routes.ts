@@ -4110,6 +4110,26 @@ ${personaSnapshot.name}:`;
     }
   });
 
+  // 특정 페르소나 조회 (공개 페르소나만) - 와일드카드이므로 가장 마지막에 배치
+  app.get("/api/personas/:id", async (req, res) => {
+    try {
+      const persona = await fileManager.getMBTIPersonaById(req.params.id);
+      if (!persona) {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+
+      // 공개 페르소나만 반환 (private이 아닌 것만)
+      if (persona.visibility === "private") {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+
+      res.json(persona);
+    } catch (error) {
+      console.error("Error getting persona:", error);
+      res.status(500).json({ error: "Failed to get persona" });
+    }
+  });
+
   // 페르소나 관리 API (인증 필요, 역할별 필터링)
   app.get("/api/admin/personas", isAuthenticated, async (req: any, res) => {
     try {
