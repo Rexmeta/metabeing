@@ -256,6 +256,7 @@ export default function ConversationView() {
         initialChatMode="messenger"
         isPersonaChat={isPersonaDirectChat}
         initialMessages={initialMessages}
+        personaId={personaRun.personaId}
       />
     </div>
   );
