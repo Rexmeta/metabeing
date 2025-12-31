@@ -73,6 +73,21 @@ export default function PersonaChat() {
     staleTime: 60000,
   });
 
+  // 페르소나 대화 세션 시작/재개
+  const { data: chatSession, isLoading: loadingSession, error: sessionError } = useQuery<PersonaChatSession>({
+    queryKey: ["/api/personas", params.personaId, "start-direct-chat"],
+    queryFn: async () => {
+      const res = await apiRequest(`/api/personas/${params.personaId}/start-direct-chat`, {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'realtime_voice' }),
+      });
+      return res;
+    },
+    enabled: !!params.personaId,
+    staleTime: 0, // 항상 최신 데이터 로드
+    refetchOnMount: true,
+  });
+
   const getProfileImage = useCallback((p: Persona | undefined) => {
     if (!p) return null;
     const gender = p.gender || 'female';
@@ -160,10 +175,10 @@ export default function PersonaChat() {
   });
 
   useEffect(() => {
-    if (persona) {
+    if (persona && chatSession) {
       setTimeout(() => setShowChat(true), 100);
     }
-  }, [persona]);
+  }, [persona, chatSession]);
 
   const handleChatComplete = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
@@ -181,7 +196,7 @@ export default function PersonaChat() {
   const profileImage = getProfileImage(persona);
   const personaKeyDisplay = persona?.personaKey || persona?.mbtiType || persona?.mbti || params.personaId?.toUpperCase();
 
-  if (loadingPersona) {
+  if (loadingPersona || loadingSession) {
     return (
       <PersonaLoadingState
         profileImage={profileImage}
@@ -192,14 +207,16 @@ export default function PersonaChat() {
     );
   }
 
-  if (personaError || !persona) {
+  if (personaError || !persona || sessionError || !chatSession) {
     return (
       <div className="h-full flex items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4">
         <div className="text-center space-y-3 sm:space-y-4 p-4 sm:p-6 max-w-md w-full">
           <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
             <User className="w-6 h-6 sm:w-8 sm:h-8 text-destructive" />
           </div>
-          <p className="text-destructive font-medium text-sm sm:text-base">페르소나를 찾을 수 없습니다</p>
+          <p className="text-destructive font-medium text-sm sm:text-base">
+            {personaError ? "페르소나를 찾을 수 없습니다" : "대화 세션을 시작할 수 없습니다"}
+          </p>
           <Button onClick={() => setLocation("/explore")} variant="outline" data-testid="button-back-explore" className="text-sm sm:text-base">
             <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
             탐색으로 돌아가기
@@ -217,13 +234,13 @@ export default function PersonaChat() {
       <ChatWindow
         scenario={dummyScenario}
         persona={personaSnapshot}
-        conversationId={`persona-session-${params.personaId}-${Date.now()}`}
-        personaRunId=""
+        conversationId={chatSession.personaRunId}
+        personaRunId={chatSession.personaRunId}
         onChatComplete={handleChatComplete}
         onExit={handleExit}
         initialChatMode="messenger"
         isPersonaChat={true}
-        initialMessages={[]}
+        initialMessages={chatSession.messages || []}
         personaId={params.personaId}
       />
     </div>
