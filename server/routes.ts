@@ -3,14 +3,15 @@ import { createServer, type Server } from "http";
 import WebSocket, { WebSocketServer } from "ws";
 import { storage } from "./storage";
 // Replit Auth 제거됨
-import { 
-  insertConversationSchema, 
+import {
+  insertConversationSchema,
   insertFeedbackSchema,
   insertPersonaSelectionSchema,
   insertStrategyChoiceSchema,
   insertSequenceAnalysisSchema,
   likes,
-  personaRuns
+  personaRuns,
+  scenarioRuns
 } from "@shared/schema";
 import { db } from "./storage";
 import { eq, and, sql } from "drizzle-orm";
@@ -4372,6 +4373,124 @@ ${personaSnapshot.name}:`;
     } catch (error) {
       console.error("Error fetching persona stats:", error);
       res.status(500).json({ error: "Failed to fetch persona stats" });
+    }
+  });
+
+  // 페르소나 분석 정보 조회 (관리자용 상세 통계)
+  app.get("/api/personas/:id/analytics", isAuthenticated, async (req: any, res) => {
+    try {
+      const personaId = req.params.id;
+
+      // 페르소나 정보 조회
+      const persona = await fileManager.getMBTIPersonaById(personaId);
+      if (!persona) {
+        return res.status(404).json({ error: "Persona not found" });
+      }
+
+      // 제작자 정보 조회
+      let creatorName = "Unknown";
+      if (persona.ownerId) {
+        const creator = await storage.getUser(persona.ownerId);
+        if (creator) {
+          creatorName = creator.name || creator.email?.split('@')[0] || "Unknown";
+        }
+      }
+
+      // personaRuns 조회
+      const allPersonaRuns = await db
+        .select()
+        .from(personaRuns)
+        .where(eq(personaRuns.personaId, personaId));
+
+      // 고유 사용자 수 계산 (scenarioRuns를 통해)
+      const scenarioRunIds = allPersonaRuns.map(pr => pr.scenarioRunId);
+      let uniqueUserIds = new Set<string>();
+
+      if (scenarioRunIds.length > 0) {
+        const uniqueScenarioRuns = await db
+          .select({ userId: scenarioRuns.userId })
+          .from(scenarioRuns)
+          .where(sql`${scenarioRuns.id} IN (${sql.join(scenarioRunIds.map(id => sql`${id}`), sql`, `)})`);
+
+        uniqueUserIds = new Set(uniqueScenarioRuns.map(sr => sr.userId));
+      }
+
+      // 통계 계산
+      const totalConversations = allPersonaRuns.length;
+      const completedConversations = allPersonaRuns.filter(pr => pr.status === 'completed').length;
+      const totalTurns = allPersonaRuns.reduce((sum, pr) => sum + (pr.turnCount || 0), 0);
+      const avgTurnsPerConversation = totalConversations > 0 ? totalTurns / totalConversations : 0;
+
+      // 평균 점수 계산
+      const scoredRuns = allPersonaRuns.filter(pr => pr.score !== null && pr.score !== undefined);
+      const avgScore = scoredRuns.length > 0
+        ? scoredRuns.reduce((sum, pr) => sum + (pr.score || 0), 0) / scoredRuns.length
+        : null;
+
+      // 최근 활동 (최근 5개)
+      const recentActivity = allPersonaRuns
+        .sort((a, b) => {
+          const timeA = a.lastActivityAt || a.startedAt;
+          const timeB = b.lastActivityAt || b.startedAt;
+          return new Date(timeB).getTime() - new Date(timeA).getTime();
+        })
+        .slice(0, 5)
+        .map(pr => ({
+          id: pr.id,
+          turnCount: pr.turnCount,
+          score: pr.score,
+          status: pr.status,
+          startedAt: pr.startedAt,
+          lastActivityAt: pr.lastActivityAt,
+        }));
+
+      // 좋아요/싫어요 수 조회
+      const likesResult = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(likes)
+        .where(and(
+          eq(likes.targetType, 'character'),
+          eq(likes.targetId, personaId),
+          eq(likes.type, 'like')
+        ));
+
+      const dislikesResult = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(likes)
+        .where(and(
+          eq(likes.targetType, 'character'),
+          eq(likes.targetId, personaId),
+          eq(likes.type, 'dislike')
+        ));
+
+      res.json({
+        personaId,
+        persona: {
+          id: persona.id,
+          name: persona.displayName || persona.name,
+          mbti: persona.mbti || persona.mbtiType,
+          description: persona.description,
+        },
+        creatorId: persona.ownerId || null,
+        creatorName,
+        statistics: {
+          uniqueUsersCount: uniqueUserIds.size,
+          totalConversations,
+          completedConversations,
+          completionRate: totalConversations > 0
+            ? (completedConversations / totalConversations * 100).toFixed(1)
+            : '0.0',
+          totalTurns,
+          avgTurnsPerConversation: avgTurnsPerConversation.toFixed(1),
+          avgScore: avgScore !== null ? avgScore.toFixed(1) : null,
+          likesCount: Number(likesResult[0]?.count || 0),
+          dislikesCount: Number(dislikesResult[0]?.count || 0),
+        },
+        recentActivity,
+      });
+    } catch (error) {
+      console.error("Error fetching persona analytics:", error);
+      res.status(500).json({ error: "Failed to fetch persona analytics" });
     }
   });
 
