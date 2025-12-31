@@ -97,9 +97,10 @@ interface ChatWindowProps {
   onConversationEnding?: () => void;
   isPersonaChat?: boolean;
   initialMessages?: ConversationMessage[];
+  personaId?: string; // 페르소나 직접 대화용 personaId
 }
 
-export default function ChatWindow({ scenario, persona, conversationId, personaRunId, onChatComplete, onExit, onPersonaChange, onReady, onConversationEnding, initialChatMode = 'character', isPersonaChat = false, initialMessages = [] }: ChatWindowProps) {
+export default function ChatWindow({ scenario, persona, conversationId, personaRunId, onChatComplete, onExit, onPersonaChange, onReady, onConversationEnding, initialChatMode = 'character', isPersonaChat = false, initialMessages = [], personaId }: ChatWindowProps) {
   // personaRunId가 없으면 conversationId를 사용 (대부분의 경우 conversationId가 personaRunId임)
   const effectivePersonaRunId = personaRunId || conversationId;
   const [location, setLocation] = useLocation();
@@ -113,6 +114,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   const [conversationStartTime, setConversationStartTime] = useState<Date | null>(null);
   const [localMessages, setLocalMessages] = useState<ConversationMessage[]>(initialMessages);
   const [chatMode, setChatMode] = useState<'messenger' | 'character'>(initialChatMode);
+  const [actualConversationId, setActualConversationId] = useState<string>(conversationId);
 
   // initialMessages가 변경되면 localMessages 업데이트 (쿼리 로딩 완료 후)
   // 마운트 시점에 초기 메시지 로드 여부 추적
@@ -475,8 +477,23 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   const sendMessageMutation = useMutation({
     mutationFn: async (message: string) => {
       // 페르소나 직접 대화인 경우 별도 API 사용
-      if (isPersonaChat) {
-        const response = await apiRequest("POST", `/api/persona-chat/${conversationId}/message`, {
+      if (isPersonaChat && personaId) {
+        // 첫 메시지인 경우 세션 생성
+        let sessionId = actualConversationId;
+        if (actualConversationId.startsWith('persona-')) {
+          console.log(`🆕 새 페르소나 채팅 세션 생성: personaId=${personaId}`);
+          const sessionResponse = await apiRequest("POST", "/api/persona-chat", {
+            personaId,
+            mode: "text",
+            difficulty: 2
+          });
+          const session = await sessionResponse.json();
+          sessionId = session.id;
+          setActualConversationId(sessionId);
+          console.log(`✅ 세션 생성 완료: ${sessionId}`);
+        }
+
+        const response = await apiRequest("POST", `/api/persona-chat/${sessionId}/message`, {
           message,
           personaSnapshot: persona,
           messages: localMessages,
@@ -484,7 +501,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
         });
         return response.json();
       }
-      
+
       // 기존 시나리오+페르소나 대화
       const response = await apiRequest("POST", `/api/conversations/${conversationId}/messages`, {
         message
