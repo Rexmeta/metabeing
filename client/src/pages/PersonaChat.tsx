@@ -75,11 +75,14 @@ export default function PersonaChat() {
 
   // 페르소나 대화 세션 시작/재개
   const { data: chatSession, isLoading: loadingSession, error: sessionError } = useQuery<PersonaChatSession>({
-    queryKey: ["/api/personas", params.personaId, "start-direct-chat"],
+    queryKey: ["/api/persona-chat", params.personaId],
     queryFn: async () => {
-      const res = await apiRequest(`/api/personas/${params.personaId}/start-direct-chat`, {
+      const res = await apiRequest('/api/persona-chat', {
         method: 'POST',
-        body: JSON.stringify({ mode: 'realtime_voice' }),
+        body: JSON.stringify({
+          personaId: params.personaId,
+          mode: 'realtime_voice'
+        }),
       });
       return res;
     },
