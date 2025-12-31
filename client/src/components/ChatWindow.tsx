@@ -162,11 +162,21 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
         wasLoaded: initialMessagesLoadedRef.current,
         messages: initialMessages
       });
-      setLocalMessages(initialMessages);
-      initialMessagesLoadedRef.current = true;
-      loadedMessagesCountRef.current = initialMessages.length;
+
+      // 기존 localMessages보다 initialMessages가 더 많은 경우에만 업데이트
+      // (서버에서 새 메시지를 로드한 경우)
+      // 또는 아직 로드하지 않은 경우에만 업데이트
+      if (!initialMessagesLoadedRef.current || initialMessages.length > localMessages.length) {
+        setLocalMessages(initialMessages);
+        initialMessagesLoadedRef.current = true;
+        loadedMessagesCountRef.current = initialMessages.length;
+      } else {
+        // initialMessages 개수가 같거나 적으면 로드 상태만 업데이트
+        console.log('⏭️ Skipping initial messages load - local messages already up to date');
+        loadedMessagesCountRef.current = initialMessages.length;
+      }
     }
-  }, [initialMessages]);
+  }, [initialMessages, localMessages.length]);
   const [isWideScreen, setIsWideScreen] = useState(false);
   const [showInputMode, setShowInputMode] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -499,7 +509,9 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
           messages: localMessages,
           difficulty: scenario.difficulty || 2
         });
-        return response.json();
+        const result = await response.json();
+        // 세션 ID를 응답에 포함하여 반환 (상태 업데이트 타이밍 이슈 방지)
+        return { ...result, sessionId };
       }
 
       // 기존 시나리오+페르소나 대화
@@ -511,6 +523,12 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
     onSuccess: (data) => {
       // 페르소나 직접 대화인 경우 다른 응답 구조 처리
       if (isPersonaChat && data.response) {
+        // sessionId가 응답에 포함되어 있으면 actualConversationId 업데이트
+        if (data.sessionId && actualConversationId !== data.sessionId) {
+          console.log(`🔄 세션 ID 업데이트: ${actualConversationId} -> ${data.sessionId}`);
+          setActualConversationId(data.sessionId);
+        }
+
         const aiMessage: ConversationMessage = {
           sender: 'ai',
           message: data.response,
@@ -520,7 +538,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
         };
         // localMessages에는 이미 사용자 메시지가 추가되어 있으므로 AI 메시지만 추가
         setLocalMessages(prev => [...prev, aiMessage]);
-        
+
         // 감정에 따라 캐릭터 이미지 업데이트
         if (data.emotion) {
           setCurrentEmotion(data.emotion);

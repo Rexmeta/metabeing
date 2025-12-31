@@ -85,8 +85,8 @@ export default function PersonaChat() {
       return res.json();
     },
     enabled: !!params.personaId,
-    staleTime: 0, // 항상 최신 데이터 로드
-    refetchOnMount: true,
+    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지 (불필요한 재로딩 방지)
+    refetchOnMount: false, // 마운트 시 자동 재로딩 비활성화
   });
 
   const getProfileImage = useCallback((p: Persona | undefined) => {
