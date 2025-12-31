@@ -229,14 +229,14 @@ export default function PersonaChat() {
 
   if (personaError || !persona) {
     return (
-      <div className="h-full flex items-center justify-center bg-gradient-to-b from-background to-muted/30">
-        <div className="text-center space-y-4 p-6">
-          <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
-            <User className="w-8 h-8 text-destructive" />
+      <div className="h-full flex items-center justify-center bg-gradient-to-b from-background to-muted/30 px-4">
+        <div className="text-center space-y-3 sm:space-y-4 p-4 sm:p-6 max-w-md w-full">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+            <User className="w-6 h-6 sm:w-8 sm:h-8 text-destructive" />
           </div>
-          <p className="text-destructive font-medium">페르소나를 찾을 수 없습니다</p>
-          <Button onClick={() => setLocation("/explore")} variant="outline" data-testid="button-back-explore">
-            <ArrowLeft className="h-4 w-4 mr-2" />
+          <p className="text-destructive font-medium text-sm sm:text-base">페르소나를 찾을 수 없습니다</p>
+          <Button onClick={() => setLocation("/explore")} variant="outline" data-testid="button-back-explore" className="text-sm sm:text-base">
+            <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
             탐색으로 돌아가기
           </Button>
         </div>
