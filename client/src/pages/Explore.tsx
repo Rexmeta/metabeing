@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 
 function formatSNSNumber(num: number): string {
   if (num >= 1000000) {
@@ -256,11 +257,12 @@ function ScenarioCard({ scenario, personas = [] }: { scenario: Scenario; persona
 function PersonaCard({ persona, size = "default" }: { persona: Persona; size?: "default" | "small" }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  
+  const { toast } = useToast();
+
   const getProfileImage = () => {
     const gender = persona.gender || 'female';
     const genderKey = gender.toLowerCase() === 'male' ? 'male' : 'female';
-    
+
     if (persona.images?.[genderKey]?.expressions?.base) {
       return persona.images[genderKey].expressions.base;
     }
@@ -272,7 +274,7 @@ function PersonaCard({ persona, size = "default" }: { persona: Persona; size?: "
     }
     return null;
   };
-  
+
   const profileImage = getProfileImage();
   const mbti = persona.mbtiType || persona.mbti || persona.id?.toUpperCase();
 
@@ -314,12 +316,53 @@ function PersonaCard({ persona, size = "default" }: { persona: Persona; size?: "
     reactMutation.mutate(type);
   };
 
+  const handlePersonaClick = async () => {
+    try {
+      console.log(`🔍 페르소나 클릭: ${persona.id}, 기존 대화 확인 중...`);
+
+      // 기존 대화가 있는지 확인하기 위해 API 호출
+      const response = await fetch("/api/persona-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          personaId: persona.id,
+          mode: "text",
+          difficulty: 2
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to check existing chat");
+      }
+
+      const session = await response.json();
+
+      // 기존 대화가 있는 경우 (isResumed: true)
+      if (session.isResumed && session.messages && session.messages.length > 0) {
+        console.log(`♻️ 기존 대화 발견, ConversationView로 이동: /chat/${session.id}`);
+        setLocation(`/chat/${session.id}`);
+      } else {
+        // 새 대화인 경우
+        console.log(`🆕 새 대화 시작: /persona/${persona.id}/chat`);
+        setLocation(`/persona/${persona.id}/chat`);
+      }
+    } catch (error) {
+      console.error("페르소나 대화 확인 실패:", error);
+      toast({
+        title: "오류",
+        description: "대화를 시작할 수 없습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const cardSize = size === "small" ? "w-[140px] sm:w-[160px]" : "w-[160px] sm:w-[180px]";
 
   return (
-    <div 
+    <div
       className={`relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer group flex-shrink-0 ${cardSize}`}
-      onClick={() => setLocation(`/persona/${persona.id}/chat`)}
+      onClick={handlePersonaClick}
       data-testid={`card-persona-${persona.id}`}
     >
       {profileImage ? (
