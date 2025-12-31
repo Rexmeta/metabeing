@@ -18,7 +18,7 @@ export default function AdminManagement() {
   const [location, setLocation] = useLocation();
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const tabFromUrl = urlParams.get('tab');
-  const [activeTab, setActiveTab] = useState(tabFromUrl || "manage-scenarios");
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "manage-personas");
   const { toast } = useToast();
 
   const [deleteDialog, setDeleteDialog] = useState<{ type: string; id: string; name: string } | null>(null);

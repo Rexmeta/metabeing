@@ -65,9 +65,9 @@ export default function PersonaChat() {
   const [showChat, setShowChat] = useState(false);
 
   const { data: persona, isLoading: loadingPersona, error: personaError } = useQuery<Persona>({
-    queryKey: ["/api/admin/personas", params.personaId],
+    queryKey: ["/api/personas", params.personaId],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/personas/${params.personaId}`);
+      const res = await fetch(`/api/personas/${params.personaId}`);
       if (!res.ok) throw new Error("Failed to fetch persona");
       return res.json();
     },
