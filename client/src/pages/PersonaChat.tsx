@@ -181,8 +181,17 @@ export default function PersonaChat() {
           messagesCount: session.messages?.length || 0,
           messages: session.messages
         });
-        setChatSession(session);
 
+        // 기존 대화가 있는 경우 ConversationView로 리다이렉트
+        if (session.isResumed && session.messages && session.messages.length > 0) {
+          console.log(`♻️ 기존 대화 발견, ConversationView로 이동: /chat/${session.id}`);
+          setLocation(`/chat/${session.id}`);
+          return;
+        }
+
+        // 새 대화인 경우 계속 진행
+        console.log(`🆕 새 대화 시작`);
+        setChatSession(session);
         setTimeout(() => setShowChat(true), 100);
       } catch (error) {
         console.error("페르소나 대화 생성 실패:", error);
@@ -198,7 +207,7 @@ export default function PersonaChat() {
     };
 
     startPersonaChat();
-  }, [persona, chatSession, isCreating, params.personaId]);
+  }, [persona, chatSession, isCreating, params.personaId, setLocation]);
 
   const handleChatComplete = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
