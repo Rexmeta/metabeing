@@ -29,7 +29,7 @@ interface UseRealtimeVoiceReturn {
   disconnect: () => void;
   startRecording: () => void;
   stopRecording: () => void;
-  sendTextMessage: (text: string) => void;
+  sendTextMessage: (text: string, responseMode?: 'text' | 'voice') => void;
   error: string | null;
 }
 
@@ -993,20 +993,20 @@ export function useRealtimeVoice({
     }, 100); // 100ms delay
   }, []);
 
-  const sendTextMessage = useCallback((text: string) => {
+  const sendTextMessage = useCallback((text: string, responseMode: 'text' | 'voice' = 'text') => {
     if (!text.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.log('⚠️ Cannot send text message: invalid state');
       return;
     }
 
-    console.log('📤 Sending text message:', text);
+    console.log(`📤 Sending text message (responseMode: ${responseMode}):`, text);
 
     // Add user transcription to local display
     if (onUserTranscriptionRef.current) {
       onUserTranscriptionRef.current(text);
     }
 
-    // Send text as conversation item to Gemini
+    // Send text as conversation item to Gemini with responseMode
     wsRef.current.send(JSON.stringify({
       type: 'conversation.item.create',
       item: {
@@ -1018,15 +1018,17 @@ export function useRealtimeVoice({
             text: text,
           }
         ]
-      }
+      },
+      responseMode: responseMode, // 'text' = 텍스트 응답만, 'voice' = 음성 응답도 포함
     }));
 
-    // Request AI response
+    // Request AI response with appropriate modalities
     wsRef.current.send(JSON.stringify({
       type: 'response.create',
       response: {
-        modalities: ['audio', 'text'],
+        modalities: responseMode === 'voice' ? ['audio', 'text'] : ['text'],
       },
+      responseMode: responseMode,
     }));
 
     console.log('✅ Text message sent and response requested');

@@ -92,6 +92,7 @@ interface RealtimeSession {
   messageIndex: number; // Atomic message counter for turnIndex (prevents race conditions)
   saveQueue: Promise<void>; // Serialization queue for message saves (prevents concurrent index collisions)
   savedMessageIds: Set<string>; // Idempotent guard: track saved messageIds to prevent duplicates
+  currentResponseMode: 'text' | 'voice'; // 현재 응답 모드: text=텍스트만, voice=음성포함
 }
 
 export class RealtimeVoiceService {
@@ -401,6 +402,7 @@ export class RealtimeVoiceService {
       messageIndex: initialMessageIndex, // Atomic message counter - initialized from DB
       saveQueue: Promise.resolve(), // Serialization queue starts resolved
       savedMessageIds: new Set<string>(), // Idempotent guard for duplicate message saves
+      currentResponseMode: 'voice', // 기본값: 음성 응답 (첫 인사는 음성으로)
     };
 
     this.sessions.set(sessionId, session);
@@ -947,6 +949,11 @@ export class RealtimeVoiceService {
               console.log(`🔇 Suppressing inline audio (thinking text detected)`);
               continue;
             }
+            // Skip audio if response mode is text-only
+            if (session.currentResponseMode === 'text') {
+              console.log(`🔇 Suppressing inline audio (text-only response mode)`);
+              continue;
+            }
             const audioData = part.inlineData.data;
             const mimeType = part.inlineData.mimeType || 'audio/pcm';
             console.log(`🔊 Audio data received (inlineData), mimeType: ${mimeType}, length: ${audioData?.length || 0}`);
@@ -1050,7 +1057,9 @@ export class RealtimeVoiceService {
       case 'input_audio_buffer.commit':
         // User stopped recording - send END_OF_TURN event to Gemini
         // Note: transcript will be sent automatically when Gemini detects turn completion via VAD
-        console.log('📤 User stopped recording, sending END_OF_TURN event');
+        // 음성 입력이므로 응답 모드를 voice로 설정
+        session.currentResponseMode = 'voice';
+        console.log('📤 User stopped recording, setting response mode to voice, sending END_OF_TURN event');
         session.geminiSession.sendRealtimeInput({
           event: 'END_OF_TURN'
         });
@@ -1058,6 +1067,11 @@ export class RealtimeVoiceService {
 
       case 'response.create':
         // Client explicitly requesting a response - send END_OF_TURN to trigger Gemini
+        // Update response mode if provided
+        if (message.responseMode) {
+          session.currentResponseMode = message.responseMode;
+          console.log(`🔄 Response mode updated: ${session.currentResponseMode}`);
+        }
         console.log('🔄 Explicit response request, sending END_OF_TURN event');
         session.geminiSession.sendRealtimeInput({
           event: 'END_OF_TURN'
@@ -1069,6 +1083,12 @@ export class RealtimeVoiceService {
         if (message.item && message.item.content) {
           const text = message.item.content[0]?.text || '';
           console.log(`📝 Text message received: "${text.substring(0, 50)}..."`);
+          
+          // Update response mode if provided (text input → text response, voice input → voice response)
+          if (message.responseMode) {
+            session.currentResponseMode = message.responseMode;
+            console.log(`📝 Response mode set: ${session.currentResponseMode}`);
+          }
           
           // Gemini에게 전달
           session.geminiSession.sendClientContent({
