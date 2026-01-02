@@ -1068,10 +1068,40 @@ export class RealtimeVoiceService {
         // Client sending a text message
         if (message.item && message.item.content) {
           const text = message.item.content[0]?.text || '';
+          console.log(`📝 Text message received: "${text.substring(0, 50)}..."`);
+          
+          // Gemini에게 전달
           session.geminiSession.sendClientContent({
             turns: [{ role: 'user', parts: [{ text }] }],
             turnComplete: true,
           });
+          
+          // DB에 사용자 텍스트 메시지 저장
+          if (text.trim()) {
+            session.totalUserTranscriptLength += text.length;
+            
+            this.queueMessageSave(
+              session.conversationId,
+              'user',
+              text.trim(),
+              null,
+              null,
+              3
+            ).then(() => {
+              console.log(`💾 Text message saved: "${text.substring(0, 30)}..."`);
+              this.sendToClient(session, {
+                type: 'user.message.saved',
+                text: text.trim(),
+              });
+            }).catch(err => {
+              console.error('❌ Failed to save text message:', err);
+              this.sendToClient(session, {
+                type: 'user.message.failed',
+                text: text.trim(),
+                error: 'Failed to save message',
+              });
+            });
+          }
         }
         break;
 
