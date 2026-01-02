@@ -2208,28 +2208,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                 )}
               </div>
 
-              {/* Top Center - 최근 5개 대화 내역 (캐릭터 모드) */}
-              {localMessages.length > 0 && (
-                <div className="absolute top-20 xl:top-4 left-1/2 transform -translate-x-1/2 z-20 w-full max-w-2xl px-4">
-                  <div className="bg-black/40 backdrop-blur-md rounded-xl shadow-lg max-h-60 overflow-y-auto p-3 space-y-2">
-                    {localMessages.slice(-5).map((msg) => (
-                      <div
-                        key={`${msg.timestamp}-${msg.sender}-${msg.message?.substring(0, 20)}`}
-                        className={`text-sm p-2 rounded-lg ${
-                          msg.sender === 'user'
-                            ? 'bg-blue-500/80 text-white ml-8'
-                            : 'bg-white/90 text-slate-900 mr-8'
-                        }`}
-                      >
-                        <span className="font-semibold text-xs opacity-80">
-                          {msg.sender === 'user' ? '나' : persona.name}:
-                        </span>{' '}
-                        <span className="text-sm">{msg.message}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* 최근 대화 내역은 하단 입력창 위로 이동됨 */}
 
               {/* Top Right - Control Buttons */}
               <div className="absolute top-4 right-4 z-20 flex items-center">
@@ -2258,6 +2237,25 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
               {/* Bottom Interactive Box - AI Message Focused */}
               <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 w-full max-w-4xl lg:max-w-6xl xl:max-w-[90%] px-4 bg-[#00000000]">
                 <Card className="rounded-2xl overflow-hidden text-card-foreground backdrop-blur-sm shadow-xl border border-white/10 bg-[#ffffff9c]">
+                  
+                  {/* 최근 대화 내역 - 입력창 바로 위 */}
+                  {localMessages.length > 0 && (
+                    <div className="max-h-40 overflow-y-auto p-3 space-y-1 bg-transparent">
+                      {localMessages.slice(-5).map((msg) => (
+                        <div
+                          key={`${msg.timestamp}-${msg.sender}-${msg.message?.substring(0, 20)}`}
+                          className="text-sm"
+                        >
+                          <span className={`font-semibold ${msg.sender === 'user' ? 'text-blue-600' : 'text-purple-600'}`}>
+                            {msg.sender === 'user' ? '나' : persona.name}:
+                          </span>{' '}
+                          <span className={msg.sender === 'user' ? 'text-blue-800' : 'text-slate-700'}>
+                            {msg.message}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   
                   {/* 실시간 음성 모드 */}
                   {inputMode === 'realtime-voice' ? (
@@ -2430,56 +2428,29 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                     </>
                   ) : (
                     <>
-                      {/* AI Message Section - Full Width */}
-                      <div className="p-4 bg-[#ffffff9c]">
-                    {isLoading ? (
-                      <div className="flex items-center justify-center space-x-2" data-testid="status-typing">
-                        <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce"></div>
-                        <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                        <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-                        <span className="ml-2 text-slate-600">대화 생성 중...</span>
-                      </div>
-                    ) : latestAiMessage ? (
-                      <div className="space-y-3">
-                        <p className="text-slate-800 leading-relaxed text-base" data-testid="text-ai-line">
-                          {latestAiMessage.message}
-                        </p>
-                        
-                        {/* Inline Chat Button - Minimal Space */}
-                        {!showInputMode && (
-                          <div className="flex justify-end pt-2">
+                      {/* 상태 표시 영역 */}
+                      <div className="p-2 bg-transparent">
+                        {isLoading ? (
+                          <div className="flex items-center justify-center space-x-2" data-testid="status-typing">
+                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                            <span className="ml-2 text-sm text-slate-600">응답 중...</span>
+                          </div>
+                        ) : !showInputMode && localMessages.length === 0 ? (
+                          <div className="text-center py-2">
                             <Button
                               onClick={() => setShowInputMode(true)}
                               className="bg-purple-600 hover:bg-purple-700 text-white"
-                              data-testid="button-start-chat-inline"
+                              data-testid="button-start-chat-first"
                               size="sm"
                             >
-                              <i className="fas fa-comment mr-1"></i>
+                              <i className="fas fa-comment mr-2"></i>
                               대화하기
                             </Button>
                           </div>
-                        )}
+                        ) : null}
                       </div>
-                    ) : (
-                      <div className="text-center text-slate-600 py-4">
-                        <i className="fas fa-comment-dots text-2xl text-purple-400 mb-2"></i>
-                        <p>대화를 시작해보세요</p>
-                        
-                        {/* First Chat Button */}
-                        <div className="mt-4">
-                          <Button
-                            onClick={() => setShowInputMode(true)}
-                            className="bg-purple-600 hover:bg-purple-700 text-white"
-                            data-testid="button-start-chat-first"
-                            size="sm"
-                          >
-                            <i className="fas fa-comment mr-2"></i>
-                            대화하기
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
                   
                   {/* Input Section - Only When Active */}
