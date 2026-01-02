@@ -137,7 +137,7 @@ export default function PersonaChat() {
 
   const createPersonaSnapshotForChat = (p: Persona): ScenarioPersona => ({
     id: p.id,
-    name: p.name,
+    name: p.name || "AI 페르소나",
     personaKey: p.personaKey || p.mbtiType || p.mbti || "",
     role: p.position || "AI 대화 상대",
     department: p.department || "일반",

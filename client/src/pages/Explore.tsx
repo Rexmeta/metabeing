@@ -352,6 +352,12 @@ function PersonaCard({
       return;
     }
 
+    // 비로그인 사용자: 체험 가능 페르소나라도 로그인 페이지로 안내
+    if (!isAuthenticated) {
+      onLockedClick?.();
+      return;
+    }
+
     // 기존 대화 확인: 이미 해당 페르소나와의 대화가 있으면 그 대화로 이동
     if (activeConversations) {
       const existingConversation = activeConversations.find((c: any) => c.personaId === persona.id);
@@ -489,6 +495,12 @@ export default function Explore() {
   const { isAuthenticated } = useAuth();
   const { isGuest, guestSession, isPersonaAvailable } = useGuestSession();
   const [showSignupDialog, setShowSignupDialog] = useState(false);
+  const [signupDialogType, setSignupDialogType] = useState<'locked' | 'guest'>('guest');
+
+  const handlePersonaLockedClick = (isLocked: boolean) => {
+    setSignupDialogType(isLocked ? 'locked' : 'guest');
+    setShowSignupDialog(true);
+  };
 
   const { data: scenarios = [], isLoading: loadingScenarios } = useQuery<Scenario[]>({
     queryKey: ["/api/scenarios/public"],
@@ -561,7 +573,7 @@ export default function Explore() {
                         persona={persona} 
                         isAuthenticated={isAuthenticated}
                         isPersonaLocked={isLocked}
-                        onLockedClick={() => setShowSignupDialog(true)}
+                        onLockedClick={() => handlePersonaLockedClick(isLocked)}
                       />
                     );
                   })}
@@ -614,7 +626,7 @@ export default function Explore() {
                         size="small" 
                         isAuthenticated={isAuthenticated}
                         isPersonaLocked={isLocked}
-                        onLockedClick={() => setShowSignupDialog(true)}
+                        onLockedClick={() => handlePersonaLockedClick(isLocked)}
                       />
                     );
                   })}
@@ -642,7 +654,7 @@ export default function Explore() {
                         persona={persona} 
                         isAuthenticated={isAuthenticated}
                         isPersonaLocked={isLocked}
-                        onLockedClick={() => setShowSignupDialog(true)}
+                        onLockedClick={() => handlePersonaLockedClick(isLocked)}
                       />
                     );
                   })}
@@ -670,7 +682,7 @@ export default function Explore() {
                         persona={persona} 
                         isAuthenticated={isAuthenticated}
                         isPersonaLocked={isLocked}
-                        onLockedClick={() => setShowSignupDialog(true)}
+                        onLockedClick={() => handlePersonaLockedClick(isLocked)}
                       />
                     );
                   })}
@@ -686,15 +698,30 @@ export default function Explore() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-primary" />
-              회원 전용 페르소나
+              {signupDialogType === 'locked' ? (
+                <>
+                  <Lock className="h-5 w-5 text-primary" />
+                  회원 전용 페르소나
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-5 w-5 text-primary" />
+                  대화를 시작하려면 로그인하세요
+                </>
+              )}
             </DialogTitle>
             <DialogDescription className="pt-2 space-y-3">
-              <p>이 페르소나는 회원 전용입니다. 무료 회원가입 후 16가지 모든 성격 유형과 무제한 대화를 즐겨보세요!</p>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
-                <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
-                <span>현재 체험 가능: ISTJ, ENFP, ENTJ</span>
-              </div>
+              {signupDialogType === 'locked' ? (
+                <>
+                  <p>이 페르소나는 회원 전용입니다. 무료 회원가입 후 16가지 모든 성격 유형과 무제한 대화를 즐겨보세요!</p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                    <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span>현재 체험 가능: ISTJ, ENFP, ENTJ</span>
+                  </div>
+                </>
+              ) : (
+                <p>무료 회원가입 후 다양한 AI 페르소나와 대화하고, 대화 기록을 저장하세요. 회원에게는 16가지 성격 유형과 무제한 대화가 제공됩니다!</p>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 pt-2">

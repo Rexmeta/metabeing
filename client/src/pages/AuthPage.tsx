@@ -22,7 +22,7 @@ export function AuthPage() {
   }, [isAuthenticated, setLocation]);
 
   const handleGuestTrial = () => {
-    setLocation("/guest");
+    setLocation("/explore");
   };
 
   return (
@@ -62,10 +62,10 @@ export function AuthPage() {
             data-testid="button-guest-trial"
           >
             <MessageCircle className="w-4 h-4" />
-            로그인 없이 체험하기
+            먼저 둘러보기
           </Button>
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            3가지 페르소나와 무료 대화 체험
+            페르소나와 시나리오를 미리 확인해보세요
           </p>
         </div>
       </div>
