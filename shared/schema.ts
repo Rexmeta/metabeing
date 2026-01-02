@@ -694,3 +694,32 @@ export type Experience = typeof experiences.$inferSelect;
 export type Like = typeof likes.$inferSelect;
 export type Bookmark = typeof bookmarks.$inferSelect;
 export type Report = typeof reports.$inferSelect;
+
+// 게스트 세션 테이블 - IP 기반 무료 체험 관리
+export const guestSessions = pgTable("guest_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ipAddress: varchar("ip_address").notNull(),
+  sessionToken: varchar("session_token").notNull().unique(),
+  conversationCount: integer("conversation_count").notNull().default(0),
+  turnCount: integer("turn_count").notNull().default(0),
+  lastPersonaId: varchar("last_persona_id"),
+  currentPersonaRunId: varchar("current_persona_run_id"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  lastActivityAt: timestamp("last_activity_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  expiresAt: timestamp("expires_at").notNull(),
+}, (table) => [
+  index("idx_guest_sessions_ip").on(table.ipAddress),
+  index("idx_guest_sessions_token").on(table.sessionToken),
+  index("idx_guest_sessions_expires").on(table.expiresAt),
+]);
+
+export const insertGuestSessionSchema = createInsertSchema(guestSessions).omit({
+  id: true,
+  conversationCount: true,
+  turnCount: true,
+  createdAt: true,
+  lastActivityAt: true,
+});
+
+export type InsertGuestSession = z.infer<typeof insertGuestSessionSchema>;
+export type GuestSession = typeof guestSessions.$inferSelect;
