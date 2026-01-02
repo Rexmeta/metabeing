@@ -608,9 +608,10 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
     if (!message || isLoading) return;
 
     // 실시간 음성 모드일 때는 WebSocket으로 텍스트 전송
+    // 텍스트 입력 시에는 responseMode를 'text'로 설정하여 텍스트 응답만 받음
     if (inputMode === 'realtime-voice' && realtimeVoice.status === 'connected') {
       setUserInput("");
-      realtimeVoice.sendTextMessage(message);
+      realtimeVoice.sendTextMessage(message, 'text'); // 텍스트 입력 → 텍스트 응답
       return;
     }
 
@@ -2219,24 +2220,23 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                 )}
               </div>
 
-              {/* Top Center - 실시간 음성 대화 내역 (캐릭터 모드에서는 숨김) */}
-              {false && inputMode === 'realtime-voice' && localMessages.length > 0 && (
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 w-full max-w-2xl px-4">
-                  <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg max-h-60 overflow-y-auto p-4 space-y-2">
-                    <h3 className="text-sm font-semibold text-slate-700 mb-2 sticky top-0 bg-white/90">대화 내역</h3>
-                    {localMessages.map((msg, index) => (
+              {/* Top Center - 최근 5개 대화 내역 (캐릭터 모드) */}
+              {localMessages.length > 0 && (
+                <div className="absolute top-20 xl:top-4 left-1/2 transform -translate-x-1/2 z-20 w-full max-w-2xl px-4">
+                  <div className="bg-black/40 backdrop-blur-md rounded-xl shadow-lg max-h-60 overflow-y-auto p-3 space-y-2">
+                    {localMessages.slice(-5).map((msg) => (
                       <div
-                        key={index}
-                        className={`text-sm p-2 rounded ${
+                        key={`${msg.timestamp}-${msg.sender}-${msg.message?.substring(0, 20)}`}
+                        className={`text-sm p-2 rounded-lg ${
                           msg.sender === 'user'
-                            ? 'bg-blue-100 text-blue-900 ml-8'
-                            : 'bg-slate-100 text-slate-900 mr-8'
+                            ? 'bg-blue-500/80 text-white ml-8'
+                            : 'bg-white/90 text-slate-900 mr-8'
                         }`}
                       >
-                        <span className="font-semibold text-xs">
+                        <span className="font-semibold text-xs opacity-80">
                           {msg.sender === 'user' ? '나' : persona.name}:
                         </span>{' '}
-                        {msg.message}
+                        <span className="text-sm">{msg.message}</span>
                       </div>
                     ))}
                   </div>
