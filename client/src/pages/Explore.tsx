@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Search, TrendingUp, Star, FileText, Sparkles, User, ThumbsUp, ThumbsDown, MessageCircle, ChevronRight, Flame, Heart, Plus } from "lucide-react";
+import { Search, TrendingUp, Star, FileText, Sparkles, User, ThumbsUp, ThumbsDown, MessageCircle, ChevronRight, Flame, Heart, Plus, Lock, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,14 @@ import { apiRequest } from "@/lib/queryClient";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useGuestSession } from "@/hooks/useGuestSession";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function formatSNSNumber(num: number): string {
   if (num >= 1000000) {
@@ -256,7 +264,19 @@ function ScenarioCard({ scenario, personas = [], isAuthenticated }: { scenario: 
   );
 }
 
-function PersonaCard({ persona, size = "default", isAuthenticated }: { persona: Persona; size?: "default" | "small"; isAuthenticated: boolean }) {
+function PersonaCard({ 
+  persona, 
+  size = "default", 
+  isAuthenticated,
+  isPersonaLocked = false,
+  onLockedClick
+}: { 
+  persona: Persona; 
+  size?: "default" | "small"; 
+  isAuthenticated: boolean;
+  isPersonaLocked?: boolean;
+  onLockedClick?: () => void;
+}) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
@@ -326,6 +346,12 @@ function PersonaCard({ persona, size = "default", isAuthenticated }: { persona: 
   };
 
   const handlePersonaClick = () => {
+    // 잠긴 페르소나인 경우 콜백 호출
+    if (isPersonaLocked && onLockedClick) {
+      onLockedClick();
+      return;
+    }
+
     // 기존 대화 확인: 이미 해당 페르소나와의 대화가 있으면 그 대화로 이동
     if (activeConversations) {
       const existingConversation = activeConversations.find((c: any) => c.personaId === persona.id);
@@ -353,15 +379,24 @@ function PersonaCard({ persona, size = "default", isAuthenticated }: { persona: 
         <img 
           src={profileImage} 
           alt={persona.name}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-active:scale-95"
+          className={`absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-active:scale-95 ${isPersonaLocked ? 'grayscale opacity-70' : ''}`}
         />
       ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center">
+        <div className={`absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center ${isPersonaLocked ? 'grayscale opacity-70' : ''}`}>
           <User className="w-12 h-12 text-primary/50" />
         </div>
       )}
       
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      
+      {isPersonaLocked && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+          <div className="flex flex-col items-center gap-1 text-white/90">
+            <Lock className="w-6 h-6" />
+            <span className="text-xs font-medium">회원 전용</span>
+          </div>
+        </div>
+      )}
       
       <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
         <div className="flex items-center gap-1.5 mb-1">
@@ -452,6 +487,8 @@ export default function Explore() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const { isAuthenticated } = useAuth();
+  const { isGuest, guestSession, isPersonaAvailable } = useGuestSession();
+  const [showSignupDialog, setShowSignupDialog] = useState(false);
 
   const { data: scenarios = [], isLoading: loadingScenarios } = useQuery<Scenario[]>({
     queryKey: ["/api/scenarios/public"],
@@ -515,9 +552,19 @@ export default function Explore() {
             ) : (
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
-                  {recommendedPersonas.map((persona) => (
-                    <PersonaCard key={persona.id} persona={persona} isAuthenticated={isAuthenticated} />
-                  ))}
+                  {recommendedPersonas.map((persona) => {
+                    const personaMbti = persona.mbtiType || persona.mbti || persona.id;
+                    const isLocked = isGuest && !isPersonaAvailable(personaMbti);
+                    return (
+                      <PersonaCard 
+                        key={persona.id} 
+                        persona={persona} 
+                        isAuthenticated={isAuthenticated}
+                        isPersonaLocked={isLocked}
+                        onLockedClick={() => setShowSignupDialog(true)}
+                      />
+                    );
+                  })}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
               </ScrollArea>
@@ -557,9 +604,20 @@ export default function Explore() {
             ) : (
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
-                  {personas.slice(0, 10).map((persona) => (
-                    <PersonaCard key={persona.id} persona={persona} size="small" isAuthenticated={isAuthenticated} />
-                  ))}
+                  {personas.slice(0, 10).map((persona) => {
+                    const personaMbti = persona.mbtiType || persona.mbti || persona.id;
+                    const isLocked = isGuest && !isPersonaAvailable(personaMbti);
+                    return (
+                      <PersonaCard 
+                        key={persona.id} 
+                        persona={persona} 
+                        size="small" 
+                        isAuthenticated={isAuthenticated}
+                        isPersonaLocked={isLocked}
+                        onLockedClick={() => setShowSignupDialog(true)}
+                      />
+                    );
+                  })}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
               </ScrollArea>
@@ -575,9 +633,19 @@ export default function Explore() {
             ) : (
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
-                  {popularPersonas.map((persona) => (
-                    <PersonaCard key={persona.id} persona={persona} isAuthenticated={isAuthenticated} />
-                  ))}
+                  {popularPersonas.map((persona) => {
+                    const personaMbti = persona.mbtiType || persona.mbti || persona.id;
+                    const isLocked = isGuest && !isPersonaAvailable(personaMbti);
+                    return (
+                      <PersonaCard 
+                        key={persona.id} 
+                        persona={persona} 
+                        isAuthenticated={isAuthenticated}
+                        isPersonaLocked={isLocked}
+                        onLockedClick={() => setShowSignupDialog(true)}
+                      />
+                    );
+                  })}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
               </ScrollArea>
@@ -593,9 +661,19 @@ export default function Explore() {
             ) : (
               <ScrollArea className="w-full">
                 <div className="flex gap-3 pb-2 px-4">
-                  {trendingPersonas.map((persona) => (
-                    <PersonaCard key={persona.id} persona={persona} isAuthenticated={isAuthenticated} />
-                  ))}
+                  {trendingPersonas.map((persona) => {
+                    const personaMbti = persona.mbtiType || persona.mbti || persona.id;
+                    const isLocked = isGuest && !isPersonaAvailable(personaMbti);
+                    return (
+                      <PersonaCard 
+                        key={persona.id} 
+                        persona={persona} 
+                        isAuthenticated={isAuthenticated}
+                        isPersonaLocked={isLocked}
+                        onLockedClick={() => setShowSignupDialog(true)}
+                      />
+                    );
+                  })}
                 </div>
                 <ScrollBar orientation="horizontal" className="invisible" />
               </ScrollArea>
@@ -603,6 +681,33 @@ export default function Explore() {
           </section>
         </div>
       </div>
+
+      <Dialog open={showSignupDialog} onOpenChange={setShowSignupDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-primary" />
+              회원 전용 페르소나
+            </DialogTitle>
+            <DialogDescription className="pt-2 space-y-3">
+              <p>이 페르소나는 회원 전용입니다. 무료 회원가입 후 16가지 모든 성격 유형과 무제한 대화를 즐겨보세요!</p>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
+                <span>현재 체험 가능: ISTJ, ENFP, ENTJ</span>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button onClick={() => setLocation("/auth")} className="gap-2">
+              <UserPlus className="h-4 w-4" />
+              무료 회원가입
+            </Button>
+            <Button variant="ghost" onClick={() => setShowSignupDialog(false)}>
+              나중에
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
