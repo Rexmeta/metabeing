@@ -170,6 +170,9 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
         setLocalMessages(initialMessages);
         initialMessagesLoadedRef.current = true;
         loadedMessagesCountRef.current = initialMessages.length;
+        // 기존 대화 기록이 있으면 바로 입력창 표시 (대화 시작하기 버튼 스킵)
+        setShowInputMode(true);
+        console.log('✅ 기존 대화 기록 발견 - 입력창 바로 표시');
       } else {
         // initialMessages 개수가 같거나 적으면 로드 상태만 업데이트
         console.log('⏭️ Skipping initial messages load - local messages already up to date');
@@ -179,9 +182,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   }, [initialMessages, localMessages.length]);
   const [isWideScreen, setIsWideScreen] = useState(false);
   // 기존 대화 기록이 있으면 바로 입력창 표시, 없으면 "대화 시작하기" 버튼 표시
-  const [showInputMode, setShowInputMode] = useState(() => {
-    return initialMessages && initialMessages.length > 0;
-  });
+  const [showInputMode, setShowInputMode] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isEmotionTransitioning, setIsEmotionTransitioning] = useState(false);
     const [personaImagesAvailable, setPersonaImagesAvailable] = useState<{[key: string]: boolean}>({});
