@@ -467,6 +467,25 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   // 모든 모드에서 턴 제한 없음 (999턴)
   const maxTurns = 999;
 
+  // 실시간 음성 연결 완료 시 자동으로 녹음 시작 (Web Speech API 활성화)
+  const prevStatusRef = useRef<string>('disconnected');
+  useEffect(() => {
+    // disconnected/connecting → connected 전환 시에만 자동 시작
+    if (prevStatusRef.current !== 'connected' && realtimeVoice.status === 'connected') {
+      console.log('🎤 실시간 음성 연결 완료, 자동으로 녹음 시작');
+      // AI 첫 인사 후에 녹음 시작하도록 약간 지연
+      const timer = setTimeout(() => {
+        if (realtimeVoice.status === 'connected' && !realtimeVoice.isRecording) {
+          hasUserSpokenRef.current = false;
+          setShowMicPrompt(true);
+          realtimeVoice.startRecording();
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+    prevStatusRef.current = realtimeVoice.status;
+  }, [realtimeVoice.status, realtimeVoice.isRecording, realtimeVoice.startRecording]);
+
   const { data: conversation, error } = useQuery<Conversation>({
     queryKey: ["/api/conversations", conversationId],
     enabled: !!conversationId && !isPersonaChat,
