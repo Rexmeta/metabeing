@@ -81,39 +81,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ipAddress = getClientIp(req);
       const existingToken = req.cookies?.guestToken;
       
-      // 기존 세션 확인
+      // 기존 세션 확인 (실패 시 무시하고 새 세션 생성)
       if (existingToken) {
-        const existingSession = await storage.getGuestSessionByToken(existingToken);
-        if (existingSession) {
+        try {
+          const existingSession = await storage.getGuestSessionByToken(existingToken);
+          if (existingSession) {
+            return res.json({
+              session: existingSession,
+              limits: {
+                maxConversations: GUEST_MAX_CONVERSATIONS,
+                maxTurnsPerConversation: GUEST_MAX_TURNS_PER_CONVERSATION,
+                remainingConversations: Math.max(0, GUEST_MAX_CONVERSATIONS - existingSession.conversationCount),
+                allowedPersonas: GUEST_ALLOWED_PERSONAS,
+              }
+            });
+          }
+        } catch (e) {
+          console.log('Token session lookup failed, will create new session');
+        }
+      }
+      
+      // IP로 기존 세션 확인 (실패 시 무시하고 새 세션 생성)
+      try {
+        const ipSession = await storage.getGuestSessionByIp(ipAddress);
+        if (ipSession) {
+          res.cookie('guestToken', ipSession.sessionToken, { 
+            httpOnly: true, 
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000 // 24시간
+          });
           return res.json({
-            session: existingSession,
+            session: ipSession,
             limits: {
               maxConversations: GUEST_MAX_CONVERSATIONS,
               maxTurnsPerConversation: GUEST_MAX_TURNS_PER_CONVERSATION,
-              remainingConversations: Math.max(0, GUEST_MAX_CONVERSATIONS - existingSession.conversationCount),
+              remainingConversations: Math.max(0, GUEST_MAX_CONVERSATIONS - ipSession.conversationCount),
               allowedPersonas: GUEST_ALLOWED_PERSONAS,
             }
           });
         }
-      }
-      
-      // IP로 기존 세션 확인
-      const ipSession = await storage.getGuestSessionByIp(ipAddress);
-      if (ipSession) {
-        res.cookie('guestToken', ipSession.sessionToken, { 
-          httpOnly: true, 
-          sameSite: 'strict',
-          maxAge: 24 * 60 * 60 * 1000 // 24시간
-        });
-        return res.json({
-          session: ipSession,
-          limits: {
-            maxConversations: GUEST_MAX_CONVERSATIONS,
-            maxTurnsPerConversation: GUEST_MAX_TURNS_PER_CONVERSATION,
-            remainingConversations: Math.max(0, GUEST_MAX_CONVERSATIONS - ipSession.conversationCount),
-            allowedPersonas: GUEST_ALLOWED_PERSONAS,
-          }
-        });
+      } catch (e) {
+        console.log('IP session lookup failed, will create new session');
       }
       
       // 새 세션 생성
@@ -145,10 +153,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/guest/personas', async (req, res) => {
     try {
       const personaCache = GlobalPersonaCache.getInstance();
-      const allPersonas = personaCache.getAllPersonas();
       
-      // 게스트 허용 페르소나만 필터링
-      const guestPersonas = allPersonas.filter(p => GUEST_ALLOWED_PERSONAS.includes(p.mbtiType));
+      // 게스트 허용 페르소나만 로드
+      const guestPersonas = GUEST_ALLOWED_PERSONAS.map(mbtiType => {
+        const persona = personaCache.getPersonaData(mbtiType.toLowerCase());
+        if (persona) {
+          return {
+            mbtiType: persona.personaKey?.toUpperCase() || mbtiType,
+            name: persona.name || mbtiType,
+            description: persona.description || ''
+          };
+        }
+        return { mbtiType, name: mbtiType, description: '' };
+      });
       
       res.json({
         personas: guestPersonas,
@@ -203,7 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const personaCache = GlobalPersonaCache.getInstance();
-      const persona = personaCache.getPersonaByMbtiType(personaId);
+      const persona = personaCache.getPersonaData(personaId.toLowerCase());
       
       if (!persona) {
         return res.status(404).json({ message: "페르소나를 찾을 수 없습니다" });

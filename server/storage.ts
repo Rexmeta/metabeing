@@ -1782,25 +1782,29 @@ export class PostgreSQLStorage implements IStorage {
   }
   
   async getGuestSessionByToken(sessionToken: string): Promise<GuestSession | undefined> {
-    const [session] = await db.select()
-      .from(guestSessions)
-      .where(and(
-        eq(guestSessions.sessionToken, sessionToken),
-        gt(guestSessions.expiresAt, new Date())
-      ));
-    return session;
+    const result = await withRetry(async () => 
+      db.select()
+        .from(guestSessions)
+        .where(and(
+          eq(guestSessions.sessionToken, sessionToken),
+          gt(guestSessions.expiresAt, new Date())
+        ))
+    );
+    return result?.[0];
   }
   
   async getGuestSessionByIp(ipAddress: string): Promise<GuestSession | undefined> {
-    const [session] = await db.select()
-      .from(guestSessions)
-      .where(and(
-        eq(guestSessions.ipAddress, ipAddress),
-        gt(guestSessions.expiresAt, new Date())
-      ))
-      .orderBy(desc(guestSessions.createdAt))
-      .limit(1);
-    return session;
+    const result = await withRetry(async () =>
+      db.select()
+        .from(guestSessions)
+        .where(and(
+          eq(guestSessions.ipAddress, ipAddress),
+          gt(guestSessions.expiresAt, new Date())
+        ))
+        .orderBy(desc(guestSessions.createdAt))
+        .limit(1)
+    );
+    return result?.[0];
   }
   
   async updateGuestSession(id: string, updates: Partial<GuestSession>): Promise<GuestSession> {
