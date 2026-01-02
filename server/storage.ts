@@ -1,4 +1,4 @@
-import { type Conversation, type InsertConversation, type Feedback, type InsertFeedback, type PersonaSelection, type StrategyChoice, type SequenceAnalysis, type User, type UpsertUser, type ScenarioRun, type InsertScenarioRun, type PersonaRun, type InsertPersonaRun, type ChatMessage, type InsertChatMessage, type Category, type InsertCategory, type SystemSetting, type AiUsageLog, type InsertAiUsageLog, type AiUsageSummary, type AiUsageByFeature, type AiUsageByModel, type AiUsageDaily, conversations, feedbacks, users, scenarioRuns, personaRuns, chatMessages, categories, systemSettings, aiUsageLogs } from "@shared/schema";
+import { type Conversation, type InsertConversation, type Feedback, type InsertFeedback, type PersonaSelection, type StrategyChoice, type SequenceAnalysis, type User, type UpsertUser, type ScenarioRun, type InsertScenarioRun, type PersonaRun, type InsertPersonaRun, type ChatMessage, type InsertChatMessage, type Category, type InsertCategory, type SystemSetting, type AiUsageLog, type InsertAiUsageLog, type AiUsageSummary, type AiUsageByFeature, type AiUsageByModel, type AiUsageDaily, type GuestSession, conversations, feedbacks, users, scenarioRuns, personaRuns, chatMessages, categories, systemSettings, aiUsageLogs, guestSessions } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
@@ -138,6 +138,15 @@ export interface IStorage {
   getAiUsageByModel(startDate: Date, endDate: Date): Promise<AiUsageByModel[]>;
   getAiUsageDaily(startDate: Date, endDate: Date): Promise<AiUsageDaily[]>;
   getAiUsageLogs(startDate: Date, endDate: Date, limit?: number): Promise<AiUsageLog[]>;
+  
+  // Guest Session operations - 게스트 체험 모드
+  createGuestSession(ipAddress: string, sessionToken: string): Promise<GuestSession>;
+  getGuestSessionByToken(sessionToken: string): Promise<GuestSession | undefined>;
+  getGuestSessionByIp(ipAddress: string): Promise<GuestSession | undefined>;
+  updateGuestSession(id: string, updates: Partial<GuestSession>): Promise<GuestSession>;
+  incrementGuestConversationCount(id: string): Promise<GuestSession>;
+  incrementGuestTurnCount(id: string): Promise<GuestSession>;
+  deleteExpiredGuestSessions(): Promise<number>;
 }
 
 export class MemStorage implements IStorage {
@@ -1757,6 +1766,77 @@ export class PostgreSQLStorage implements IStorage {
       ))
       .orderBy(desc(aiUsageLogs.occurredAt))
       .limit(limit);
+  }
+  
+  // Guest Session operations - 게스트 체험 모드
+  async createGuestSession(ipAddress: string, sessionToken: string): Promise<GuestSession> {
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24); // 24시간 후 만료
+    
+    const [session] = await db.insert(guestSessions).values({
+      ipAddress,
+      sessionToken,
+      expiresAt,
+    }).returning();
+    return session;
+  }
+  
+  async getGuestSessionByToken(sessionToken: string): Promise<GuestSession | undefined> {
+    const [session] = await db.select()
+      .from(guestSessions)
+      .where(and(
+        eq(guestSessions.sessionToken, sessionToken),
+        gt(guestSessions.expiresAt, new Date())
+      ));
+    return session;
+  }
+  
+  async getGuestSessionByIp(ipAddress: string): Promise<GuestSession | undefined> {
+    const [session] = await db.select()
+      .from(guestSessions)
+      .where(and(
+        eq(guestSessions.ipAddress, ipAddress),
+        gt(guestSessions.expiresAt, new Date())
+      ))
+      .orderBy(desc(guestSessions.createdAt))
+      .limit(1);
+    return session;
+  }
+  
+  async updateGuestSession(id: string, updates: Partial<GuestSession>): Promise<GuestSession> {
+    const [session] = await db.update(guestSessions)
+      .set({ ...updates, lastActivityAt: new Date() })
+      .where(eq(guestSessions.id, id))
+      .returning();
+    return session;
+  }
+  
+  async incrementGuestConversationCount(id: string): Promise<GuestSession> {
+    const [session] = await db.update(guestSessions)
+      .set({ 
+        conversationCount: sqlBuilder`${guestSessions.conversationCount} + 1`,
+        lastActivityAt: new Date()
+      })
+      .where(eq(guestSessions.id, id))
+      .returning();
+    return session;
+  }
+  
+  async incrementGuestTurnCount(id: string): Promise<GuestSession> {
+    const [session] = await db.update(guestSessions)
+      .set({ 
+        turnCount: sqlBuilder`${guestSessions.turnCount} + 1`,
+        lastActivityAt: new Date()
+      })
+      .where(eq(guestSessions.id, id))
+      .returning();
+    return session;
+  }
+  
+  async deleteExpiredGuestSessions(): Promise<number> {
+    const result = await db.delete(guestSessions)
+      .where(lte(guestSessions.expiresAt, new Date()));
+    return 0; // Drizzle doesn't return count easily, just return 0
   }
 }
 
