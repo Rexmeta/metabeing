@@ -439,11 +439,15 @@ export function useRealtimeVoice({
               break;
 
             case 'user.message.saved':
-              console.log('💾 User message saved:', data.transcript, data.messageId);
+              console.log('💾 User message saved:', data.text || data.transcript, 'turnIndex:', data.turnIndex, 'messageId:', data.messageId);
               // 재시도 큐에서 해당 메시지 제거 (messageId 기반)
               if (data.messageId && pendingMessagesRef.current.has(data.messageId)) {
                 pendingMessagesRef.current.delete(data.messageId);
                 console.log('✅ Message confirmed and removed from pending:', data.messageId);
+              }
+              // UI 업데이트 콜백 호출 (서버 VAD 저장 경로에서 사용)
+              if (onUserMessageSavedRef.current && (data.text || data.transcript)) {
+                onUserMessageSavedRef.current(data.text || data.transcript, data.turnIndex || 0);
               }
               break;
 
@@ -478,13 +482,6 @@ export function useRealtimeVoice({
 
             case 'ai.message.saved':
               console.log('💾 AI message saved:', data.text?.substring(0, 50));
-              break;
-
-            case 'user.message.saved':
-              console.log('💾 User message saved:', data.text?.substring(0, 50), 'turnIndex:', data.turnIndex);
-              if (onUserMessageSavedRef.current && data.text) {
-                onUserMessageSavedRef.current(data.text, data.turnIndex || 0);
-              }
               break;
 
             case 'ai.message.failed':
