@@ -1,3 +1,4 @@
+/// <reference types="@types/dom-speech-recognition" />
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 export type RealtimeVoiceStatus = 
