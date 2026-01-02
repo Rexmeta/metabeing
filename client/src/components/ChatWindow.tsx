@@ -182,7 +182,8 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   }, [initialMessages, localMessages.length]);
   const [isWideScreen, setIsWideScreen] = useState(false);
   // 기존 대화 기록이 있으면 바로 입력창 표시, 없으면 "대화 시작하기" 버튼 표시
-  const [showInputMode, setShowInputMode] = useState(false);
+  // 초기값을 initialMessages 기반으로 설정하여 첫 렌더링부터 올바른 상태 표시
+  const [showInputMode, setShowInputMode] = useState(() => (initialMessages?.length || 0) > 0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isEmotionTransitioning, setIsEmotionTransitioning] = useState(false);
     const [personaImagesAvailable, setPersonaImagesAvailable] = useState<{[key: string]: boolean}>({});
