@@ -1366,6 +1366,26 @@ export class PostgreSQLStorage implements IStorage {
 
   // Chat Messages
   async createChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
+    // 🔧 중복 체크 먼저 수행 (INSERT 전에 확인)
+    try {
+      const existing = await db
+        .select()
+        .from(chatMessages)
+        .where(and(
+          eq(chatMessages.personaRunId, insertMessage.personaRunId),
+          eq(chatMessages.turnIndex, insertMessage.turnIndex),
+          eq(chatMessages.sender, insertMessage.sender)
+        ))
+        .limit(1);
+      
+      if (existing && existing.length > 0) {
+        console.log(`⏭️ [storage] Message already exists: personaRunId=${insertMessage.personaRunId}, turnIndex=${insertMessage.turnIndex}, sender=${insertMessage.sender}`);
+        return existing[0]; // 기존 메시지 반환
+      }
+    } catch (checkError) {
+      console.warn('⚠️ Failed to check existing message, proceeding with insert:', checkError);
+    }
+    
     // Neon HTTP 드라이버 재시도 로직 적용
     const message = await withRetry(async () => {
       const [msg] = await db.insert(chatMessages).values(insertMessage).returning();
