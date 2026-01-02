@@ -59,6 +59,225 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // ==================== 게스트 체험 API (인증 불필요) ====================
+  const crypto = await import('crypto');
+  
+  // 게스트 제한 상수
+  const GUEST_MAX_CONVERSATIONS = 3; // 하루 최대 대화 수
+  const GUEST_MAX_TURNS_PER_CONVERSATION = 5; // 대화당 최대 턴 수
+  const GUEST_ALLOWED_PERSONAS = ['ISTJ', 'ENFP', 'ENTJ']; // 체험 가능 페르소나
+  
+  // IP 주소 추출 헬퍼
+  function getClientIp(req: any): string {
+    return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+           req.connection?.remoteAddress || 
+           req.socket?.remoteAddress || 
+           'unknown';
+  }
+  
+  // 게스트 세션 시작/확인
+  app.post('/api/guest/session', async (req, res) => {
+    try {
+      const ipAddress = getClientIp(req);
+      const existingToken = req.cookies?.guestToken;
+      
+      // 기존 세션 확인
+      if (existingToken) {
+        const existingSession = await storage.getGuestSessionByToken(existingToken);
+        if (existingSession) {
+          return res.json({
+            session: existingSession,
+            limits: {
+              maxConversations: GUEST_MAX_CONVERSATIONS,
+              maxTurnsPerConversation: GUEST_MAX_TURNS_PER_CONVERSATION,
+              remainingConversations: Math.max(0, GUEST_MAX_CONVERSATIONS - existingSession.conversationCount),
+              allowedPersonas: GUEST_ALLOWED_PERSONAS,
+            }
+          });
+        }
+      }
+      
+      // IP로 기존 세션 확인
+      const ipSession = await storage.getGuestSessionByIp(ipAddress);
+      if (ipSession) {
+        res.cookie('guestToken', ipSession.sessionToken, { 
+          httpOnly: true, 
+          sameSite: 'strict',
+          maxAge: 24 * 60 * 60 * 1000 // 24시간
+        });
+        return res.json({
+          session: ipSession,
+          limits: {
+            maxConversations: GUEST_MAX_CONVERSATIONS,
+            maxTurnsPerConversation: GUEST_MAX_TURNS_PER_CONVERSATION,
+            remainingConversations: Math.max(0, GUEST_MAX_CONVERSATIONS - ipSession.conversationCount),
+            allowedPersonas: GUEST_ALLOWED_PERSONAS,
+          }
+        });
+      }
+      
+      // 새 세션 생성
+      const sessionToken = crypto.randomUUID();
+      const newSession = await storage.createGuestSession(ipAddress, sessionToken);
+      
+      res.cookie('guestToken', sessionToken, { 
+        httpOnly: true, 
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000
+      });
+      
+      res.json({
+        session: newSession,
+        limits: {
+          maxConversations: GUEST_MAX_CONVERSATIONS,
+          maxTurnsPerConversation: GUEST_MAX_TURNS_PER_CONVERSATION,
+          remainingConversations: GUEST_MAX_CONVERSATIONS,
+          allowedPersonas: GUEST_ALLOWED_PERSONAS,
+        }
+      });
+    } catch (error) {
+      console.error('Guest session error:', error);
+      res.status(500).json({ message: "세션 생성 실패" });
+    }
+  });
+  
+  // 게스트용 페르소나 목록 조회
+  app.get('/api/guest/personas', async (req, res) => {
+    try {
+      const personaCache = GlobalPersonaCache.getInstance();
+      const allPersonas = personaCache.getAllPersonas();
+      
+      // 게스트 허용 페르소나만 필터링
+      const guestPersonas = allPersonas.filter(p => GUEST_ALLOWED_PERSONAS.includes(p.mbtiType));
+      
+      res.json({
+        personas: guestPersonas,
+        message: "회원가입 시 16가지 모든 성격 유형과 대화할 수 있습니다"
+      });
+    } catch (error) {
+      console.error('Guest personas error:', error);
+      res.status(500).json({ message: "페르소나 조회 실패" });
+    }
+  });
+  
+  // 게스트 대화 전송
+  app.post('/api/guest/chat', async (req, res) => {
+    try {
+      const guestToken = req.cookies?.guestToken;
+      if (!guestToken) {
+        return res.status(401).json({ message: "게스트 세션이 필요합니다" });
+      }
+      
+      const session = await storage.getGuestSessionByToken(guestToken);
+      if (!session) {
+        return res.status(401).json({ message: "유효하지 않은 세션입니다" });
+      }
+      
+      // 대화 제한 확인
+      if (session.conversationCount >= GUEST_MAX_CONVERSATIONS && 
+          req.body.personaId !== session.lastPersonaId) {
+        return res.status(403).json({ 
+          message: "무료 체험 대화 횟수를 초과했습니다. 회원가입 후 계속 대화하세요!",
+          limitReached: true,
+          type: 'conversation'
+        });
+      }
+      
+      if (session.turnCount >= GUEST_MAX_TURNS_PER_CONVERSATION * session.conversationCount + GUEST_MAX_TURNS_PER_CONVERSATION) {
+        return res.status(403).json({ 
+          message: "이 대화의 최대 턴 수에 도달했습니다. 회원가입 후 더 긴 대화를 나눠보세요!",
+          limitReached: true,
+          type: 'turn'
+        });
+      }
+      
+      const { personaId, message, conversationHistory } = req.body;
+      
+      // 허용된 페르소나인지 확인
+      if (!GUEST_ALLOWED_PERSONAS.includes(personaId)) {
+        return res.status(403).json({ 
+          message: "이 페르소나는 회원 전용입니다. 가입 후 이용해주세요!",
+          limitReached: true,
+          type: 'persona'
+        });
+      }
+      
+      const personaCache = GlobalPersonaCache.getInstance();
+      const persona = personaCache.getPersonaByMbtiType(personaId);
+      
+      if (!persona) {
+        return res.status(404).json({ message: "페르소나를 찾을 수 없습니다" });
+      }
+      
+      // 새 대화인지 확인하고 카운트 증가
+      if (session.lastPersonaId !== personaId) {
+        await storage.incrementGuestConversationCount(session.id);
+        await storage.updateGuestSession(session.id, { lastPersonaId: personaId });
+      }
+      
+      // 턴 카운트 증가
+      await storage.incrementGuestTurnCount(session.id);
+      
+      // AI 응답 생성
+      const messages = conversationHistory || [];
+      messages.push({ sender: 'user', message, timestamp: new Date().toISOString() });
+      
+      const aiResponse = await generateAIResponse(
+        messages,
+        persona,
+        null, // scenario
+        2, // 기본 난이도
+        undefined // context
+      );
+      
+      res.json({
+        response: aiResponse.response,
+        emotion: aiResponse.emotion,
+        turnCount: session.turnCount + 1,
+        remainingTurns: GUEST_MAX_TURNS_PER_CONVERSATION - ((session.turnCount + 1) % GUEST_MAX_TURNS_PER_CONVERSATION || GUEST_MAX_TURNS_PER_CONVERSATION),
+      });
+    } catch (error) {
+      console.error('Guest chat error:', error);
+      res.status(500).json({ message: "대화 생성 실패" });
+    }
+  });
+  
+  // 게스트 세션 상태 확인
+  app.get('/api/guest/status', async (req, res) => {
+    try {
+      const guestToken = req.cookies?.guestToken;
+      if (!guestToken) {
+        return res.json({ hasSession: false });
+      }
+      
+      const session = await storage.getGuestSessionByToken(guestToken);
+      if (!session) {
+        return res.json({ hasSession: false });
+      }
+      
+      res.json({
+        hasSession: true,
+        session: {
+          conversationCount: session.conversationCount,
+          turnCount: session.turnCount,
+          lastPersonaId: session.lastPersonaId,
+          expiresAt: session.expiresAt,
+        },
+        limits: {
+          maxConversations: GUEST_MAX_CONVERSATIONS,
+          maxTurnsPerConversation: GUEST_MAX_TURNS_PER_CONVERSATION,
+          remainingConversations: Math.max(0, GUEST_MAX_CONVERSATIONS - session.conversationCount),
+          allowedPersonas: GUEST_ALLOWED_PERSONAS,
+        }
+      });
+    } catch (error) {
+      console.error('Guest status error:', error);
+      res.status(500).json({ message: "상태 확인 실패" });
+    }
+  });
+  
+  // ==================== 게스트 API 끝 ====================
+  
   // 업로드 파일 접근 (프로필 이미지는 공개, 기타 파일은 인증 필요)
   const path = await import('path');
   const fs = await import('fs');
