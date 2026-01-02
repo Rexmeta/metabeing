@@ -821,9 +821,20 @@ export class RealtimeVoiceService {
             transcript: userMessage,
           });
 
-          // ✨ Note: DB 저장은 클라이언트의 Web Speech API를 통한 'user.message' 이벤트에서만 처리
-          // 이렇게 하여 중복 저장 방지 (messageId 기반 idempotent guard 활용)
-          // inputTranscription은 화면 표시용 transcript 전송만 담당
+          // ✨ 수정: 서버 측 inputTranscription에서 사용자 메시지를 DB에 즉시 저장
+          // 클라이언트의 user.message 이벤트와 중복 저장 방지를 위해 content 해시 체크 추가
+          const convId = session.conversationId;
+          const userMsgToSave = userMessage; // 클로저 캡처
+          
+          this.queueMessageSave(convId, 'user', userMsgToSave, null, null, 3)
+            .then(() => {
+              console.log(`💾 User message saved (VAD): "${userMsgToSave.substring(0, 30)}..."`);
+              this.sendToClient(session, { type: 'user.message.saved', transcript: userMsgToSave });
+            })
+            .catch(err => {
+              console.error(`❌ Failed to save user message (VAD):`, err);
+              this.sendToClient(session, { type: 'user.message.failed', transcript: userMsgToSave, error: String(err) });
+            });
 
           session.userTranscriptBuffer = ''; // 버퍼 초기화
         }
@@ -1291,43 +1302,58 @@ export class RealtimeVoiceService {
       session = Array.from(this.sessions.values()).find(s => s.conversationId === conversationId) || null;
     }
     
+    // 🔧 핵심 수정: turnIndex를 첫 시도에서만 한 번 할당하고, 재시도에서는 동일한 값 사용
+    let personaRunId: string | null = null;
+    let nextTurnIndex: number | null = null;
+    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // 세션이 있으면 직접 personaRunId 사용 (가장 신뢰할 수 있는 방법)
-        let personaRunId: string;
-        
-        if (session && session.personaRunId) {
-          personaRunId = session.personaRunId;
-          console.log(`🔍 [Attempt ${attempt}/${maxRetries}] Using session.personaRunId: ${personaRunId}`);
-        } else {
-          // 세션이 없으면 conversationId로 personaRun 조회
-          const personaRunByConvId = await storage.getPersonaRunByConversationId(conversationId);
-          if (personaRunByConvId) {
-            personaRunId = personaRunByConvId.id;
-            console.log(`🔍 [Attempt ${attempt}/${maxRetries}] Found personaRunId via conversationId lookup: ${personaRunId}`);
+        // 첫 시도에서만 personaRunId 조회
+        if (personaRunId === null) {
+          if (session && session.personaRunId) {
+            personaRunId = session.personaRunId;
+            console.log(`🔍 Using session.personaRunId: ${personaRunId}`);
           } else {
-            // conversationId 자체가 personaRunId일 수 있음 (fallback)
-            const personaRun = await storage.getPersonaRun(conversationId);
-            if (personaRun) {
-              personaRunId = conversationId;
-              console.log(`🔍 [Attempt ${attempt}/${maxRetries}] conversationId is personaRunId: ${personaRunId}`);
+            const personaRunByConvId = await storage.getPersonaRunByConversationId(conversationId);
+            if (personaRunByConvId) {
+              personaRunId = personaRunByConvId.id;
+              console.log(`🔍 Found personaRunId via conversationId lookup: ${personaRunId}`);
             } else {
-              console.log(`⚠️ PersonaRun not found for conversationId: ${conversationId}`);
-              return;
+              const personaRun = await storage.getPersonaRun(conversationId);
+              if (personaRun) {
+                personaRunId = conversationId;
+                console.log(`🔍 conversationId is personaRunId: ${personaRunId}`);
+              } else {
+                console.log(`⚠️ PersonaRun not found for conversationId: ${conversationId}`);
+                return;
+              }
             }
           }
         }
         
-        // 세션별 atomic messageIndex 사용 (동시성 문제 해결)
-        let nextTurnIndex: number;
-        if (session) {
-          nextTurnIndex = session.messageIndex++;
-          console.log(`🔢 Using session atomic index: ${nextTurnIndex}`);
+        // 🔧 핵심 수정: 첫 시도에서만 turnIndex 할당 (재시도 시 동일한 값 사용)
+        if (nextTurnIndex === null) {
+          if (session) {
+            nextTurnIndex = session.messageIndex++;
+            console.log(`🔢 Allocated new session atomic index: ${nextTurnIndex}`);
+          } else {
+            const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId) || [];
+            nextTurnIndex = existingMessages.length;
+            console.log(`🔢 Using DB-based index (no session): ${nextTurnIndex}`);
+          }
         } else {
-          // 세션 없으면 DB 기반 (fallback)
-          const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId) || [];
-          nextTurnIndex = existingMessages.length;
-          console.log(`🔢 Using DB-based index (no session): ${nextTurnIndex}`);
+          console.log(`🔢 [Retry ${attempt}/${maxRetries}] Reusing turnIndex: ${nextTurnIndex}`);
+        }
+        
+        // 🔧 중복 방지: 동일 personaRunId + turnIndex + sender 조합 확인
+        const existingMessages = await storage.getChatMessagesByPersonaRun(personaRunId) || [];
+        const isDuplicate = existingMessages.some(
+          msg => msg.turnIndex === nextTurnIndex && msg.sender === sender
+        );
+        
+        if (isDuplicate) {
+          console.log(`⏭️ Message already exists: personaRunId=${personaRunId}, turnIndex=${nextTurnIndex}, sender=${sender}`);
+          return; // 이미 저장됨 - 성공으로 간주
         }
         
         // 메시지 저장
