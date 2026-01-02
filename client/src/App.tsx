@@ -24,6 +24,7 @@ import Conversations from "@/pages/Conversations";
 import CreatePersona from "@/pages/CreatePersona";
 import PersonaAnalytics from "@/pages/PersonaAnalytics";
 import { AuthPage } from "@/pages/AuthPage";
+import GuestChat from "@/pages/GuestChat";
 
 function ContentManagementRedirect() {
   const [, setLocation] = useLocation();
@@ -117,6 +118,7 @@ function MainRouter() {
       <Route path="/" component={Explore} />
       <Route path="/explore" component={Explore} />
       <Route path="/auth" component={AuthPage} />
+      <Route path="/guest" component={GuestChat} />
       <Route path="/persona/:personaId/chat">
         {() => <ProtectedRoute component={PersonaChat} />}
       </Route>
