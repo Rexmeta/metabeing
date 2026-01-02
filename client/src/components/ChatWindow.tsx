@@ -290,12 +290,33 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
     },
     onUserTranscription: (transcript) => {
       console.log('🎤 User transcript:', transcript);
-      // 사용자 음성 전사를 대화창에 추가
+      // 사용자 음성 전사를 대화창에 즉시 추가 (클라이언트 STT 경로)
       setLocalMessages(prev => [...prev, {
         sender: 'user',
         message: transcript,
         timestamp: new Date().toISOString(),
       }]);
+    },
+    onUserMessageSaved: (text, turnIndex) => {
+      console.log('💾 User message saved notification:', text, 'turnIndex:', turnIndex);
+      // 서버에서 사용자 메시지 저장 확인 후 UI에 추가 (서버 VAD 경로)
+      // 중복 방지: 동일한 메시지가 이미 있는지 확인
+      setLocalMessages(prev => {
+        const isDuplicate = prev.some(msg => 
+          msg.sender === 'user' && 
+          (msg.message === text || msg.message.trim() === text.trim())
+        );
+        if (isDuplicate) {
+          console.log('⏭️ Skipping duplicate user message in UI');
+          return prev;
+        }
+        console.log('✅ Adding user message to UI from saved notification');
+        return [...prev, {
+          sender: 'user',
+          message: text,
+          timestamp: new Date().toISOString(),
+        }];
+      });
     },
     onError: (error) => {
       toast({

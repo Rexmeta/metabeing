@@ -16,6 +16,7 @@ interface UseRealtimeVoiceProps {
   onMessage?: (message: string) => void;
   onMessageComplete?: (message: string, emotion?: string, emotionReason?: string) => void;
   onUserTranscription?: (transcript: string) => void;
+  onUserMessageSaved?: (text: string, turnIndex: number) => void; // 사용자 메시지 저장 알림
   onError?: (error: string) => void;
   onSessionTerminated?: (reason: string) => void;
 }
@@ -41,6 +42,7 @@ export function useRealtimeVoice({
   onMessage,
   onMessageComplete,
   onUserTranscription,
+  onUserMessageSaved,
   onError,
   onSessionTerminated,
 }: UseRealtimeVoiceProps): UseRealtimeVoiceReturn {
@@ -80,6 +82,7 @@ export function useRealtimeVoice({
   const onMessageRef = useRef(onMessage);
   const onMessageCompleteRef = useRef(onMessageComplete);
   const onUserTranscriptionRef = useRef(onUserTranscription);
+  const onUserMessageSavedRef = useRef(onUserMessageSaved);
   const onErrorRef = useRef(onError);
   const onSessionTerminatedRef = useRef(onSessionTerminated);
   
@@ -87,9 +90,10 @@ export function useRealtimeVoice({
     onMessageRef.current = onMessage;
     onMessageCompleteRef.current = onMessageComplete;
     onUserTranscriptionRef.current = onUserTranscription;
+    onUserMessageSavedRef.current = onUserMessageSaved;
     onErrorRef.current = onError;
     onSessionTerminatedRef.current = onSessionTerminated;
-  }, [onMessage, onMessageComplete, onUserTranscription, onError, onSessionTerminated]);
+  }, [onMessage, onMessageComplete, onUserTranscription, onUserMessageSaved, onError, onSessionTerminated]);
 
   const getWebSocketUrl = useCallback((token: string) => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -474,6 +478,13 @@ export function useRealtimeVoice({
 
             case 'ai.message.saved':
               console.log('💾 AI message saved:', data.text?.substring(0, 50));
+              break;
+
+            case 'user.message.saved':
+              console.log('💾 User message saved:', data.text?.substring(0, 50), 'turnIndex:', data.turnIndex);
+              if (onUserMessageSavedRef.current && data.text) {
+                onUserMessageSavedRef.current(data.text, data.turnIndex || 0);
+              }
               break;
 
             case 'ai.message.failed':

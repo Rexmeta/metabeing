@@ -1367,6 +1367,17 @@ export class RealtimeVoiceService {
         });
         console.log(`💾 Chat message saved: personaRunId=${personaRunId}, turnIndex=${nextTurnIndex}, sender=${sender}`);
         
+        // 🔧 사용자 메시지 저장 후 클라이언트에 알림 전송
+        if (sender === 'user' && session) {
+          this.sendToClient(session, { 
+            type: 'user.message.saved', 
+            text: message,
+            turnIndex: nextTurnIndex,
+            personaRunId: personaRunId
+          });
+          console.log(`📤 Sent user.message.saved event to client: "${message.substring(0, 30)}..."`);
+        }
+        
         // 메시지 미리보기 생성 (최대 50자)
         const messagePreview = message.length > 50 ? message.substring(0, 50) + '...' : message;
         
