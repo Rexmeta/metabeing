@@ -144,10 +144,14 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
       initialMessagesLoadedRef.current = false;
       loadedMessagesCountRef.current = 0;
       setLocalMessages([]); // 이전 메시지 클리어
+      // 기존 대화 기록 여부에 따라 showInputMode 재설정
+      const hasExistingMessages = (initialMessages?.length || 0) > 0;
+      setShowInputMode(hasExistingMessages);
+      console.log(`🔄 showInputMode 재설정: ${hasExistingMessages} (initialMessages: ${initialMessages?.length || 0}개)`);
       previousConversationIdRef.current = conversationId;
       previousPersonaRunIdRef.current = personaRunId;
     }
-  }, [conversationId, personaRunId]);
+  }, [conversationId, personaRunId, initialMessages]);
 
   useEffect(() => {
     // 초기 메시지가 있고 (아직 로드하지 않았거나 메시지 개수가 변경되었으면) 로드
