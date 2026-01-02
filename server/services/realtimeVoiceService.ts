@@ -402,7 +402,7 @@ export class RealtimeVoiceService {
       messageIndex: initialMessageIndex, // Atomic message counter - initialized from DB
       saveQueue: Promise.resolve(), // Serialization queue starts resolved
       savedMessageIds: new Set<string>(), // Idempotent guard for duplicate message saves
-      currentResponseMode: 'voice', // 기본값: 음성 응답 (첫 인사는 음성으로)
+      currentResponseMode: 'text', // 기본값: 텍스트 응답 (마이크 클릭 전까지 텍스트만)
     };
 
     this.sessions.set(sessionId, session);
@@ -740,6 +740,11 @@ export class RealtimeVoiceService {
       // Skip audio if interrupted (barge-in active)
       if (session.isInterrupted) {
         console.log(`🔇 Suppressing audio (barge-in active)`);
+        return;
+      }
+      // Skip audio if response mode is text-only (텍스트 입력 → 텍스트 응답만)
+      if (session.currentResponseMode === 'text') {
+        // 로그 과다 방지: 매번 로그 출력하지 않음
         return;
       }
       console.log('🔊 Audio data received (top-level)');
