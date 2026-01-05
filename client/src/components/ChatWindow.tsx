@@ -1686,11 +1686,11 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Chat Messages Area */}
           {chatMode === 'messenger' && (
-            <div className="flex flex-col flex-1 min-h-0">
-              <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-gradient-to-b from-slate-50 to-white scroll-smooth" data-testid="chat-messages">
+            <div className="flex flex-col flex-1 min-h-0 h-full">
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-gradient-to-b from-slate-50 to-white scroll-smooth min-h-0" data-testid="chat-messages">
                 {localMessages.map((message: ConversationMessage, index: number) => (
                 <div
                   key={index}
@@ -1773,8 +1773,8 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
               <div ref={messagesEndRef} />
               </div>
 
-              {/* Chat Input Area */}
-              <div className="border-t border-slate-100 bg-white p-6 shadow-[0_-4px_20px_-8px_rgba(0,0,0,0.1)]">
+              {/* Chat Input Area - 하단 고정 */}
+              <div className="flex-shrink-0 border-t border-slate-100 bg-white p-4 sm:p-6 shadow-[0_-4px_20px_-8px_rgba(0,0,0,0.1)]">
                 {currentTurnCount >= maxTurns ? (
                   <div className="text-center space-y-4">
                     <div className="text-lg font-semibold text-slate-700">
