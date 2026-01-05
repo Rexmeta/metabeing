@@ -1805,8 +1805,8 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                   </div>
                 ) : inputMode === 'realtime-voice' ? (
                   <>
-                    {/* 대화 시작 전 상태 */}
-                    {realtimeVoice.status === 'disconnected' && (
+                    {/* 대화 시작 전 상태 - 기존 대화가 없을 때만 표시 */}
+                    {realtimeVoice.status === 'disconnected' && localMessages.length === 0 && (
                       <div className="text-center space-y-4 py-4">
                         <p className="text-sm text-slate-600">실시간 음성 대화를 시작하세요</p>
                         <Button
@@ -1817,6 +1817,50 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                           <i className="fas fa-phone mr-2"></i>
                           대화 시작하기
                         </Button>
+                      </div>
+                    )}
+                    
+                    {/* 기존 대화가 있을 때 - 바로 입력창 표시 (disconnected 상태에서도) */}
+                    {realtimeVoice.status === 'disconnected' && localMessages.length > 0 && (
+                      <div className="flex items-center justify-center gap-4 py-2">
+                        {/* 중앙 마이크 버튼 */}
+                        <button
+                          onClick={() => realtimeVoice.connect(localMessages.some(m => m.sender === 'user'))}
+                          className="relative w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:scale-105"
+                          data-testid="button-realtime-voice-reconnect"
+                          title="음성 대화 시작"
+                        >
+                          <i className="fas fa-microphone text-xl"></i>
+                        </button>
+                        
+                        {/* 텍스트 입력 영역 */}
+                        <div className="flex items-center gap-2 flex-1 max-w-full">
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={userInput}
+                              onChange={(e) => setUserInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey && userInput.trim()) {
+                                  e.preventDefault();
+                                  handleSendMessage();
+                                }
+                              }}
+                              placeholder="메시지를 입력하세요..."
+                              className="w-full px-4 py-2 rounded-full border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                              data-testid="input-chat-reconnect"
+                            />
+                          </div>
+                          <Button
+                            onClick={handleSendMessage}
+                            disabled={!userInput.trim() || isLoading}
+                            size="icon"
+                            className="bg-purple-600 hover:bg-purple-700 rounded-full shrink-0"
+                            data-testid="button-send-reconnect"
+                          >
+                            <i className="fas fa-paper-plane"></i>
+                          </Button>
+                        </div>
                       </div>
                     )}
                     
