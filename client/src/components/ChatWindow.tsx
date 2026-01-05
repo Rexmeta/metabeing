@@ -1387,7 +1387,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   };
 
   return (
-    <div className="chat-window flex flex-col h-full w-full overflow-hidden">
+    <div className="chat-window flex flex-col h-full max-h-full w-full overflow-hidden">
       {isInitialLoading && (
         <div 
           className={`fixed inset-0 z-50 bg-black flex items-center justify-center transition-opacity duration-500 ${
@@ -1398,7 +1398,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
           <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
         </div>
       )}
-      <div className="bg-white shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0 relative">
+      <div className="bg-white shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0 max-h-full relative">
         {/* Chat Header - 상단 고정 */}
         <div className="flex-shrink-0 bg-gradient-to-r from-corporate-600 to-corporate-700 px-4 sm:px-6 py-3 sm:py-4 text-white">
           <div className="flex items-center justify-between gap-3">
@@ -1686,10 +1686,10 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 max-h-full overflow-hidden">
           {/* Chat Messages Area */}
           {chatMode === 'messenger' && (
-            <div className="flex flex-col flex-1 min-h-0 h-full">
+            <div className="flex flex-col flex-1 min-h-0 max-h-full overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-gradient-to-b from-slate-50 to-white scroll-smooth min-h-0" data-testid="chat-messages">
                 {localMessages.map((message: ConversationMessage, index: number) => (
                 <div

@@ -231,7 +231,7 @@ export default function PersonaChat() {
   const personaSnapshot = createPersonaSnapshotForChat(persona);
 
   return (
-    <div className={`h-full w-full relative transition-opacity duration-300 ${showChat ? 'opacity-100' : 'opacity-0'}`}>
+    <div className={`flex flex-col h-full w-full overflow-hidden transition-opacity duration-300 ${showChat ? 'opacity-100' : 'opacity-0'}`}>
       <ChatWindow
         scenario={dummyScenario}
         persona={personaSnapshot}
