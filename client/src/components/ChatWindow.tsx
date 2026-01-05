@@ -84,6 +84,55 @@ const formatSNSNumber = (num: number): string => {
   return num.toString();
 };
 
+// AI 응답에서 chain-of-thought, JSON wrapper, 불필요한 텍스트 정리
+const cleanAIResponse = (text: string | undefined | null): string => {
+  if (!text) return '';
+  
+  let cleaned = text;
+  
+  // 1. JSON 형식 {"content": "..."} 패턴 처리
+  if (cleaned.startsWith('{"content"')) {
+    try {
+      const parsed = JSON.parse(cleaned);
+      cleaned = typeof parsed.content === 'string' ? parsed.content : cleaned;
+    } catch {
+      // JSON 파싱 실패 시 정규식으로 추출 시도
+      const match = cleaned.match(/^\{"content":\s*"(.*)"\s*[,}]/s);
+      if (match) {
+        cleaned = match[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+      }
+    }
+  }
+  
+  // 2. Chain-of-thought 패턴 제거 (영어 사고 과정)
+  // "I'm processing..." / "Let me think..." / "My ENFJ instincts..." 등
+  const cotPatterns = [
+    /^I'm processing[^.]*\.[^]*?\n+/i,
+    /^Let me think[^.]*\.[^]*?\n+/i,
+    /^My [A-Z]{4} instincts[^.]*\.[^]*?\n+/i,
+    /^I'll start by[^.]*\.[^]*?\n+/i,
+    /^I hope to[^.]*\.[^]*?\n+/i,
+    /^I need to[^.]*\.[^]*?\n+/i,
+    /^I want to[^.]*\.[^]*?\n+/i,
+    /^I should[^.]*\.[^]*?\n+/i,
+    /^The user[^.]*\.[^]*?\n+/i,
+  ];
+  
+  for (const pattern of cotPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  
+  // 3. 복합 패턴: 여러 문장의 영어 사고 후 한국어 응답
+  // "I'm processing the user's... My ENFJ instincts... I'll start by...\n한국어응답"
+  const mixedPattern = /^(?:(?:I'm|I'll|I need|I want|I should|I hope|My|Let me|The user)[^\n]*\n)+/i;
+  cleaned = cleaned.replace(mixedPattern, '');
+  
+  // 4. 앞뒤 공백 정리
+  cleaned = cleaned.trim();
+  
+  return cleaned || text; // 정리 실패 시 원본 반환
+};
+
 interface ChatWindowProps {
   scenario: ComplexScenario;
   persona: ScenarioPersona;
@@ -283,10 +332,10 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
         setTimeout(() => setIsEmotionTransitioning(false), 150);
       }
       
-      // 완전한 AI 메시지를 대화창에 추가
+      // 완전한 AI 메시지를 대화창에 추가 (chain-of-thought 제거)
       setLocalMessages(prev => [...prev, {
         sender: 'ai',
-        message: message,
+        message: cleanAIResponse(message),
         timestamp: new Date().toISOString(),
         emotion: emotion || '중립',
         emotionReason: emotionReason || '',
@@ -561,7 +610,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
 
         const aiMessage: ConversationMessage = {
           sender: 'ai',
-          message: data.response,
+          message: cleanAIResponse(data.response),
           timestamp: new Date().toISOString(),
           emotion: data.emotion || '중립',
           emotionReason: data.emotionReason || ''
@@ -582,7 +631,11 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
       if (data.messages && data.messages.length > 0) {
         const latestMessage = data.messages[data.messages.length - 1];
         if (latestMessage.sender === 'ai') {
-          setLocalMessages(prev => [...prev, latestMessage]);
+          const cleanedMessage = {
+            ...latestMessage,
+            message: cleanAIResponse(latestMessage.message)
+          };
+          setLocalMessages(prev => [...prev, cleanedMessage]);
         }
       }
       
@@ -1841,9 +1894,12 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                               value={userInput}
                               onChange={(e) => setUserInput(e.target.value)}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey && userInput.trim()) {
+                                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                   e.preventDefault();
-                                  handleSendMessage();
+                                  const inputValue = (e.target as HTMLInputElement).value.trim();
+                                  if (inputValue && !isLoading) {
+                                    handleSendMessage();
+                                  }
                                 }
                               }}
                               placeholder="메시지를 입력하세요..."
@@ -1949,10 +2005,13 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                                 }
                               }}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey && userInput.trim()) {
+                                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                   e.preventDefault();
-                                  handleSendMessage();
-                                  setIsInputExpanded(false);
+                                  const inputValue = (e.target as HTMLInputElement).value.trim();
+                                  if (inputValue && !isLoading) {
+                                    handleSendMessage();
+                                    setIsInputExpanded(false);
+                                  }
                                 }
                               }}
                               placeholder={isInputExpanded ? "메시지 입력... (Enter로 전송)" : "텍스트로 대화"}
@@ -2343,9 +2402,12 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                                   value={userInput}
                                   onChange={(e) => setUserInput(e.target.value)}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey && userInput.trim()) {
+                                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                       e.preventDefault();
-                                      handleSendMessage();
+                                      const inputValue = (e.target as HTMLInputElement).value.trim();
+                                      if (inputValue && !isLoading) {
+                                        handleSendMessage();
+                                      }
                                     }
                                   }}
                                   placeholder="메시지를 입력하세요..."
@@ -2455,10 +2517,13 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                                     }
                                   }}
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey && userInput.trim()) {
+                                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                       e.preventDefault();
-                                      handleSendMessage();
-                                      setIsInputExpanded(false);
+                                      const inputValue = (e.target as HTMLInputElement).value.trim();
+                                      if (inputValue && !isLoading) {
+                                        handleSendMessage();
+                                        setIsInputExpanded(false);
+                                      }
                                     }
                                   }}
                                   placeholder={isInputExpanded ? "메시지 입력... (Enter로 전송)" : "텍스트로 대화"}
