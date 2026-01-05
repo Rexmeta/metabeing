@@ -26,6 +26,7 @@ import { generateScenarioWithAI, enhanceScenarioWithAI } from "./services/aiScen
 import { realtimeVoiceService } from "./services/realtimeVoiceService";
 import { generateIntroVideo, deleteIntroVideo, getVideoGenerationStatus } from "./services/gemini-video-generator";
 import { GlobalPersonaCache } from "./utils/globalPersonaCache";
+import { memoryService } from "./services/memoryService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 이메일 기반 인증 시스템 설정
@@ -1573,10 +1574,21 @@ ${personaSnapshot.name}:`;
       };
 
       // 사용자가 선택한 난이도를 시나리오 객체에 적용
-      const scenarioWithUserDifficulty = {
+      let scenarioWithUserDifficulty: any = {
         ...scenarioObj,
-        difficulty: personaRun.difficulty || scenarioRun.difficulty // 사용자가 선택한 난이도 사용
+        difficulty: personaRun.difficulty || scenarioRun.difficulty
       };
+      
+      // ✨ 페르소나 직접 대화인 경우 메모리 컨텍스트 주입
+      if (scenarioRun.conversationType === 'persona_direct') {
+        const memoryContext = await memoryService.getMemoryContextForPrompt(scenarioRun.userId, personaId);
+        if (memoryContext) {
+          scenarioWithUserDifficulty = {
+            ...scenarioWithUserDifficulty,
+            context: (scenarioWithUserDifficulty.context || '') + memoryContext
+          };
+        }
+      }
 
       // ✨ 메시지를 ConversationMessage 형식으로 변환
       const messagesForAI = (isSkipTurn ? existingMessages : [...existingMessages, {
@@ -1632,6 +1644,18 @@ ${personaSnapshot.name}:`;
 
       // ✨ 업데이트된 메시지 목록 조회
       const updatedMessages = await storage.getChatMessagesByPersonaRun(personaRunId);
+      
+      // ✨ 메모리 처리 (비동기, 논블로킹)
+      const isPersonaDirectChat = scenarioRun.conversationType === 'persona_direct';
+      if (isPersonaDirectChat) {
+        memoryService.processConversationMemory(
+          scenarioRun.userId,
+          personaRun.personaId,
+          personaRunId,
+          updatedMessages,
+          isCompleted
+        ).catch(err => console.error('Memory processing error:', err));
+      }
       
       // ✨ 응답 형식을 기존과 동일하게 유지 (호환성)
       const messagesInOldFormat = (updatedMessages || []).map(msg => ({
