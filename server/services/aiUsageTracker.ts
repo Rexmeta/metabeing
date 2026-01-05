@@ -32,6 +32,7 @@ export type AIFeature =
   | 'realtime'
   | 'image'
   | 'video'
+  | 'memory'
   | 'other';
 
 export type AIProvider = 'gemini' | 'openai' | 'anthropic' | 'other';
