@@ -92,7 +92,38 @@ export class OptimizedGeminiProvider implements AIServiceInterface {
       });
 
       const responseText = this.extractResponseText(response);
-      const responseData = JSON.parse(responseText || '{"content": "죄송합니다. 응답을 생성할 수 없습니다.", "emotion": "중립", "emotionReason": "시스템 오류"}');
+      
+      // 강화된 JSON 파싱 로직
+      let responseData: { content?: any; emotion?: string; emotionReason?: string };
+      try {
+        responseData = JSON.parse(responseText || '{}');
+      } catch (parseError) {
+        console.error("JSON parse error, using raw text:", parseError);
+        // JSON 파싱 실패 시 응답 텍스트를 content로 사용
+        responseData = { content: responseText, emotion: "중립", emotionReason: "응답 형식 변환" };
+      }
+      
+      // content가 문자열인지 확인하고, 객체나 다른 타입인 경우 처리
+      let finalContent = responseData.content;
+      if (typeof finalContent !== 'string') {
+        if (finalContent && typeof finalContent === 'object') {
+          // content가 객체인 경우 (중첩 JSON), content 필드 추출 시도
+          finalContent = finalContent.content || JSON.stringify(finalContent);
+        } else {
+          finalContent = "죄송합니다. 응답을 생성할 수 없습니다.";
+        }
+      }
+      
+      // content가 JSON 문자열로 시작하는 경우 재파싱 시도
+      if (finalContent.startsWith('{"content"')) {
+        try {
+          const innerParsed = JSON.parse(finalContent);
+          finalContent = innerParsed.content || finalContent;
+        } catch {
+          // 재파싱 실패 시 그대로 사용하되 JSON 부분 제거
+          finalContent = finalContent.replace(/^\{"content":\s*"?/, '').replace(/"?\}$/, '');
+        }
+      }
       
       const totalTime = Date.now() - startTime;
       console.log(`✓ Optimized Gemini call completed in ${totalTime}ms`);
@@ -109,7 +140,7 @@ export class OptimizedGeminiProvider implements AIServiceInterface {
       });
 
       return {
-        content: responseData.content || "죄송합니다. 응답을 생성할 수 없습니다.",
+        content: finalContent || "죄송합니다. 응답을 생성할 수 없습니다.",
         emotion: responseData.emotion || "중립",
         emotionReason: responseData.emotionReason || "시스템 오류로 기본 응답 제공"
       };
