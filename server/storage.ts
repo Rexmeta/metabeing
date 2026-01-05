@@ -1,4 +1,4 @@
-import { type Conversation, type InsertConversation, type Feedback, type InsertFeedback, type PersonaSelection, type StrategyChoice, type SequenceAnalysis, type User, type UpsertUser, type ScenarioRun, type InsertScenarioRun, type PersonaRun, type InsertPersonaRun, type ChatMessage, type InsertChatMessage, type Category, type InsertCategory, type SystemSetting, type AiUsageLog, type InsertAiUsageLog, type AiUsageSummary, type AiUsageByFeature, type AiUsageByModel, type AiUsageDaily, type GuestSession, conversations, feedbacks, users, scenarioRuns, personaRuns, chatMessages, categories, systemSettings, aiUsageLogs, guestSessions } from "@shared/schema";
+import { type Conversation, type InsertConversation, type Feedback, type InsertFeedback, type PersonaSelection, type StrategyChoice, type SequenceAnalysis, type User, type UpsertUser, type ScenarioRun, type InsertScenarioRun, type PersonaRun, type InsertPersonaRun, type ChatMessage, type InsertChatMessage, type Category, type InsertCategory, type SystemSetting, type AiUsageLog, type InsertAiUsageLog, type AiUsageSummary, type AiUsageByFeature, type AiUsageByModel, type AiUsageDaily, type GuestSession, type PersonaMemory, type InsertPersonaMemory, type PersonaRunSummary, type InsertPersonaRunSummary, type MemoryContext, conversations, feedbacks, users, scenarioRuns, personaRuns, chatMessages, categories, systemSettings, aiUsageLogs, guestSessions, personaMemories, personaRunSummaries } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
@@ -147,6 +147,32 @@ export interface IStorage {
   incrementGuestConversationCount(id: string): Promise<GuestSession>;
   incrementGuestTurnCount(id: string): Promise<GuestSession>;
   deleteExpiredGuestSessions(): Promise<number>;
+  
+  // ============================================
+  // Long-term Memory System - 롱텀 메모리 시스템
+  // ============================================
+  
+  // Persona Memories - 장기 기억 (사용자-페르소나 핵심 정보)
+  createPersonaMemory(memory: InsertPersonaMemory): Promise<PersonaMemory>;
+  getPersonaMemories(userId: string, personaId: string, limit?: number): Promise<PersonaMemory[]>;
+  getPersonaMemoriesByType(userId: string, personaId: string, memoryType: string): Promise<PersonaMemory[]>;
+  updatePersonaMemory(id: string, updates: Partial<PersonaMemory>): Promise<PersonaMemory>;
+  deletePersonaMemory(id: string): Promise<void>;
+  incrementMemoryAccessCount(id: string): Promise<void>;
+  deleteOldLowImportanceMemories(userId: string, personaId: string, keepCount: number): Promise<number>;
+  
+  // Persona Run Summaries - 대화 요약 (에피소드 기억)
+  createPersonaRunSummary(summary: InsertPersonaRunSummary): Promise<PersonaRunSummary>;
+  getPersonaRunSummary(personaRunId: string): Promise<PersonaRunSummary | undefined>;
+  getRecentPersonaRunSummaries(userId: string, personaId: string, limit?: number): Promise<PersonaRunSummary[]>;
+  updatePersonaRunSummary(id: string, updates: Partial<PersonaRunSummary>): Promise<PersonaRunSummary>;
+  
+  // Memory Context - 프롬프트 주입용 컨텍스트 조합
+  getMemoryContext(userId: string, personaId: string): Promise<MemoryContext>;
+  
+  // Chat Messages with Pagination - 대화 히스토리 페이지네이션
+  getChatMessagesByPersonaRunPaginated(personaRunId: string, beforeId?: string, limit?: number): Promise<{ messages: ChatMessage[]; hasMore: boolean }>;
+  getConversationHistory(userId: string, personaId: string, limit?: number): Promise<{ personaRuns: PersonaRun[]; totalTurnCount: number; firstConversationAt: Date | null }>;
 }
 
 export class MemStorage implements IStorage {
@@ -581,6 +607,79 @@ export class MemStorage implements IStorage {
   
   async getAiUsageLogs(_startDate: Date, _endDate: Date, _limit?: number): Promise<AiUsageLog[]> {
     return [];
+  }
+  
+  // Guest Session - MemStorage stubs
+  async createGuestSession(_ipAddress: string, _sessionToken: string): Promise<GuestSession> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getGuestSessionByToken(_sessionToken: string): Promise<GuestSession | undefined> {
+    return undefined;
+  }
+  async getGuestSessionByIp(_ipAddress: string): Promise<GuestSession | undefined> {
+    return undefined;
+  }
+  async updateGuestSession(_id: string, _updates: Partial<GuestSession>): Promise<GuestSession> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async incrementGuestConversationCount(_id: string): Promise<GuestSession> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async incrementGuestTurnCount(_id: string): Promise<GuestSession> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deleteExpiredGuestSessions(): Promise<number> {
+    return 0;
+  }
+  
+  // Long-term Memory - MemStorage stubs
+  async createPersonaMemory(_memory: InsertPersonaMemory): Promise<PersonaMemory> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getPersonaMemories(_userId: string, _personaId: string, _limit?: number): Promise<PersonaMemory[]> {
+    return [];
+  }
+  async getPersonaMemoriesByType(_userId: string, _personaId: string, _memoryType: string): Promise<PersonaMemory[]> {
+    return [];
+  }
+  async updatePersonaMemory(_id: string, _updates: Partial<PersonaMemory>): Promise<PersonaMemory> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async deletePersonaMemory(_id: string): Promise<void> {
+    // no-op
+  }
+  async incrementMemoryAccessCount(_id: string): Promise<void> {
+    // no-op
+  }
+  async deleteOldLowImportanceMemories(_userId: string, _personaId: string, _keepCount: number): Promise<number> {
+    return 0;
+  }
+  async createPersonaRunSummary(_summary: InsertPersonaRunSummary): Promise<PersonaRunSummary> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getPersonaRunSummary(_personaRunId: string): Promise<PersonaRunSummary | undefined> {
+    return undefined;
+  }
+  async getRecentPersonaRunSummaries(_userId: string, _personaId: string, _limit?: number): Promise<PersonaRunSummary[]> {
+    return [];
+  }
+  async updatePersonaRunSummary(_id: string, _updates: Partial<PersonaRunSummary>): Promise<PersonaRunSummary> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getMemoryContext(_userId: string, _personaId: string): Promise<MemoryContext> {
+    return {
+      longTermMemories: [],
+      recentSummaries: [],
+      lastConversationPreview: "",
+      totalConversationCount: 0,
+      relationshipDuration: "첫 대화"
+    };
+  }
+  async getChatMessagesByPersonaRunPaginated(_personaRunId: string, _beforeId?: string, _limit?: number): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
+    return { messages: [], hasMore: false };
+  }
+  async getConversationHistory(_userId: string, _personaId: string, _limit?: number): Promise<{ personaRuns: PersonaRun[]; totalTurnCount: number; firstConversationAt: Date | null }> {
+    return { personaRuns: [], totalTurnCount: 0, firstConversationAt: null };
   }
 }
 
@@ -1841,6 +1940,282 @@ export class PostgreSQLStorage implements IStorage {
     const result = await db.delete(guestSessions)
       .where(lte(guestSessions.expiresAt, new Date()));
     return 0; // Drizzle doesn't return count easily, just return 0
+  }
+  
+  // ============================================
+  // Long-term Memory System Implementation
+  // ============================================
+  
+  // Persona Memories - 장기 기억
+  async createPersonaMemory(memory: InsertPersonaMemory): Promise<PersonaMemory> {
+    const [result] = await db.insert(personaMemories).values(memory).returning();
+    return result;
+  }
+  
+  async getPersonaMemories(userId: string, personaId: string, limit: number = 20): Promise<PersonaMemory[]> {
+    try {
+      const result = await withRetry(async () =>
+        db.select()
+          .from(personaMemories)
+          .where(and(
+            eq(personaMemories.userId, userId),
+            eq(personaMemories.personaId, personaId)
+          ))
+          .orderBy(desc(personaMemories.importanceScore), desc(personaMemories.lastAccessedAt))
+          .limit(limit)
+      );
+      return result || [];
+    } catch (error) {
+      console.error('getPersonaMemories error:', error);
+      return [];
+    }
+  }
+  
+  async getPersonaMemoriesByType(userId: string, personaId: string, memoryType: string): Promise<PersonaMemory[]> {
+    try {
+      const result = await withRetry(async () =>
+        db.select()
+          .from(personaMemories)
+          .where(and(
+            eq(personaMemories.userId, userId),
+            eq(personaMemories.personaId, personaId),
+            eq(personaMemories.memoryType, memoryType)
+          ))
+          .orderBy(desc(personaMemories.importanceScore))
+      );
+      return result || [];
+    } catch (error) {
+      console.error('getPersonaMemoriesByType error:', error);
+      return [];
+    }
+  }
+  
+  async updatePersonaMemory(id: string, updates: Partial<PersonaMemory>): Promise<PersonaMemory> {
+    const [result] = await db.update(personaMemories)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(personaMemories.id, id))
+      .returning();
+    return result;
+  }
+  
+  async deletePersonaMemory(id: string): Promise<void> {
+    await db.delete(personaMemories).where(eq(personaMemories.id, id));
+  }
+  
+  async incrementMemoryAccessCount(id: string): Promise<void> {
+    await db.update(personaMemories)
+      .set({
+        accessCount: sqlBuilder`${personaMemories.accessCount} + 1`,
+        lastAccessedAt: new Date()
+      })
+      .where(eq(personaMemories.id, id));
+  }
+  
+  async deleteOldLowImportanceMemories(userId: string, personaId: string, keepCount: number): Promise<number> {
+    // 중요도 낮고 오래된 메모리 정리 (keepCount개 이상일 때)
+    const memories = await this.getPersonaMemories(userId, personaId, 1000);
+    if (memories.length <= keepCount) return 0;
+    
+    // 중요도 낮은 순으로 정렬 후 삭제
+    const toDelete = memories
+      .sort((a, b) => a.importanceScore - b.importanceScore || 
+        (a.lastAccessedAt?.getTime() || 0) - (b.lastAccessedAt?.getTime() || 0))
+      .slice(0, memories.length - keepCount);
+    
+    for (const mem of toDelete) {
+      await this.deletePersonaMemory(mem.id);
+    }
+    return toDelete.length;
+  }
+  
+  // Persona Run Summaries - 대화 요약
+  async createPersonaRunSummary(summary: InsertPersonaRunSummary): Promise<PersonaRunSummary> {
+    const [result] = await db.insert(personaRunSummaries).values(summary).returning();
+    return result;
+  }
+  
+  async getPersonaRunSummary(personaRunId: string): Promise<PersonaRunSummary | undefined> {
+    try {
+      const result = await withRetry(async () =>
+        db.select()
+          .from(personaRunSummaries)
+          .where(eq(personaRunSummaries.personaRunId, personaRunId))
+          .orderBy(desc(personaRunSummaries.createdAt))
+          .limit(1)
+      );
+      return result?.[0];
+    } catch (error) {
+      console.error('getPersonaRunSummary error:', error);
+      return undefined;
+    }
+  }
+  
+  async getRecentPersonaRunSummaries(userId: string, personaId: string, limit: number = 5): Promise<PersonaRunSummary[]> {
+    try {
+      const result = await withRetry(async () =>
+        db.select()
+          .from(personaRunSummaries)
+          .where(and(
+            eq(personaRunSummaries.userId, userId),
+            eq(personaRunSummaries.personaId, personaId)
+          ))
+          .orderBy(desc(personaRunSummaries.createdAt))
+          .limit(limit)
+      );
+      return result || [];
+    } catch (error) {
+      console.error('getRecentPersonaRunSummaries error:', error);
+      return [];
+    }
+  }
+  
+  async updatePersonaRunSummary(id: string, updates: Partial<PersonaRunSummary>): Promise<PersonaRunSummary> {
+    const [result] = await db.update(personaRunSummaries)
+      .set(updates)
+      .where(eq(personaRunSummaries.id, id))
+      .returning();
+    return result;
+  }
+  
+  // Memory Context - 프롬프트 주입용 컨텍스트 조합
+  async getMemoryContext(userId: string, personaId: string): Promise<MemoryContext> {
+    try {
+      // 1. 장기 기억 조회 (최대 10개, 중요도순)
+      const longTermMemories = await this.getPersonaMemories(userId, personaId, 10);
+      
+      // 2. 최근 대화 요약 조회 (최대 3개)
+      const recentSummaries = await this.getRecentPersonaRunSummaries(userId, personaId, 3);
+      
+      // 3. 대화 히스토리 정보
+      const history = await this.getConversationHistory(userId, personaId, 10);
+      
+      // 4. 마지막 대화 미리보기 생성
+      let lastConversationPreview = "";
+      if (history.personaRuns.length > 0) {
+        const lastRun = history.personaRuns[0];
+        lastConversationPreview = lastRun.lastMessage || "";
+      }
+      
+      // 5. 관계 기간 계산
+      let relationshipDuration = "첫 대화";
+      if (history.firstConversationAt) {
+        const days = Math.floor((Date.now() - history.firstConversationAt.getTime()) / (1000 * 60 * 60 * 24));
+        if (days === 0) relationshipDuration = "오늘 처음";
+        else if (days === 1) relationshipDuration = "어제부터";
+        else if (days < 7) relationshipDuration = `${days}일 전부터`;
+        else if (days < 30) relationshipDuration = `${Math.floor(days / 7)}주 전부터`;
+        else relationshipDuration = `${Math.floor(days / 30)}개월 전부터`;
+      }
+      
+      // 접근 횟수 증가 (백그라운드)
+      for (const memory of longTermMemories) {
+        this.incrementMemoryAccessCount(memory.id).catch(() => {});
+      }
+      
+      return {
+        longTermMemories,
+        recentSummaries,
+        lastConversationPreview,
+        totalConversationCount: history.personaRuns.length,
+        relationshipDuration
+      };
+    } catch (error) {
+      console.error('getMemoryContext error:', error);
+      return {
+        longTermMemories: [],
+        recentSummaries: [],
+        lastConversationPreview: "",
+        totalConversationCount: 0,
+        relationshipDuration: "첫 대화"
+      };
+    }
+  }
+  
+  // Chat Messages with Pagination - 커서 기반 페이지네이션
+  async getChatMessagesByPersonaRunPaginated(
+    personaRunId: string, 
+    beforeId?: string, 
+    limit: number = 50
+  ): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
+    try {
+      let query = db.select()
+        .from(chatMessages)
+        .where(eq(chatMessages.personaRunId, personaRunId));
+      
+      // 커서 기반 페이지네이션: beforeId 이전 메시지만
+      if (beforeId) {
+        const [beforeMsg] = await db.select()
+          .from(chatMessages)
+          .where(eq(chatMessages.id, beforeId));
+        if (beforeMsg) {
+          query = db.select()
+            .from(chatMessages)
+            .where(and(
+              eq(chatMessages.personaRunId, personaRunId),
+              sqlBuilder`${chatMessages.turnIndex} < ${beforeMsg.turnIndex}`
+            ));
+        }
+      }
+      
+      const result = await withRetry(async () =>
+        query.orderBy(desc(chatMessages.turnIndex)).limit(limit + 1)
+      );
+      
+      const hasMore = (result?.length || 0) > limit;
+      const messages = (result || []).slice(0, limit).reverse(); // 오래된 순으로 정렬
+      
+      return { messages, hasMore };
+    } catch (error) {
+      console.error('getChatMessagesByPersonaRunPaginated error:', error);
+      return { messages: [], hasMore: false };
+    }
+  }
+  
+  // Conversation History - 대화 히스토리
+  async getConversationHistory(
+    userId: string, 
+    personaId: string, 
+    limit: number = 20
+  ): Promise<{ personaRuns: PersonaRun[]; totalTurnCount: number; firstConversationAt: Date | null }> {
+    try {
+      // 해당 사용자-페르소나 조합의 모든 personaRun 조회
+      const runs = await withRetry(async () =>
+        db.select()
+          .from(personaRuns)
+          .innerJoin(scenarioRuns, eq(personaRuns.scenarioRunId, scenarioRuns.id))
+          .where(and(
+            eq(scenarioRuns.userId, userId),
+            eq(personaRuns.personaId, personaId)
+          ))
+          .orderBy(desc(personaRuns.lastActivityAt))
+          .limit(limit)
+      );
+      
+      const personaRunsList = runs?.map(r => r.persona_runs) || [];
+      const totalTurnCount = personaRunsList.reduce((sum, r) => sum + (r.turnCount || 0), 0);
+      
+      // 첫 대화 시간 조회
+      let firstConversationAt: Date | null = null;
+      if (personaRunsList.length > 0) {
+        const oldest = await withRetry(async () =>
+          db.select({ startedAt: personaRuns.startedAt })
+            .from(personaRuns)
+            .innerJoin(scenarioRuns, eq(personaRuns.scenarioRunId, scenarioRuns.id))
+            .where(and(
+              eq(scenarioRuns.userId, userId),
+              eq(personaRuns.personaId, personaId)
+            ))
+            .orderBy(asc(personaRuns.startedAt))
+            .limit(1)
+        );
+        firstConversationAt = oldest?.[0]?.startedAt || null;
+      }
+      
+      return { personaRuns: personaRunsList, totalTurnCount, firstConversationAt };
+    } catch (error) {
+      console.error('getConversationHistory error:', error);
+      return { personaRuns: [], totalTurnCount: 0, firstConversationAt: null };
+    }
   }
 }
 

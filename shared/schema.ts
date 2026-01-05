@@ -723,3 +723,102 @@ export const insertGuestSessionSchema = createInsertSchema(guestSessions).omit({
 
 export type InsertGuestSession = z.infer<typeof insertGuestSessionSchema>;
 export type GuestSession = typeof guestSessions.$inferSelect;
+
+// ============================================
+// 롱텀 메모리 시스템 테이블
+// ============================================
+
+// 페르소나별 장기 메모리 - 사용자-페르소나 간 핵심 정보 저장
+export const personaMemories = pgTable("persona_memories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  personaId: text("persona_id").notNull(), // 페르소나 ID (MBTI 타입 또는 캐릭터 ID)
+  
+  // 메모리 내용
+  memoryType: text("memory_type").notNull().default("fact"), // fact, preference, relationship, context
+  content: text("content").notNull(), // 메모리 내용 (예: "사용자는 개발자이다", "커피를 좋아함")
+  keywords: text("keywords").array(), // 검색용 키워드
+  
+  // 중요도 및 관련성
+  importanceScore: integer("importance_score").notNull().default(5), // 1-10, 높을수록 중요
+  accessCount: integer("access_count").notNull().default(0), // 사용 횟수 (자주 참조될수록 중요)
+  
+  // 출처 추적
+  sourcePersonaRunId: varchar("source_persona_run_id").references(() => personaRuns.id, { onDelete: 'set null' }),
+  sourceTurnIndex: integer("source_turn_index"), // 메모리가 추출된 대화 턴
+  
+  // 타임스탬프
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  lastAccessedAt: timestamp("last_accessed_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  // 사용자-페르소나 조합으로 메모리 조회 최적화
+  index("idx_persona_memories_user_persona").on(table.userId, table.personaId),
+  // 중요도 기반 정렬 최적화
+  index("idx_persona_memories_importance").on(table.userId, table.personaId, table.importanceScore),
+  // 최근 접근 기반 정렬
+  index("idx_persona_memories_last_accessed").on(table.lastAccessedAt),
+  // 메모리 타입 필터링
+  index("idx_persona_memories_type").on(table.memoryType),
+]);
+
+// 대화 세션별 요약 - 에피소드 메모리
+export const personaRunSummaries = pgTable("persona_run_summaries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  personaRunId: varchar("persona_run_id").notNull().references(() => personaRuns.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  personaId: text("persona_id").notNull(),
+  
+  // 요약 내용
+  summary: text("summary").notNull(), // 대화 전체 요약
+  keyTopics: text("key_topics").array(), // 주요 주제들
+  userIntents: text("user_intents").array(), // 사용자의 주요 의도/목적
+  emotionalTone: text("emotional_tone"), // 대화의 전반적인 감정 톤
+  
+  // 메타데이터
+  turnCount: integer("turn_count").notNull().default(0),
+  startTurnIndex: integer("start_turn_index").notNull().default(0), // 요약 시작 턴
+  endTurnIndex: integer("end_turn_index").notNull().default(0), // 요약 끝 턴
+  
+  // 연속성 관리
+  previousSummaryId: varchar("previous_summary_id"), // 이전 요약 참조 (연속 대화용)
+  
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  // personaRun으로 요약 조회
+  index("idx_persona_run_summaries_run").on(table.personaRunId),
+  // 사용자-페르소나별 히스토리 조회
+  index("idx_persona_run_summaries_user_persona").on(table.userId, table.personaId),
+  // 최신순 정렬
+  index("idx_persona_run_summaries_created").on(table.createdAt),
+]);
+
+// Insert 스키마
+export const insertPersonaMemorySchema = createInsertSchema(personaMemories).omit({
+  id: true,
+  accessCount: true,
+  createdAt: true,
+  lastAccessedAt: true,
+  updatedAt: true,
+});
+
+export const insertPersonaRunSummarySchema = createInsertSchema(personaRunSummaries).omit({
+  id: true,
+  createdAt: true,
+});
+
+// 타입 정의
+export type InsertPersonaMemory = z.infer<typeof insertPersonaMemorySchema>;
+export type PersonaMemory = typeof personaMemories.$inferSelect;
+
+export type InsertPersonaRunSummary = z.infer<typeof insertPersonaRunSummarySchema>;
+export type PersonaRunSummary = typeof personaRunSummaries.$inferSelect;
+
+// 메모리 컨텍스트 타입 - 프롬프트에 주입할 때 사용
+export type MemoryContext = {
+  longTermMemories: PersonaMemory[]; // 핵심 장기 기억
+  recentSummaries: PersonaRunSummary[]; // 최근 대화 요약들
+  lastConversationPreview: string; // 마지막 대화 미리보기
+  totalConversationCount: number; // 총 대화 횟수
+  relationshipDuration: string; // 관계 기간 (예: "3일 전부터")
+};
