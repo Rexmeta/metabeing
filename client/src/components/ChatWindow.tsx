@@ -1387,7 +1387,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
   };
 
   return (
-    <div className="chat-window flex flex-col h-full w-full">
+    <div className="chat-window flex flex-col h-full w-full overflow-hidden">
       {isInitialLoading && (
         <div 
           className={`fixed inset-0 z-50 bg-black flex items-center justify-center transition-opacity duration-500 ${
@@ -1399,8 +1399,8 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
         </div>
       )}
       <div className="bg-white shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-1 min-h-0 relative">
-        {/* Chat Header */}
-        <div className="bg-gradient-to-r from-corporate-600 to-corporate-700 px-4 sm:px-6 py-3 sm:py-4 text-white">
+        {/* Chat Header - 상단 고정 */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-corporate-600 to-corporate-700 px-4 sm:px-6 py-3 sm:py-4 text-white">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
               {/* 원형 페르소나 아바타 */}
