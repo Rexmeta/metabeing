@@ -154,12 +154,14 @@ export interface IStorage {
   
   // Persona Memories - 장기 기억 (사용자-페르소나 핵심 정보)
   createPersonaMemory(memory: InsertPersonaMemory): Promise<PersonaMemory>;
+  getPersonaMemory(id: string): Promise<PersonaMemory | undefined>;
   getPersonaMemories(userId: string, personaId: string, limit?: number): Promise<PersonaMemory[]>;
   getPersonaMemoriesByType(userId: string, personaId: string, memoryType: string): Promise<PersonaMemory[]>;
   updatePersonaMemory(id: string, updates: Partial<PersonaMemory>): Promise<PersonaMemory>;
   deletePersonaMemory(id: string): Promise<void>;
   incrementMemoryAccessCount(id: string): Promise<void>;
   deleteOldLowImportanceMemories(userId: string, personaId: string, keepCount: number): Promise<number>;
+  getPersonaRelationshipStats(userId: string, personaId: string): Promise<{ totalConversations: number; totalTurns: number; firstConversationAt: Date | null; lastConversationAt: Date | null; memoryCount: number }>;
   
   // Persona Run Summaries - 대화 요약 (에피소드 기억)
   createPersonaRunSummary(summary: InsertPersonaRunSummary): Promise<PersonaRunSummary>;
@@ -653,6 +655,12 @@ export class MemStorage implements IStorage {
   }
   async deleteOldLowImportanceMemories(_userId: string, _personaId: string, _keepCount: number): Promise<number> {
     return 0;
+  }
+  async getPersonaMemory(_id: string): Promise<PersonaMemory | undefined> {
+    return undefined;
+  }
+  async getPersonaRelationshipStats(_userId: string, _personaId: string): Promise<{ totalConversations: number; totalTurns: number; firstConversationAt: Date | null; lastConversationAt: Date | null; memoryCount: number }> {
+    return { totalConversations: 0, totalTurns: 0, firstConversationAt: null, lastConversationAt: null, memoryCount: 0 };
   }
   async createPersonaRunSummary(_summary: InsertPersonaRunSummary): Promise<PersonaRunSummary> {
     throw new Error("Not implemented in MemStorage");
@@ -1998,8 +2006,56 @@ export class PostgreSQLStorage implements IStorage {
     return result;
   }
   
+  async getPersonaMemory(id: string): Promise<PersonaMemory | undefined> {
+    try {
+      const [result] = await db.select()
+        .from(personaMemories)
+        .where(eq(personaMemories.id, id))
+        .limit(1);
+      return result;
+    } catch (error) {
+      console.error('getPersonaMemory error:', error);
+      return undefined;
+    }
+  }
+  
   async deletePersonaMemory(id: string): Promise<void> {
     await db.delete(personaMemories).where(eq(personaMemories.id, id));
+  }
+  
+  async getPersonaRelationshipStats(userId: string, personaId: string): Promise<{
+    totalConversations: number;
+    totalTurns: number;
+    firstConversationAt: Date | null;
+    lastConversationAt: Date | null;
+    memoryCount: number;
+  }> {
+    try {
+      const history = await this.getConversationHistory(userId, personaId, 1000);
+      const memories = await this.getPersonaMemories(userId, personaId, 1000);
+      
+      let lastConversationAt: Date | null = null;
+      if (history.personaRuns.length > 0) {
+        lastConversationAt = history.personaRuns[0].lastActivityAt || history.personaRuns[0].startedAt;
+      }
+      
+      return {
+        totalConversations: history.personaRuns.length,
+        totalTurns: history.totalTurnCount,
+        firstConversationAt: history.firstConversationAt,
+        lastConversationAt,
+        memoryCount: memories.length
+      };
+    } catch (error) {
+      console.error('getPersonaRelationshipStats error:', error);
+      return {
+        totalConversations: 0,
+        totalTurns: 0,
+        firstConversationAt: null,
+        lastConversationAt: null,
+        memoryCount: 0
+      };
+    }
   }
   
   async incrementMemoryAccessCount(id: string): Promise<void> {

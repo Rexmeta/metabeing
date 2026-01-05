@@ -1645,8 +1645,7 @@ ${personaSnapshot.name}:`;
       // ✨ 업데이트된 메시지 목록 조회
       const updatedMessages = await storage.getChatMessagesByPersonaRun(personaRunId);
       
-      // ✨ 메모리 처리 (비동기, 논블로킹)
-      const isPersonaDirectChat = scenarioRun.conversationType === 'persona_direct';
+      // ✨ 메모리 처리 (비동기, 논블로킹) - 페르소나 직접 대화에서만 활성화
       if (isPersonaDirectChat) {
         memoryService.processConversationMemory(
           scenarioRun.userId,
@@ -5823,6 +5822,105 @@ ${personaSnapshot.name}:`;
   });
 
   console.log('✅ WebSocket server initialized at /api/realtime-voice');
+
+  // ==================== 메모리 관리 API ====================
+  
+  // 페이지네이션된 채팅 히스토리 조회
+  app.get("/api/conversations/:id/messages", isAuthenticated, async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.user?.id;
+      const personaRunId = req.params.id;
+      const { limit = 50, beforeId } = req.query;
+      
+      // 권한 확인
+      const personaRun = await storage.getPersonaRun(personaRunId);
+      if (!personaRun) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      
+      const scenarioRun = await storage.getScenarioRun(personaRun.scenarioRunId);
+      if (!scenarioRun || scenarioRun.userId !== userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      const result = await storage.getChatMessagesByPersonaRunPaginated(
+        personaRunId,
+        beforeId as string | undefined,
+        Number(limit)
+      );
+      
+      res.json({
+        messages: result.messages,
+        hasMore: result.hasMore
+      });
+    } catch (error) {
+      console.error("Messages fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+  
+  // 특정 페르소나에 대한 메모리 조회
+  app.get("/api/personas/:personaId/memories", isAuthenticated, async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.user?.id;
+      const { personaId } = req.params;
+      const { limit = 10 } = req.query;
+      
+      const memories = await storage.getPersonaMemories(userId, personaId, Number(limit));
+      
+      res.json({ memories });
+    } catch (error) {
+      console.error("Memories fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch memories" });
+    }
+  });
+  
+  // 메모리 삭제 (사용자가 특정 메모리 삭제 요청)
+  app.delete("/api/memories/:memoryId", isAuthenticated, async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.user?.id;
+      const { memoryId } = req.params;
+      
+      const memory = await storage.getPersonaMemory(memoryId);
+      if (!memory) {
+        return res.status(404).json({ error: "Memory not found" });
+      }
+      
+      if (memory.userId !== userId) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      await storage.deletePersonaMemory(memoryId);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Memory delete error:", error);
+      res.status(500).json({ error: "Failed to delete memory" });
+    }
+  });
+  
+  // 페르소나와의 관계 정보 조회 (대화 수, 첫 대화 날짜 등)
+  app.get("/api/personas/:personaId/relationship", isAuthenticated, async (req, res) => {
+    try {
+      // @ts-ignore
+      const userId = req.user?.id;
+      const { personaId } = req.params;
+      
+      const stats = await storage.getPersonaRelationshipStats(userId, personaId);
+      const memories = await storage.getPersonaMemories(userId, personaId, 5);
+      
+      res.json({
+        ...stats,
+        recentMemories: memories
+      });
+    } catch (error) {
+      console.error("Relationship fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch relationship" });
+    }
+  });
   
   return httpServer;
 }
