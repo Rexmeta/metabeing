@@ -1642,19 +1642,9 @@ ${personaSnapshot.name}:`;
         await checkAndCompleteScenario(personaRun.scenarioRunId);
       }
 
-      // ✨ 업데이트된 메시지 목록 조회
+      // ✨ 업데이트된 메시지 목록 조회 (최근 100개만)
       const updatedMessages = await storage.getChatMessagesByPersonaRun(personaRunId);
-      
-      // ✨ 메모리 처리 (비동기, 논블로킹) - 페르소나 직접 대화에서만 활성화
-      if (isPersonaDirectChat) {
-        memoryService.processConversationMemory(
-          scenarioRun.userId,
-          personaRun.personaId,
-          personaRunId,
-          updatedMessages,
-          isCompleted
-        ).catch(err => console.error('Memory processing error:', err));
-      }
+      const recentMessages = updatedMessages.slice(-100);
       
       // ✨ 응답 형식을 기존과 동일하게 유지 (호환성)
       const messagesInOldFormat = (updatedMessages || []).map(msg => ({
@@ -1684,6 +1674,19 @@ ${personaSnapshot.name}:`;
         messages: messagesInOldFormat, // 클라이언트에서 사용
         isCompleted,
       });
+      
+      // ✨ 메모리 처리 (응답 이후, 비동기, 논블로킹) - 페르소나 직접 대화에서만 활성화
+      if (isPersonaDirectChat && personaRun.personaId) {
+        setImmediate(() => {
+          memoryService.processConversationMemory(
+            scenarioRun.userId,
+            personaRun.personaId,
+            personaRunId,
+            recentMessages,
+            isCompleted
+          ).catch(err => console.error('Memory processing error:', err));
+        });
+      }
     } catch (error) {
       console.error("Message processing error:", error);
       res.status(500).json({ error: "Failed to process message" });

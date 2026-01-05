@@ -20,8 +20,8 @@ interface MemoryExtractionResult {
 interface SummaryGenerationResult {
   summary: string;
   keyTopics: string[];
-  emotionalTone: string;
-  turnCount: number;
+  emotionalTone?: string;
+  turnCount?: number;
 }
 
 const MEMORY_EXTRACTION_PROMPT = `당신은 대화 분석 전문가입니다. 사용자와 AI 캐릭터 간의 대화에서 장기적으로 기억할 가치가 있는 핵심 정보를 추출합니다.
@@ -106,7 +106,24 @@ export class MemoryService {
         return null;
       }
       
-      const parsed = JSON.parse(jsonMatch[0]) as MemoryExtractionResult;
+      let parsed: MemoryExtractionResult;
+      try {
+        const raw = JSON.parse(jsonMatch[0]);
+        if (!raw.memories || !Array.isArray(raw.memories)) {
+          console.error("Memory extraction: Invalid structure - missing memories array");
+          return null;
+        }
+        parsed = {
+          memories: raw.memories.filter((m: any) => 
+            typeof m.content === 'string' &&
+            typeof m.memoryType === 'string' &&
+            typeof m.importanceScore === 'number'
+          ).slice(0, 5)
+        };
+      } catch (parseError) {
+        console.error("Memory extraction: JSON parse error", parseError);
+        return null;
+      }
       
       await trackUsage({
         feature: "memory",
@@ -148,7 +165,23 @@ export class MemoryService {
         return null;
       }
       
-      const parsed = JSON.parse(jsonMatch[0]) as SummaryGenerationResult;
+      let parsed: SummaryGenerationResult;
+      try {
+        const raw = JSON.parse(jsonMatch[0]);
+        if (typeof raw.summary !== 'string') {
+          console.error("Summary generation: Invalid structure - missing summary");
+          return null;
+        }
+        parsed = {
+          summary: raw.summary.substring(0, 2000),
+          keyTopics: Array.isArray(raw.keyTopics) ? raw.keyTopics.slice(0, 5) : [],
+          emotionalTone: typeof raw.emotionalTone === 'string' ? raw.emotionalTone : undefined,
+          turnCount: typeof raw.turnCount === 'number' ? raw.turnCount : undefined
+        };
+      } catch (parseError) {
+        console.error("Summary generation: JSON parse error", parseError);
+        return null;
+      }
       
       await trackUsage({
         feature: "memory",

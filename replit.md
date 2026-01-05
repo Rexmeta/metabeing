@@ -38,7 +38,10 @@ Preferred communication style: Simple, everyday language.
 ## Data Storage
 - **ORM**: Drizzle ORM (PostgreSQL dialect)
 - **Database**: PostgreSQL (Neon serverless)
-- **Schema**: `conversations`, `feedbacks`, `users`, `categories`, `system_settings`, `ai_usage_logs` tables.
+- **Schema**: `conversations`, `feedbacks`, `users`, `categories`, `system_settings`, `ai_usage_logs`, `persona_memories`, `persona_run_summaries` tables.
+- **Long-term Memory System**: Dual-layer architecture for persona memory:
+    - `persona_memories`: Cross-session facts about users (preferences, relationships, events) with importance scores
+    - `persona_run_summaries`: Per-conversation episode summaries for context continuity
 
 ## Features
 - **Conversation Types**: Two conversation modes supported:
