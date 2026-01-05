@@ -96,8 +96,8 @@ const cleanAIResponse = (text: string | undefined | null): string => {
       const parsed = JSON.parse(cleaned);
       cleaned = typeof parsed.content === 'string' ? parsed.content : cleaned;
     } catch {
-      // JSON 파싱 실패 시 정규식으로 추출 시도
-      const match = cleaned.match(/^\{"content":\s*"(.*)"\s*[,}]/s);
+      // JSON 파싱 실패 시 정규식으로 추출 시도 ([\s\S]는 s 플래그 대신 사용)
+      const match = cleaned.match(/^\{"content":\s*"([\s\S]*)"\s*[,}]/);
       if (match) {
         cleaned = match[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
       }
@@ -1792,7 +1792,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                           }`
                     }`}>
                       <p className={`leading-relaxed ${message.sender === "user" ? "text-white" : "text-slate-700"}`}>
-                        {message.message}
+                        {message.sender === 'ai' ? cleanAIResponse(message.message) : message.message}
                       </p>
                     </div>
                     <span className="text-[10px] text-slate-400 mt-1 mx-1">
@@ -2353,7 +2353,7 @@ export default function ChatWindow({ scenario, persona, conversationId, personaR
                             {msg.sender === 'user' ? '나' : persona.name}:
                           </span>{' '}
                           <span className={msg.sender === 'user' ? 'text-blue-800' : 'text-slate-700'}>
-                            {msg.message}
+                            {msg.sender === 'ai' ? cleanAIResponse(msg.message) : msg.message}
                           </span>
                         </div>
                       ))}
